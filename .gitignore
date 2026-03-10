@@ -98,6 +98,35 @@ app.*.map.json
 **/ios/**/*sync/
 **/ios/**/.sconsign.dblite
 **/ios/**/.tags*
+
+# Docker ignores
+node_modules/
+.git/
+Dockerfile*
+.dockerignore
+*.log*
+coverage/
+
+# ESLint ignores
+dist/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Database files
+*.db
+*.sqlite
+database.sql
+
+# OS files
+Thumbs.db
+
+# IDE settings
+*.swp
+*.swo
+*~
 **/ios/**/.vagrant/
 **/ios/**/DerivedData/
 **/ios/**/Icon?

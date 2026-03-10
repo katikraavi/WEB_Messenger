@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database Service
+  postgres:
+    image: postgres:13-alpine
+    container_name: messenger-postgres
+    environment:
+      POSTGRES_USER: messenger_user
+      POSTGRES_PASSWORD: messenger_password
+      POSTGRES_DB: messenger_db
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U messenger_user -d messenger_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - messenger-network
+    restart: unless-stopped
+
+  # Serverpod Backend Service
+  serverpod:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: messenger-backend
+    environment:
+      DATABASE_URL: postgres://messenger_user:messenger_password@postgres:5432/messenger_db
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_NAME: messenger_db
+      DATABASE_USER: messenger_user
+      DATABASE_PASSWORD: messenger_password
+      SERVERPOD_ENV: development
+      SERVERPOD_PORT: 8081
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - messenger-network
+    restart: unless-stopped
+    volumes:
+      - ./backend:/app/backend:ro
+
+networks:
+  messenger-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
