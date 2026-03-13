@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'user_profile.dart';
 
 /// Form state for editing user profile
 /// 
@@ -6,6 +7,9 @@ import 'dart:io';
 /// Used by the profile edit screen to manage form state and validation.
 
 class ProfileFormState {
+  /// User ID being edited
+  final String userId;
+
   /// Current username value in the form
   final String username;
 
@@ -31,6 +35,7 @@ class ProfileFormState {
 
   /// Creates a [ProfileFormState] instance
   const ProfileFormState({
+    required this.userId,
     required this.username,
     required this.bio,
     this.isPrivateProfile = false,
@@ -42,11 +47,13 @@ class ProfileFormState {
 
   /// Creates an initial form state from existing profile values
   factory ProfileFormState.initial({
+    required String userId,
     required String username,
     required String bio,
     required bool isPrivateProfile,
   }) {
     return ProfileFormState(
+      userId: userId,
       username: username,
       bio: bio,
       isPrivateProfile: isPrivateProfile,
@@ -59,6 +66,7 @@ class ProfileFormState {
 
   /// Creates a copy of this [ProfileFormState] with specified fields replaced
   ProfileFormState copyWith({
+    String? userId,
     String? username,
     String? bio,
     bool? isPrivateProfile,
@@ -69,6 +77,7 @@ class ProfileFormState {
     bool clearError = false,
   }) {
     return ProfileFormState(
+      userId: userId ?? this.userId,
       username: username ?? this.username,
       bio: bio ?? this.bio,
       isPrivateProfile: isPrivateProfile ?? this.isPrivateProfile,
@@ -76,6 +85,20 @@ class ProfileFormState {
       isDirty: isDirty ?? this.isDirty,
       isLoading: isLoading ?? this.isLoading,
       error: clearError ? null : (error ?? this.error),
+    );
+  }
+
+  /// Convert form state to UserProfile for API submission
+  /// 
+  /// T056: Returns updated UserProfile with current form values
+  UserProfile toUserProfile() {
+    return UserProfile(
+      userId: userId,
+      username: username,
+      profilePictureUrl: null, // Ignore during edit (handled separately)
+      aboutMe: bio,
+      isPrivateProfile: isPrivateProfile,
+      isDefaultProfilePicture: true, // Not changed in edit form
     );
   }
 
@@ -87,6 +110,7 @@ class ProfileFormState {
 
   @override
   String toString() => '''ProfileFormState(
+    userId: $userId,
     username: $username,
     bio: $bio,
     isPrivateProfile: $isPrivateProfile,
@@ -101,6 +125,7 @@ class ProfileFormState {
       identical(this, other) ||
       other is ProfileFormState &&
           runtimeType == other.runtimeType &&
+          userId == other.userId &&
           username == other.username &&
           bio == other.bio &&
           isPrivateProfile == other.isPrivateProfile &&
@@ -111,6 +136,7 @@ class ProfileFormState {
 
   @override
   int get hashCode =>
+      userId.hashCode ^
       username.hashCode ^
       bio.hashCode ^
       isPrivateProfile.hashCode ^
