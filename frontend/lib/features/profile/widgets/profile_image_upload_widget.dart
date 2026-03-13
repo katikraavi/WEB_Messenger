@@ -110,10 +110,12 @@ class ProfileImageUploadWidget extends ConsumerWidget {
                   final image =
                   await ImagePickerService.pickImageFromGallery();
                   if (image != null) {
-                    final error = ImagePickerService.validateImage(image);
-                    if (error != null) {
+                    // Comprehensive validation with specific error messages
+                    final validationError =
+                        await ImagePickerService.validateImageComprehensive(image);
+                    if (validationError != null) {
                       if (context.mounted) {
-                        showCopyableErrorSnackBar(context, error);
+                        showCopyableErrorSnackBar(context, validationError.message);
                       }
                       return;
                     }
@@ -139,10 +141,12 @@ class ProfileImageUploadWidget extends ConsumerWidget {
                   final image =
                   await ImagePickerService.pickImageFromCamera();
                   if (image != null) {
-                    final error = ImagePickerService.validateImage(image);
-                    if (error != null) {
+                    // Comprehensive validation with specific error messages
+                    final validationError =
+                        await ImagePickerService.validateImageComprehensive(image);
+                    if (validationError != null) {
                       if (context.mounted) {
-                        showCopyableErrorSnackBar(context, error);
+                        showCopyableErrorSnackBar(context, validationError.message);
                       }
                       return;
                     }
