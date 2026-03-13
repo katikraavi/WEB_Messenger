@@ -4,6 +4,7 @@ import '../models/user_profile.dart';
 import '../models/profile_form_state.dart';
 import '../providers/profile_form_state_provider.dart';
 import '../services/profile_api_service.dart';
+import '../widgets/profile_image_upload_widget.dart';
 
 /// Screen for editing user profile information
 /// 
@@ -104,6 +105,14 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // T079: Image upload widget
+              Center(
+                child: ProfileImageUploadWidget(
+                  currentImageUrl: widget.profile.profilePictureUrl,
+                ),
+              ),
+              const SizedBox(height: 24),
+
               // T057: Username text field with character counter
               _buildUsernameField(ref, formState),
               const SizedBox(height: 24),

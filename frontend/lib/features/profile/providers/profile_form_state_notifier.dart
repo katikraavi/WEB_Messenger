@@ -1,7 +1,9 @@
+import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/profile_form_state.dart';
 import '../models/user_profile.dart';
 import '../utils/validators.dart';
+import '../utils/image_validator.dart';
 
 /// StateNotifier for managing profile edit form state
 /// 
@@ -146,5 +148,53 @@ class ProfileFormStateNotifier extends StateNotifier<ProfileFormState> {
   /// Useful for external state management
   void setDirty(bool isDirty) {
     state = state.copyWith(isDirty: isDirty);
+  }
+
+  /// Set image file for upload [T076]
+  /// 
+  /// Validates image before setting in state:
+  /// - Format check: JPEG or PNG only
+  /// - Size check: ≤5MB
+  /// - Dimensions check: 100x100 to 5000x5000 px
+  /// 
+  /// If validation fails, sets error and doesn't update pendingImage
+  /// If validation passes, updates pendingImage and clears error
+  Future<bool> setImage(File imageFile) async {
+    try {
+      final filePath = imageFile.path;
+      final fileSize = await imageFile.length();
+
+      // Validate image before storing
+      final validationError = await ImageValidator.validateImage(
+        filePath: filePath,
+        fileSizeBytes: fileSize,
+      );
+      
+      if (validationError != null) {
+        // Validation failed - set error but don't update image
+        state = state.copyWith(error: validationError);
+        return false;
+      }
+
+      // Validation passed - update pending image and mark dirty
+      state = state.copyWith(
+        pendingImage: imageFile,
+        isDirty: true,
+        error: null,
+      );
+      return true;
+    } catch (e) {
+      print('[ProfileFormStateNotifier] Error setting image: $e');
+      state = state.copyWith(error: ValidationError.imageFormatInvalid);
+      return false;
+    }
+  }
+
+  /// Remove pending image [T076 - complementary]
+  /// 
+  /// Clears the pendingImage field, useful when user cancels upload
+  /// or clicks remove after selecting an image
+  void removeImage() {
+    state = state.copyWith(pendingImage: null);
   }
 }
