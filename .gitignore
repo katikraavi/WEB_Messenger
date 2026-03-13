@@ -1,5 +1,4 @@
-# Specs and planning documents
-.specs
+
 
 # Chat and conversation files
 .github/prompts/
@@ -156,5 +155,7 @@ Thumbs.db
 .env.local
 .env.*.local
 
-
+# Specs and planning documents
+.specs
 .github
+specs/

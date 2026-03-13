@@ -1,0 +1,11 @@
+                                              List of relations
+ Schema |       Name        | Type  |     Owner      | Persistence | Access method |    Size    | Description 
+--------+-------------------+-------+----------------+-------------+---------------+------------+-------------
+ public | chat_members      | table | messenger_user | permanent   | heap          | 0 bytes    | 
+ public | chats             | table | messenger_user | permanent   | heap          | 8192 bytes | 
+ public | invites           | table | messenger_user | permanent   | heap          | 0 bytes    | 
+ public | messages          | table | messenger_user | permanent   | heap          | 8192 bytes | 
+ public | schema_migrations | table | messenger_user | permanent   | heap          | 8192 bytes | 
+ public | users             | table | messenger_user | permanent   | heap          | 8192 bytes | 
+(6 rows)
+

@@ -38,8 +38,15 @@ dependencies:
   # HTTP client for backend API calls
   http: ^1.1.0
   
-  # State management and provider packages (defer implementation to feature phases)
-  # Consider adding in future phases: riverpod, bloc, provider, get_it
+  # State management
+  provider: ^6.0.0
+  flutter_riverpod: ^2.0.0
+  
+  # Secure token storage
+  flutter_secure_storage: ^9.0.0
+  
+  # UUID generation
+  uuid: ^4.0.0
 
 dev_dependencies:
   flutter_test:

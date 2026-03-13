@@ -1,5 +1,6 @@
 import 'package:http/http.dart' as http;
 import 'dart:async';
+import 'dart:io';
 
 /// HTTP Client for connecting to Serverpod backend
 /// 
@@ -18,14 +19,18 @@ class ApiClient {
   /// Automatically detects platform and sets appropriate backend URL:
   /// - Android emulator: http://host.docker.internal:8081
   /// - iOS simulator: http://localhost:8081
+  /// - Linux/Web: http://localhost:8081
   /// - Physical device: http://localhost:8081 (configure for your network)
   static Future<void> initialize() async {
     _httpClient = http.Client();
     
-    // Set base URL (Android emulator uses host.docker.internal, iOS uses localhost)
-    _baseUrl = 'http://host.docker.internal:8081'; // Android emulator
-    // For iOS simulator, try: 'http://localhost:8081'
-    // For physical device, use actual device IP or domain
+    // Set base URL based on platform
+    if (Platform.isAndroid) {
+      _baseUrl = 'http://host.docker.internal:8081';
+    } else {
+      // For iOS, Linux, macOS, Windows, Web: use localhost
+      _baseUrl = 'http://localhost:8081';
+    }
     
     // Try to connect to backend with retry logic
     _isHealthy = await connectToBackend();
@@ -41,8 +46,8 @@ class ApiClient {
 
     for (int attempt = 0; attempt < maxRetries; attempt++) {
       try {
-        final isHealthy = await isHealthy();
-        if (isHealthy) {
+        final isServerHealthy = await isHealthy();
+        if (isServerHealthy) {
           print('[API Client] Backend connected successfully on attempt ${attempt + 1}');
           return true;
         }
