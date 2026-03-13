@@ -6,6 +6,7 @@ import '../providers/search_form_provider.dart';
 import '../services/search_service.dart';
 import '../widgets/search_bar_widget.dart';
 import '../widgets/search_result_list_widget.dart';
+import '../../profile/screens/profile_view_screen.dart';
 
 /// Screen for searching users by username or email
 /// 
@@ -73,11 +74,17 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   /// Handle result tap - navigate to profile
+  /// T123: Handle result tap - navigate to ProfileViewScreen
   void _handleResultTap(UserSearchResult result) {
-    // TODO: Navigate to profile screen
-    // Example: context.go('/profile/${result.userId}');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Navigate to ${result.username}\'s profile')),
+    // Navigate to ProfileViewScreen with selected user
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ProfileViewScreen(
+          userId: result.userId,
+          isOwnProfile: false, // Viewing other user's profile
+        ),
+      ),
     );
   }
 
