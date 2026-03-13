@@ -19,33 +19,80 @@ class ProfileImageUploadWidget extends ConsumerWidget {
     return Column(
       children: [
         // Profile picture preview
-        Container(
-          height: 150,
-          width: 150,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.grey[300],
-            border: Border.all(color: Colors.grey[400]!, width: 2),
-          ),
-          child: Center(
-            child: imageState.selectedImagePath != null
-                ? ClipOval(
-              child: Image.asset(
-                imageState.selectedImagePath!,
-                fit: BoxFit.cover,
+        Stack(
+          alignment: Alignment.bottomRight,
+          children: [
+            Container(
+              height: 150,
+              width: 150,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.grey[300],
+                border: Border.all(color: Colors.grey[400]!, width: 2),
               ),
-            )
-                : currentImageUrl != null
-                ? ClipOval(
-              child: Image.network(
-                currentImageUrl!,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) =>
-                const Icon(Icons.person, size: 70),
+              child: Center(
+                child: imageState.selectedImagePath != null
+                    ? ClipOval(
+                  child: Image.asset(
+                    imageState.selectedImagePath!,
+                    fit: BoxFit.cover,
+                  ),
+                )
+                    : imageState.uploadedImageUrl != null
+                    ? ClipOval(
+                  child: Image.network(
+                    imageState.uploadedImageUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) =>
+                    const Icon(Icons.person, size: 70),
+                  ),
+                )
+                    : currentImageUrl != null
+                    ? ClipOval(
+                  child: Image.network(
+                    currentImageUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) =>
+                    const Icon(Icons.person, size: 70),
+                  ),
+                )
+                    : const Icon(Icons.person, size: 70),
               ),
-            )
-                : const Icon(Icons.person, size: 70),
-          ),
+            ),
+            // Remove button - only show if there's an uploaded image
+            if (imageState.uploadedImageUrl != null ||
+                currentImageUrl != null)
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.red,
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  iconSize: 20,
+                  onPressed: imageState.isUploading
+                      ? null
+                      : () async {
+                    try {
+                      await ref
+                          .read(profileImageProvider.notifier)
+                          .deleteImage();
+                      if (context.mounted &&
+                          imageState.error == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Image deleted successfully!')),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        showCopyableErrorSnackBar(context, 'Delete failed: $e');
+                      }
+                    }
+                  },
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: 16),
 

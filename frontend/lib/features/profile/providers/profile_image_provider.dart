@@ -101,6 +101,36 @@ class ProfileImageNotifier extends StateNotifier<ProfileImageState> {
     }
   }
 
+  Future<void> deleteImage() async {
+    if (state.uploadedImageUrl == null) {
+      state = state.copyWith(error: 'No image to delete');
+      return;
+    }
+
+    state = state.copyWith(isUploading: true, error: null);
+
+    try {
+      await _apiService.deleteImage();
+
+      state = state.copyWith(
+        isUploading: false,
+        uploadedImageUrl: null,
+        selectedImagePath: null,
+        error: null,
+      );
+    } on HttpException catch (e) {
+      state = state.copyWith(
+        isUploading: false,
+        error: e.message,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isUploading: false,
+        error: 'Delete failed: ${e.toString()}',
+      );
+    }
+  }
+
   void resetError() {
     state = state.copyWith(error: null);
   }
