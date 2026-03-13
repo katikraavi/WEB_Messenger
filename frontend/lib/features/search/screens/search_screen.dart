@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../utils/copyable_error_widget.dart';
 import '../providers/search_results_provider.dart';
 import '../providers/search_form_provider.dart';
 import '../services/search_service.dart';
@@ -71,12 +72,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     ref.read(searchFormProvider.notifier).clear();
   }
 
-  /// Handle search type change
-  void _handleSearchTypeChanged(String type) {
-    final newType = type == 'username' ? SearchType.username : SearchType.email;
-    ref.read(searchFormProvider.notifier).setSearchType(newType);
-  }
-
   /// Handle result tap - navigate to profile
   void _handleResultTap(UserSearchResult result) {
     // TODO: Navigate to profile screen
@@ -92,7 +87,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     
     // Get search results based on current form state
     final searchAsyncValue = ref.watch(
-      searchProvider((formState.query, formState.searchType)),
+      combinedSearchProvider(formState.query),
     );
 
     return Scaffold(
@@ -110,40 +105,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             onClear: _handleClear,
             debounceMs: 500,
           ),
-          
-          // Search type toggle
-          SearchTypeToggle(
-            selectedType: formState.searchType == SearchType.username
-                ? 'username'
-                : 'email',
-            onChanged: _handleSearchTypeChanged,
-          ),
 
           // Error message if validation failed
           if (formState.error != null && formState.error!.isNotEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12.0),
-                decoration: BoxDecoration(
-                  color: Colors.red[50],
-                  border: Border.all(color: Colors.red[200]!),
-                  borderRadius: BorderRadius.circular(8.0),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.warning_amber, color: Colors.red[600]),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        formState.error!,
-                        style: TextStyle(color: Colors.red[600]),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              child: CopyableErrorBanner(error: formState.error!),
             ),
 
           // Results area
@@ -152,38 +119,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               loading: () => const Center(
                 child: CircularProgressIndicator(),
               ),
-              error: (error, stackTrace) => Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(32.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.error_outline,
-                        size: 64,
-                        color: Colors.red,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Search Error',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        error.toString(),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.grey[600]),
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: () => ref.refresh(
-                          searchProvider(
-                            (formState.query, formState.searchType),
-                          ),
-                        ),
-                        child: const Text('Retry'),
-                      ),
-                    ],
+              error: (error, stackTrace) => Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: CopyableErrorWidget(
+                  error: error.toString(),
+                  title: 'Search Error',
+                  onRetry: () => ref.refresh(
+                    combinedSearchProvider(formState.query),
                   ),
                 ),
               ),
@@ -193,9 +135,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 error: null,
                 onTap: _handleResultTap,
                 onRetry: () => ref.refresh(
-                  searchProvider(
-                    (formState.query, formState.searchType),
-                  ),
+                  combinedSearchProvider(formState.query),
                 ),
               ),
             ),

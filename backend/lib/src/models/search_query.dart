@@ -1,6 +1,6 @@
 /// Query object for user search with validation
 class SearchQuery {
-  static const int minLength = 2;
+  static const int minLength = 1;
   static const int maxLength = 100;
   static const int maxResults = 50;
 
@@ -29,15 +29,17 @@ class SearchQuery {
     switch (type) {
       case SearchType.username:
         // username: alphanumeric, underscore, hyphen only
-        if (!RegExp(r'^[a-zA-Z0-9_-]+$').hasMatch(trimmed)) {
-          return 'Username can only contain letters, numbers, underscores, and hyphens';
+        // Allow @ and . for email-like queries that get routed here from combined search
+        if (!RegExp(r'^[a-zA-Z0-9_\-@.]+$').hasMatch(trimmed)) {
+          return 'Invalid search query';
         }
         break;
 
       case SearchType.email:
-        // email: basic validation (contains @ and .)
-        if (!trimmed.contains('@') || !trimmed.contains('.')) {
-          return 'Invalid email format';
+        // email: more lenient - as long as it has @ or a dot, allow it
+        // This handles partial email searches like "alice@" or "alice.smith"
+        if (!trimmed.contains('@') && !trimmed.contains('.')) {
+          return 'Search query must contain @ or . for email search';
         }
         break;
     }

@@ -7,7 +7,9 @@ class User {
   final bool emailVerified;
   final String? profilePictureUrl;
   final String? aboutMe;
+  final bool isPrivateProfile;
   final DateTime createdAt;
+  final DateTime? profileUpdatedAt;
 
   User({
     required this.id,
@@ -17,7 +19,9 @@ class User {
     required this.emailVerified,
     this.profilePictureUrl,
     this.aboutMe,
+    this.isPrivateProfile = false,
     required this.createdAt,
+    this.profileUpdatedAt,
   });
 
   /// Serialize to JSON
@@ -30,7 +34,9 @@ class User {
       'email_verified': emailVerified,
       'profile_picture_url': profilePictureUrl,
       'about_me': aboutMe,
+      'is_private_profile': isPrivateProfile,
       'created_at': createdAt.toIso8601String(),
+      'profile_updated_at': profileUpdatedAt?.toIso8601String(),
     };
   }
 
@@ -44,7 +50,11 @@ class User {
       emailVerified: json['email_verified'] as bool,
       profilePictureUrl: json['profile_picture_url'] as String?,
       aboutMe: json['about_me'] as String?,
+      isPrivateProfile: json['is_private_profile'] as bool? ?? false,
       createdAt: DateTime.parse(json['created_at'] as String),
+      profileUpdatedAt: json['profile_updated_at'] != null 
+          ? DateTime.parse(json['profile_updated_at'] as String)
+          : null,
     );
   }
 
@@ -56,6 +66,8 @@ class User {
     bool? emailVerified,
     String? profilePictureUrl,
     String? aboutMe,
+    bool? isPrivateProfile,
+    DateTime? profileUpdatedAt,
   }) {
     return User(
       id: id,
@@ -65,7 +77,9 @@ class User {
       emailVerified: emailVerified ?? this.emailVerified,
       profilePictureUrl: profilePictureUrl ?? this.profilePictureUrl,
       aboutMe: aboutMe ?? this.aboutMe,
+      isPrivateProfile: isPrivateProfile ?? this.isPrivateProfile,
       createdAt: createdAt,
+      profileUpdatedAt: profileUpdatedAt ?? this.profileUpdatedAt,
     );
   }
 

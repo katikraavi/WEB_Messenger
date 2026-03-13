@@ -5,6 +5,7 @@ import 'package:frontend/features/auth/models/auth_models.dart';
 import 'package:frontend/features/auth/providers/auth_provider.dart';
 import 'package:frontend/features/auth/screens/auth_flow_screen.dart';
 import 'package:frontend/features/search/screens/search_screen.dart';
+import 'package:frontend/features/profile/screens/profile_view_screen.dart';
 
 /// Root widget for Mobile Messenger application
 /// 
@@ -188,8 +189,8 @@ class _HomeScreenState extends State<_HomeScreen> {
   }
 }
 
-/// Authenticated home screen
-class _AuthenticatedHomeScreen extends StatelessWidget {
+/// Authenticated home screen with bottom navigation
+class _AuthenticatedHomeScreen extends StatefulWidget {
   final User user;
   final VoidCallback? onLogout;
 
@@ -199,20 +200,74 @@ class _AuthenticatedHomeScreen extends StatelessWidget {
   });
 
   @override
+  State<_AuthenticatedHomeScreen> createState() => _AuthenticatedHomeScreenState();
+}
+
+class _AuthenticatedHomeScreenState extends State<_AuthenticatedHomeScreen> {
+  int _selectedIndex = 0;
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Mobile Messenger'),
+        title: _selectedIndex == 0 ? const Text('Search Users') : const Text('My Profile'),
         elevation: 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: onLogout,
+            onPressed: widget.onLogout,
           ),
         ],
       ),
-      body: Center(
-        child: SingleChildScrollView(
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: [
+          // Search Tab
+          _SearchTab(user: widget.user),
+          
+          // Profile Tab - Show user's own profile with pre-loaded data
+          ProfileViewScreen(
+            userId: widget.user.userId,
+            isOwnProfile: true,
+            currentUser: widget.user, // Pass current user to avoid re-fetching
+          ),
+        ],
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        type: BottomNavigationBarType.fixed,
+        items: const <BottomNavigationBarItem>[
+          BottomNavigationBarItem(
+            icon: Icon(Icons.search),
+            label: 'Search',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+        ],
+        onTap: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+        },
+      ),
+    );
+  }
+}
+
+/// Search tab content
+class _SearchTab extends StatelessWidget {
+  final User user;
+
+  const _SearchTab({required this.user});
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -220,7 +275,7 @@ class _AuthenticatedHomeScreen extends StatelessWidget {
               const SizedBox(height: 16),
               Text(
                 'Welcome, ${user.username}!',
-                style: Theme.of(context).textTheme.displaySmall,
+                style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: 8),
               Text(
@@ -336,20 +391,6 @@ class _AuthenticatedHomeScreen extends StatelessWidget {
             ],
           ),
         ),
-      ),
-      
-      // Floating Action Button for Quick Access
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => const SearchScreen(),
-            ),
-          );
-        },
-        label: const Text('Search'),
-        icon: const Icon(Icons.search),
-        backgroundColor: Colors.blue,
       ),
     );
   }

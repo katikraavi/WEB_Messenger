@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../utils/copyable_error_widget.dart';
 import '../services/search_service.dart';
 
 /// Callback when a result is tapped
@@ -38,27 +39,10 @@ class SearchResultListWidget extends StatelessWidget {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, size: 64, color: Colors.red),
-              const SizedBox(height: 16),
-              Text(
-                'Search Error',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                error!,
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey[600]),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: onRetry,
-                child: const Text('Retry'),
-              ),
-            ],
+          child: CopyableErrorWidget(
+            error: error!,
+            title: 'Search Error',
+            onRetry: onRetry,
           ),
         ),
       );

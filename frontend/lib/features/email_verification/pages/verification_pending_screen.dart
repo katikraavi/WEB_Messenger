@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:async';
+import '../../../utils/copyable_error_widget.dart';
 import '../providers/verification_provider.dart';
 
 /// Screen shown while email verification is pending
@@ -47,6 +49,29 @@ class _VerificationPendingScreenState
         }
       });
     });
+  }
+
+  /// Copy token to clipboard
+  void _copyTokenToClipboard(String token) {
+    Clipboard.setData(ClipboardData(text: token));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Token copied to clipboard!'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  /// Auto-fill token field with dev token
+  void _autoFillToken(String token) {
+    _tokenController.text = token;
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Token auto-filled - Click "Verify Email" to continue'),
+        duration: Duration(seconds: 2),
+      ),
+    );
   }
 
   @override
@@ -158,30 +183,96 @@ class _VerificationPendingScreenState
                   ),
                 ),
               if (verificationState.errorMessage != null)
+                CopyableErrorBanner(error: verificationState.errorMessage!),
+              const SizedBox(height: 24),
+
+              // Development Token Display (if available)
+              if (verificationState.devToken != null) ...[
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red),
+                    color: Colors.blue.withOpacity(0.08),
+                    border: Border.all(
+                      color: Colors.blue.withOpacity(0.5),
+                      width: 2,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.error_outline, color: Colors.red),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          verificationState.errorMessage!,
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(color: Colors.red),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.key,
+                            color: Colors.blue[700],
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Verification Token (Dev Mode)',
+                            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              color: Colors.blue[700],
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.blue[50],
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: Colors.blue[200]!,
+                          ),
                         ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                verificationState.devToken!,
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  fontFamily: 'monospace',
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () => _copyTokenToClipboard(verificationState.devToken!),
+                              icon: const Icon(Icons.copy, size: 18),
+                              label: const Text('Copy Token'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () => _autoFillToken(verificationState.devToken!),
+                              icon: const Icon(Icons.check, size: 18),
+                              label: const Text('Auto-Fill'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
-              const SizedBox(height: 32),
+                const SizedBox(height: 24),
+              ],
 
               // Token input for testing/development
               Text(

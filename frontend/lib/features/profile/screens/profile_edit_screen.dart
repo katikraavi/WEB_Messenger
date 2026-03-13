@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/models/user.dart';
+import '../../../utils/copyable_error_widget.dart';
 import '../providers/profile_edit_provider.dart';
 import '../providers/profile_image_provider.dart';
 import '../services/image_picker_service.dart';
@@ -21,13 +22,21 @@ class ProfileEditScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
-  late final String editProviderId;
+  late TextEditingController _usernameController;
+  late TextEditingController _aboutMeController;
 
   @override
   void initState() {
     super.initState();
-    // Use profile data as provider key
-    editProviderId = '${widget.profile.userId}-${DateTime.now().millisecondsSinceEpoch}';
+    _usernameController = TextEditingController(text: widget.profile.username);
+    _aboutMeController = TextEditingController(text: widget.profile.aboutMe);
+  }
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _aboutMeController.dispose();
+    super.dispose();
   }
 
   @override
@@ -75,7 +84,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
 
             // Username field
             TextField(
-              initialValue: editState.username,
+              controller: _usernameController,
               decoration: InputDecoration(
                 labelText: 'Username',
                 hintText: 'Enter your username',
@@ -95,7 +104,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
 
             // About me field
             TextField(
-              initialValue: editState.aboutMe,
+              controller: _aboutMeController,
               maxLines: 4,
               maxLength: 500,
               decoration: InputDecoration(
@@ -148,10 +157,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
             // Error message
             if (editState.error != null) ...[
               const SizedBox(height: 16),
-              SnackBar(
-                content: Text(editState.error!),
-                backgroundColor: Colors.red,
-              ),
+              CopyableErrorBanner(error: editState.error!),
             ],
           ],
         ),

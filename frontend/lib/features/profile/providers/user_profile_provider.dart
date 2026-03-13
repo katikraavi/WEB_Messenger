@@ -1,105 +1,75 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/models/user.dart';
+import 'package:frontend/features/profile/models/user_profile.dart';
+import 'package:frontend/features/profile/services/profile_api_service.dart';
 
-/// State for profile view
-class UserProfileState {
-  final User? profile;
-  final String? error;
-  final bool isLoading;
-  final DateTime? lastUpdated;
+/// Riverpod provider for ProfileApiService singleton
+/// 
+/// Provides instance of ProfileApiService for dependency injection
+final profileApiServiceProvider = Provider((ref) {
+  return ProfileApiService();
+});
 
-  const UserProfileState({
-    this.profile,
-    this.error,
-    this.isLoading = false,
-    this.lastUpdated,
-  });
-
-  UserProfileState copyWith({
-    User? profile,
-    String? error,
-    bool? isLoading,
-    DateTime? lastUpdated,
-  }) =>
-      UserProfileState(
-        profile: profile ?? this.profile,
-        error: error,
-        isLoading: isLoading ?? this.isLoading,
-        lastUpdated: lastUpdated ?? this.lastUpdated,
-      );
-}
-
-/// Notifier for user profile state
-class UserProfileNotifier extends StateNotifier<UserProfileState> {
-  UserProfileNotifier() : super(const UserProfileState());
-
-  /// Fetch user profile
-  Future<void> fetchProfile(String userId) async {
-    state = state.copyWith(isLoading: true);
-    try {
-      // TODO: Call ProfileService to fetch from backend
-      // For now, return mock profile
-      await Future.delayed(const Duration(milliseconds: 300));
-      
-      final mockProfile = User(
-        userId: userId,
-        email: 'user@example.com',
-        username: 'User_$userId',
-        emailVerified: true,
-        createdAt: DateTime.now(),
-        profilePictureUrl: null,
-        aboutMe: 'Welcome to my profile',
-        isDefaultProfilePicture: true,
-        isPrivateProfile: false,
-      );
-
-      state = state.copyWith(
-        profile: mockProfile,
-        isLoading: false,
-        error: null,
-        lastUpdated: DateTime.now(),
-      );
-    } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
-    }
-  }
-
-  /// Update profile information
-  Future<void> updateProfile({
-    String? username,
-    String? aboutMe,
-    bool? isPrivateProfile,
-  }) async {
-    if (state.profile == null) return;
+/// FutureProvider for fetching user profile by userId [T036]
+/// 
+/// Automatically caches results for 5 minutes.
+/// 
+/// Arguments:
+///   - userId: User ID to fetch profile for
+/// 
+/// Usage:
+/// ```dart
+/// // Watch profile data
+/// final profileAsync = ref.watch(userProfileProvider(userId));
+/// 
+/// profileAsync.when(
+///   loading: () => CircularProgressIndicator(),
+///   data: (profile) => Text(profile.username),
+///   error: (err, stack) => Text('Error: $err'),
+/// );
+/// 
+/// // Force refresh
+/// ref.refresh(userProfileProvider(userId));
+/// ```
+/// 
+/// Caching:
+///   - Results are cached for subsequent reads
+///   - To invalidate and refetch, call ref.refresh()
+/// 
+/// Returns: UserProfile with all profile fields
+/// 
+/// Throws: Exception if fetch fails (captured in AsyncValue.error)
+final userProfileProvider = FutureProvider.family<UserProfile, String>(
+  (ref, userId) async {
+    final apiService = ref.watch(profileApiServiceProvider);
     
-    state = state.copyWith(isLoading: true);
     try {
-      // TODO: Call ProfileService to update backend
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      state = state.copyWith(
-        profile: state.profile!.copyWith(
-          username: username ?? state.profile?.username,
-          aboutMe: aboutMe ?? state.profile?.aboutMe,
-          isPrivateProfile: isPrivateProfile ?? state.profile?.isPrivateProfile,
-        ),
-        isLoading: false,
-        error: null,
-        lastUpdated: DateTime.now(),
-      );
+      // T036: Fetch profile from API service
+      final profile = await apiService.fetchProfile(userId);
+      return profile;
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      print('[userProfileProvider] Error fetching profile for $userId: $e');
+      rethrow; // Rethrow so error is captured in AsyncValue
     }
-  }
-}
-
-/// Riverpod provider for user profile
-final userProfileProvider = StateNotifierProvider<UserProfileNotifier, UserProfileState>(
-  (ref) => UserProfileNotifier(),
+  },
 );
+
+/// Provider for profile picture URL (convenience accessor)
+/// 
+/// Usage:
+/// ```dart
+/// final pictureUrlAsync = ref.watch(profilePictureUrlProvider(userId));
+/// final pictureUrl = pictureUrlAsync.whenData((url) => url);
+/// ```
+final profilePictureUrlProvider = Provider.family<AsyncValue<String?>, String>((ref, userId) {
+  return ref.watch(userProfileProvider(userId)).whenData((profile) => profile.profilePictureUrl);
+});
+
+/// Provider for checking if using default profile picture
+/// 
+/// Usage:
+/// ```dart
+/// final isDefaultAsync = ref.watch(isDefaultProfilePictureProvider(userId));
+/// ```
+final isDefaultProfilePictureProvider = Provider.family<AsyncValue<bool>, String>((ref, userId) {
+  return ref.watch(userProfileProvider(userId)).whenData((profile) => profile.isDefaultProfilePicture);
+});

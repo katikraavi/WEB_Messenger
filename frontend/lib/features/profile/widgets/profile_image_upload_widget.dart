@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../utils/copyable_error_widget.dart';
 import '../providers/profile_image_provider.dart';
 import '../services/image_picker_service.dart';
 
@@ -65,9 +66,7 @@ class ProfileImageUploadWidget extends ConsumerWidget {
                     final error = ImagePickerService.validateImage(image);
                     if (error != null) {
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(error)),
-                        );
+                        showCopyableErrorSnackBar(context, error);
                       }
                       return;
                     }
@@ -77,9 +76,7 @@ class ProfileImageUploadWidget extends ConsumerWidget {
                   }
                 } catch (e) {
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error: $e')),
-                    );
+                    showCopyableErrorSnackBar(context, 'Error: $e');
                   }
                 }
               },
@@ -98,9 +95,7 @@ class ProfileImageUploadWidget extends ConsumerWidget {
                     final error = ImagePickerService.validateImage(image);
                     if (error != null) {
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(error)),
-                        );
+                        showCopyableErrorSnackBar(context, error);
                       }
                       return;
                     }
@@ -110,9 +105,7 @@ class ProfileImageUploadWidget extends ConsumerWidget {
                   }
                 } catch (e) {
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error: $e')),
-                    );
+                    showCopyableErrorSnackBar(context, 'Error: $e');
                   }
                 }
               },

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../../../utils/secure_storage_wrapper.dart';
 import '../models/auth_models.dart';
 import '../services/auth_service.dart';
 
@@ -16,7 +16,7 @@ class AuthProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
   
-  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+  final SecureStorageWrapper _secureStorage = SecureStorageWrapper();
 
   // Getters
   User? get user => _user;

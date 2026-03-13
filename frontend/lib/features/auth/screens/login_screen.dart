@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../utils/copyable_error_widget.dart';
 import '../models/auth_models.dart';
 import '../services/auth_service.dart';
 import '../providers/auth_provider.dart';
@@ -118,13 +119,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ? authProvider.error 
           : 'Login failed: Please check your email and password';
         
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage ?? 'Login failed'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
-          ),
-        );
+        showCopyableErrorSnackBar(context, errorMessage ?? 'Login failed');
       }
     }
   }

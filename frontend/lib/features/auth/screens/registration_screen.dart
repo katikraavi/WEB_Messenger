@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../utils/copyable_error_widget.dart';
 import '../models/auth_models.dart';
 import '../services/auth_service.dart';
 import '../providers/auth_provider.dart';
@@ -152,12 +153,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     } catch (e) {
       // Error is already set in provider
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Registration failed: ${authProvider.error}'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
-          ),
+        showCopyableErrorSnackBar(
+          context, 
+          'Registration failed: ${authProvider.error ?? 'Unknown error occurred'}',
         );
       }
     }

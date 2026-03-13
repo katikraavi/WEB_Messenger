@@ -70,7 +70,11 @@ class SearchService {
 
     final token = getAuthToken();
     if (token.isEmpty) {
-      throw SearchException('Authentication token required');
+      throw SearchException(
+        'Authentication failed: Could not retrieve login token. '
+        'Please quit the app and try logging in again. '
+        'If on Linux, ensure your system keyring is unlocked.',
+      );
     }
 
     try {
@@ -122,7 +126,11 @@ class SearchService {
 
     final token = getAuthToken();
     if (token.isEmpty) {
-      throw SearchException('Authentication token required');
+      throw SearchException(
+        'Authentication failed: Could not retrieve login token. '
+        'Please quit the app and try logging in again. '
+        'If on Linux, ensure your system keyring is unlocked.',
+      );
     }
 
     try {

@@ -561,9 +561,9 @@ Response _handleSearchByUsername(Request request) {
 
     // Validate query
     final trimmed = query.trim();
-    if (trimmed.length < 2) {
+    if (trimmed.isEmpty) {
       return Response.badRequest(
-        body: jsonEncode({'error': 'Search query must be at least 2 characters'}),
+        body: jsonEncode({'error': 'Search query cannot be empty'}),
         headers: {'Content-Type': 'application/json'},
       );
     }
@@ -650,9 +650,10 @@ Response _handleSearchByEmail(Request request) {
         headers: {'Content-Type': 'application/json'},
       );
     }
-    if (!trimmed.contains('@')) {
+    // Allow partial email searches - just need @ or . (e.g., "alice.", "alice@", "alice.smith")
+    if (!trimmed.contains('@') && !trimmed.contains('.')) {
       return Response.badRequest(
-        body: jsonEncode({'error': 'Invalid email format'}),
+        body: jsonEncode({'error': 'Email search must contain @ or . for email-like queries'}),
         headers: {'Content-Type': 'application/json'},
       );
     }
