@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/user_profile.dart';
 import '../providers/user_profile_provider.dart';
 import '../widgets/profile_picture_widget.dart';
+import 'profile_edit_screen.dart';
 
 class ProfileViewScreen extends ConsumerWidget {
   final String userId;
@@ -19,33 +20,33 @@ class ProfileViewScreen extends ConsumerWidget {
     // Watch the profile provider for the given userId
     final profileAsync = ref.watch(userProfileProvider(userId));
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profile'),
-        actions: [
-          if (isOwnProfile)
-            IconButton(
-              icon: const Icon(Icons.edit),
-              onPressed: () {
-                // TODO(T049): Edit Profile screen will be enhanced in Phase 5
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Edit profile coming soon...'),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              },
-            ),
-        ],
+    return profileAsync.when(
+      loading: () => Scaffold(
+        appBar: AppBar(title: const Text('Profile')),
+        body: _buildLoadingSkeleton(context),
       ),
-      body: profileAsync.when(
-        loading: () => _buildLoadingSkeleton(context),
-        error: (error, stackTrace) => _buildErrorState(
-          context,
-          ref,
-          error.toString(),
+      error: (error, stackTrace) => Scaffold(
+        appBar: AppBar(title: const Text('Profile')),
+        body: _buildErrorState(context, ref, error.toString()),
+      ),
+      data: (profile) => Scaffold(
+        appBar: AppBar(
+          title: const Text('Profile'),
+          actions: [
+            if (isOwnProfile)
+              IconButton(
+                icon: const Icon(Icons.edit),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => ProfileEditScreen(profile: profile),
+                    ),
+                  );
+                },
+              ),
+          ],
         ),
-        data: (profile) => _buildProfileContent(
+        body: _buildProfileContent(
           context,
           ref,
           profile,
@@ -261,11 +262,9 @@ class ProfileViewScreen extends ConsumerWidget {
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    // TODO(T049): Edit Profile screen will be enhanced in Phase 5
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Edit profile coming soon...'),
-                        duration: Duration(seconds: 2),
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ProfileEditScreen(profile: profile!),
                       ),
                     );
                   },

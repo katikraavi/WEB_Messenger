@@ -1,0 +1,31 @@
+#!/bin/bash
+# Simplified flutter run replacement for emulator-5554
+# Usage: ./run or ./run debug (for debug mode)
+
+set -e
+
+cd "$(dirname "$0")"
+
+BUILD_MODE="${1:-debug}"
+DEVICE="emulator-5554"
+
+# Ensure pub deps are up to date
+flutter pub get > /dev/null 2>&1
+
+# Build and run
+echo "🚀 Building and running on $DEVICE..."
+./android/gradlew -p android app:assemble${BUILD_MODE^} > /dev/null 2>&1
+
+APK_PATH="./build/app/outputs/apk/$BUILD_MODE/app-$BUILD_MODE.apk"
+
+if [ ! -f "$APK_PATH" ]; then
+    echo "❌ APK build failed"
+    exit 1
+fi
+
+adb install -r "$APK_PATH" > /dev/null 2>&1
+adb shell am start -n com.messenger.frontend/.MainActivity
+
+echo "✅ App launched on emulator-5554!"
+echo "📊 Showing logs... (press Ctrl+C to stop)"
+adb logcat flutter:V *:S 2>/dev/null || true

@@ -2,6 +2,9 @@ import 'package:postgres/postgres.dart';
 import '../models/user_search_result.dart';
 import '../models/search_query.dart';
 
+// Alias for cleaner code
+typedef Connection = PostgreSQLConnection;
+
 /// Exception for search validation errors
 class SearchValidationException implements Exception {
   final String message;
@@ -34,10 +37,10 @@ class SearchService {
     try {
       final results = await _connection.mappedResultsQuery(
         '''
-        SELECT id, username, email, profile_picture_url, is_private_profile
-        FROM users
+        SELECT id, username, email, profile_picture_url
+        FROM \"users\"
         WHERE LOWER(username) ILIKE LOWER(@query || '%')
-          AND email_verified IS NOT NULL
+          AND email_verified = true
         ORDER BY 
           CASE WHEN LOWER(username) = LOWER(@query) THEN 0 ELSE 1 END,
           username ASC
@@ -74,11 +77,11 @@ class SearchService {
     try {
       final results = await _connection.mappedResultsQuery(
         '''
-        SELECT id, username, email, profile_picture_url, is_private_profile
-        FROM users
+        SELECT id, username, email, profile_picture_url
+        FROM \"users\"
         WHERE (LOWER(email) = LOWER(@query) 
                OR LOWER(email) ILIKE LOWER(@query || '%'))
-          AND email_verified IS NOT NULL
+          AND email_verified = true
         ORDER BY 
           CASE WHEN LOWER(email) = LOWER(@query) THEN 0 ELSE 1 END,
           email ASC

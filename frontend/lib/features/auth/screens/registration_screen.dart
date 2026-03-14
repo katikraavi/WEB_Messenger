@@ -8,10 +8,12 @@ import '../providers/auth_provider.dart';
 /// Registration screen for new users
 class RegistrationScreen extends StatefulWidget {
   final Function(User, String)? onRegistrationSuccess;
+  final VoidCallback? onBackToLogin;
 
   const RegistrationScreen({
     Key? key,
     this.onRegistrationSuccess,
+    this.onBackToLogin,
   }) : super(key: key);
 
   @override
@@ -383,7 +385,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                         ),
                         GestureDetector(
                           onTap: () {
-                            Navigator.of(context).pop();
+                            // Use callback to navigate back to login within PageView
+                            widget.onBackToLogin?.call();
                           },
                           child: const Text(
                             'Login',

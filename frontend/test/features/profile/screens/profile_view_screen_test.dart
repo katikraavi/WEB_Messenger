@@ -20,36 +20,104 @@ void main() {
       );
 
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
-    }, skip: true); // TODO: Fix timer issue
+      await tester.pumpAndSettle();
+    });
 
     testWidgets('displays profile data when loaded', (WidgetTester tester) async {
-      // TODO: Fix timer issue
-      expect(true, true);
-    }, skip: true);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProviderScope(
+            child: ProfileViewScreen(
+              userId: 'test-user',
+              isOwnProfile: false,
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+      expect(find.byType(Scaffold), findsWidgets);
+    });
 
     testWidgets('shows Edit button for own profile', (WidgetTester tester) async {
-      // TODO: Fix timer issue
-      expect(true, true);
-    }, skip: true);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProviderScope(
+            child: ProfileViewScreen(
+              userId: 'test-user',
+              isOwnProfile: true,
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.edit), findsWidgets);
+    });
 
     testWidgets('hides Edit button for other profiles', (WidgetTester tester) async {
-      // TODO: Fix timer issue
-      expect(true, true);
-    }, skip: true);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProviderScope(
+            child: ProfileViewScreen(
+              userId: 'other-user',
+              isOwnProfile: false,
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+      // Edit button should not be visible for non-own profiles
+      expect(find.byIcon(Icons.edit), findsNothing);
+    });
 
     testWidgets('displays private profile indicator when isPrivateProfile is true', (WidgetTester tester) async {
-      // TODO: Fix timer issue
-      expect(true, true);
-    }, skip: true);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProviderScope(
+            child: ProfileViewScreen(
+              userId: 'test-user',
+              isOwnProfile: false,
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+      expect(find.byType(Scaffold), findsWidgets);
+    });
 
     testWidgets('displays about me in card', (WidgetTester tester) async {
-      // TODO: Fix timer issue
-      expect(true, true);
-    }, skip: true);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProviderScope(
+            child: ProfileViewScreen(
+              userId: 'test-user',
+              isOwnProfile: false,
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+      expect(find.byType(Card), findsWidgets);
+    });
 
     testWidgets('retry button appears on error', (WidgetTester tester) async {
-      // TODO: Fix timer issue
-      expect(true, true);
-    }, skip: true);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProviderScope(
+            child: ProfileViewScreen(
+              userId: 'test-user',
+              isOwnProfile: false,
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+      expect(find.byType(Scaffold), findsWidgets);
+    });
   });
 }

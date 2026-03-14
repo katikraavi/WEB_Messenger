@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../services/profile_api_service.dart';
 
 /// State for profile editing form
 class ProfileEditFormState {
@@ -64,8 +65,14 @@ class ProfileEditFormNotifier extends StateNotifier<ProfileEditFormState> {
     state = state.copyWith(isLoading: true, error: null);
     
     try {
-      // TODO: Call ProfileService.updateProfile()
-      await Future.delayed(const Duration(milliseconds: 500));
+      // Call ProfileApiService.updateProfile() with real API request
+      final apiService = ProfileApiService();
+      await apiService.updateProfile(
+        username: state.username,
+        bio: state.aboutMe,
+        isPrivateProfile: state.isPrivateProfile,
+        token: null, // Token can be passed when auth is implemented
+      );
       
       state = state.copyWith(
         isDirty: false,

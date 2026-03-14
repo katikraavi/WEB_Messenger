@@ -1,6 +1,9 @@
 import 'package:postgres/postgres.dart';
 import 'dart:async';
 
+// Alias for cleaner code
+typedef Connection = PostgreSQLConnection;
+
 /// Migration definition encapsulating version, description, and SQL
 class Migration {
   final int version;
@@ -58,7 +61,7 @@ class MigrationRunner {
         version: 2,
         description: 'Create users table',
         upSql: '''
-          CREATE TABLE users (
+          CREATE TABLE IF NOT EXISTS "users" (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             email TEXT UNIQUE NOT NULL,
             username TEXT UNIQUE NOT NULL,
@@ -66,12 +69,18 @@ class MigrationRunner {
             email_verified BOOLEAN DEFAULT FALSE,
             profile_picture_url TEXT,
             about_me TEXT,
+            is_private_profile BOOLEAN DEFAULT FALSE,
+            profile_updated_at TIMESTAMP,
+            last_password_changed TIMESTAMP,
+            last_login_at TIMESTAMP,
+            verified_at TIMESTAMP,
             created_at TIMESTAMP DEFAULT NOW()
           );
-          CREATE INDEX idx_users_email ON users(email);
-          CREATE INDEX idx_users_username ON users(username);
+          CREATE INDEX idx_users_email ON "users"(email);
+          CREATE INDEX idx_users_username ON "users"(username);
+          CREATE INDEX idx_users_created_at ON "users"(created_at DESC);
         ''',
-        downSql: 'DROP TABLE IF EXISTS users CASCADE',
+        downSql: 'DROP TABLE IF EXISTS "users" CASCADE',
       ),
       Migration(
         version: 3,
@@ -267,11 +276,10 @@ class MigrationRunner {
             CONSTRAINT check_stored_format 
               CHECK (stored_format IN ('jpeg', 'png')),
             CONSTRAINT check_deletion_time 
-              CHECK (deleted_at IS NULL OR deleted_at >= uploaded_at),
-            CONSTRAINT unique_active_per_user 
-              UNIQUE (user_id, is_active) WHERE is_active = true
+              CHECK (deleted_at IS NULL OR deleted_at >= uploaded_at)
           );
           
+          CREATE UNIQUE INDEX idx_profile_image_user_active_unique ON profile_image(user_id, is_active) WHERE is_active = true;
           CREATE INDEX idx_profile_image_user_id ON profile_image(user_id);
           CREATE INDEX idx_profile_image_is_active ON profile_image(is_active);
           CREATE INDEX idx_profile_image_uploaded_at ON profile_image(uploaded_at DESC);
@@ -328,8 +336,8 @@ class MigrationRunner {
       try {
         await connection.execute(migration.upSql);
         await connection.execute(
-          'INSERT INTO schema_migrations (version, description) VALUES (\$1, \$2)',
-          parameters: [migration.version, migration.description],
+          'INSERT INTO schema_migrations (version, description) VALUES (@version, @description)',
+          substitutionValues: {'version': migration.version, 'description': migration.description},
         );
         print('✓ Applied migration ${migration.version}: ${migration.description}');
       } catch (e) {
@@ -350,8 +358,8 @@ class MigrationRunner {
         try {
           await connection.execute(migration.downSql);
           await connection.execute(
-            'DELETE FROM schema_migrations WHERE version = \$1',
-            parameters: [version],
+            'DELETE FROM schema_migrations WHERE version = @version',
+            substitutionValues: {'version': version},
           );
           print('↻ Rolled back migration ${migration.version}');
         } catch (e) {

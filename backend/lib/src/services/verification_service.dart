@@ -1,6 +1,9 @@
 import 'package:postgres/postgres.dart';
 import 'token_service.dart';
 
+// Alias for cleaner code
+typedef Connection = PostgreSQLConnection;
+
 /// Service for managing email verification tokens and user verification status
 class VerificationService {
   final Connection connection;
@@ -24,15 +27,15 @@ class VerificationService {
       
       // Invalidate any existing verification tokens for this user
       await connection.execute(
-        'UPDATE verification_token SET used_at = CURRENT_TIMESTAMP WHERE user_id = \$1 AND used_at IS NULL',
-        parameters: [userId],
+        'UPDATE verification_token SET used_at = CURRENT_TIMESTAMP WHERE user_id = @id AND used_at IS NULL',
+        substitutionValues: {'id': userId},
       );
       
       // Insert new token
       await connection.execute(
         '''INSERT INTO verification_token (user_id, token_hash, expires_at)
-           VALUES (\$1, \$2, \$3)''',
-        parameters: [userId, tokenHash, expiresAt],
+           VALUES (@user_id, @token_hash, @expires_at)''',
+        substitutionValues: {'user_id': userId, 'token_hash': tokenHash, 'expires_at': expiresAt},
       );
       
       return token;
@@ -51,8 +54,8 @@ class VerificationService {
       // Find the token
       final result = await connection.query(
         '''SELECT user_id, expires_at, used_at FROM verification_token 
-           WHERE token_hash = \$1''',
-        parameters: [tokenHash],
+           WHERE token_hash = @hash''',
+        substitutionValues: {'hash': tokenHash},
       );
       
       if (result.isEmpty) {
@@ -77,15 +80,15 @@ class VerificationService {
       // Mark token as used
       await connection.execute(
         '''UPDATE verification_token SET used_at = CURRENT_TIMESTAMP 
-           WHERE token_hash = \$1''',
-        parameters: [tokenHash],
+           WHERE token_hash = @hash''',
+        substitutionValues: {'hash': tokenHash},
       );
       
       // Update user verification status
       await connection.execute(
-        '''UPDATE "user" SET email_verified = true, verified_at = CURRENT_TIMESTAMP 
-           WHERE id = \$1''',
-        parameters: [userId],
+        '''UPDATE "users" SET email_verified = true, verified_at = CURRENT_TIMESTAMP 
+           WHERE id = @id''',
+        substitutionValues: {'id': userId},
       );
       
       return true;
@@ -98,8 +101,8 @@ class VerificationService {
   Future<VerificationStatus> getVerificationStatus(String userId) async {
     try {
       final result = await connection.query(
-        '''SELECT email_verified, verified_at FROM "user" WHERE id = \$1''',
-        parameters: [userId],
+        '''SELECT email_verified, verified_at FROM "users" WHERE id = @id''',
+        substitutionValues: {'id': userId},
       );
       
       if (result.isEmpty) {
@@ -123,9 +126,9 @@ class VerificationService {
   Future<void> markUserVerified(String userId) async {
     try {
       await connection.execute(
-        '''UPDATE "user" SET email_verified = true, verified_at = CURRENT_TIMESTAMP 
-           WHERE id = \$1''',
-        parameters: [userId],
+        '''UPDATE "users" SET email_verified = true, verified_at = CURRENT_TIMESTAMP 
+           WHERE id = @id''',
+        substitutionValues: {'id': userId},
       );
     } catch (e) {
       throw VerificationException('Failed to mark user verified: $e');
@@ -151,9 +154,9 @@ class VerificationService {
     try {
       final result = await connection.query(
         '''SELECT id FROM verification_token 
-           WHERE user_id = \$1 AND used_at IS NULL AND expires_at > CURRENT_TIMESTAMP
+           WHERE user_id = @id AND used_at IS NULL AND expires_at > CURRENT_TIMESTAMP
            LIMIT 1''',
-        parameters: [userId],
+        substitutionValues: {'id': userId},
       );
       
       return result.isNotEmpty;

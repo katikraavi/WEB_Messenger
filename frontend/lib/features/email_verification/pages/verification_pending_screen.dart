@@ -383,11 +383,6 @@ class _VerificationPendingScreenState
                           : 'Resend in $_resendCountdown seconds',
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  OutlinedButton(
-                    onPressed: widget.onAlternateEmail,
-                    child: const Text('Use Alternative Email'),
-                  ),
                 ],
               ),
               const SizedBox(height: 24),

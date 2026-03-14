@@ -3,7 +3,7 @@ import 'package:postgres/postgres.dart';
 /// Migration: Create Users table with authentication and profile fields
 Future<void> up(Connection connection) async {
   await connection.execute('''
-    CREATE TABLE IF NOT EXISTS "user" (
+    CREATE TABLE IF NOT EXISTS "users" (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       email VARCHAR(255) NOT NULL UNIQUE,
       username VARCHAR(50) NOT NULL UNIQUE,
@@ -11,7 +11,12 @@ Future<void> up(Connection connection) async {
       email_verified BOOLEAN NOT NULL DEFAULT false,
       profile_picture_url TEXT,
       about_me TEXT,
+      is_private_profile BOOLEAN NOT NULL DEFAULT false,
+      profile_updated_at TIMESTAMP WITH TIME ZONE,
       created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      last_password_changed TIMESTAMP WITH TIME ZONE,
+      last_login_at TIMESTAMP WITH TIME ZONE,
+      verified_at TIMESTAMP WITH TIME ZONE,
       
       -- Constraints
       CONSTRAINT email_format CHECK (email LIKE '%@%.%'),
@@ -22,27 +27,27 @@ Future<void> up(Connection connection) async {
   
   // Create indexes for common queries
   await connection.execute('''
-    CREATE UNIQUE INDEX idx_user_email ON "user"(email);
+    CREATE UNIQUE INDEX idx_users_email ON "users"(email);
   ''');
   
   await connection.execute('''
-    CREATE UNIQUE INDEX idx_user_username ON "user"(username);
+    CREATE UNIQUE INDEX idx_users_username ON "users"(username);
   ''');
   
   await connection.execute('''
-    CREATE INDEX idx_user_created_at ON "user"(created_at DESC);
+    CREATE INDEX idx_users_created_at ON "users"(created_at DESC);
   ''');
   
-  print('[✓] Table created: user');
+  print('[✓] Table created: users');
 }
 
 /// Rollback: Drop Users table
 Future<void> down(Connection connection) async {
   await connection.execute('''
-    DROP TABLE IF EXISTS "user" CASCADE;
+    DROP TABLE IF EXISTS "users" CASCADE;
   ''');
   
-  print('[✓] Table dropped: user');
+  print('[✓] Table dropped: users');
 }
 
 /// Migration metadata

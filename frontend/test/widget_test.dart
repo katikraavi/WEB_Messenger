@@ -22,5 +22,8 @@ void main() {
 
     // Verify app launches
     expect(find.byType(MessengerApp), findsOneWidget);
-  }, skip: true); // TODO: Fix timer issue
+    
+    // Give async operations time to complete
+    await tester.pumpAndSettle(const Duration(seconds: 5));
+  });
 }

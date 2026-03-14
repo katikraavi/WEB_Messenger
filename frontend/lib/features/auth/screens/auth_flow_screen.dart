@@ -112,6 +112,7 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
           onRegistrationSuccess: (user, email) {
             _navigateToEmailVerification(user, email);
           },
+          onBackToLogin: _navigateToLogin,
         ),
         // Email verification screen (only shown if _registeredUser is set)
         if (_registeredUser != null && _registeredEmail != null)

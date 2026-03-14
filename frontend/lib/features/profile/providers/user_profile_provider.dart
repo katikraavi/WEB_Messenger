@@ -43,8 +43,8 @@ final userProfileProvider = FutureProvider.family<UserProfile, String>(
     final apiService = ref.watch(profileApiServiceProvider);
     
     try {
-      // T036: Fetch profile from API service
-      final profile = await apiService.fetchProfile(userId);
+      // T036: Fetch profile from API service (token optional for public profiles)
+      final profile = await apiService.fetchProfile(userId, token: null);
       return profile;
     } catch (e) {
       print('[userProfileProvider] Error fetching profile for $userId: $e');

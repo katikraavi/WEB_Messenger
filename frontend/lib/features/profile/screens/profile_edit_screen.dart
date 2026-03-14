@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:provider/provider.dart' as provider_pkg;
 import '../models/user_profile.dart';
 import '../models/profile_form_state.dart';
 import '../providers/profile_form_state_provider.dart';
+import '../providers/user_profile_provider.dart';
 import '../services/profile_api_service.dart';
 import '../widgets/profile_image_upload_widget.dart';
+import '../../auth/providers/auth_provider.dart';
 
 /// Screen for editing user profile information
 /// 
@@ -72,33 +75,6 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
               }
             },
           ),
-          actions: [
-            // T059: Save button enabled only when isDirty=true
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Center(
-                child: ElevatedButton.icon(
-                  onPressed: (formState.isDirty &&
-                          !formState.isLoading &&
-                          formState.error == null)
-                      ? () => _saveProfile(context, ref, formState)
-                      : null,
-                  icon: formState.isLoading
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white),
-                          ),
-                        )
-                      : const Icon(Icons.check),
-                  label: const Text('Save'),
-                ),
-              ),
-            ),
-          ],
         ),
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -125,19 +101,51 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
               _buildPrivacyToggle(ref, formState),
               const SizedBox(height: 24),
 
-              // T060: Cancel button
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () {
-                    if (formState.isDirty) {
-                      _showCancelConfirmation(context);
-                    } else {
-                      Navigator.pop(context);
-                    }
-                  },
-                  child: const Text('Cancel'),
-                ),
+              // T060: Cancel and Save buttons side-by-side
+              // T138: Accessibility labels for cancel and save buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: Tooltip(
+                      message: 'Cancel editing and lose changes',
+                      child: OutlinedButton(
+                        onPressed: () {
+                          if (formState.isDirty) {
+                            _showCancelConfirmation(context);
+                          } else {
+                            Navigator.pop(context);
+                          }
+                        },
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Tooltip(
+                      message: 'Save profile changes',
+                      child: ElevatedButton.icon(
+                        onPressed: (formState.isDirty &&
+                                !formState.isLoading &&
+                                formState.error == null)
+                            ? () => _saveProfile(context, ref, formState)
+                            : null,
+                        icon: formState.isLoading
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white),
+                                ),
+                              )
+                            : const Icon(Icons.check),
+                        label: const Text('Save'),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -274,21 +282,26 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   }
 
   /// T114, T115: Build privacy toggle - Phase 9
+  /// T138: Accessibility labels for privacy toggle
   Widget _buildPrivacyToggle(WidgetRef ref, ProfileFormState formState) {
     return Card(
-      child: SwitchListTile(
-        title: const Text(
-          'Private Profile',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+      child: Semantics(
+        label: 'Privacy settings toggle',
+        enabled: true,
+        child: SwitchListTile(
+          title: const Text(
+            'Private Profile',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          ),
+          subtitle: const Text('Only contacts can see your profile'),
+          value: formState.isPrivateProfile,
+          onChanged: (value) {
+            // T115: Update form state when toggled
+            ref
+                .read(profileFormStateProvider(widget.profile).notifier)
+                .updatePrivacy(value);
+          },
         ),
-        subtitle: const Text('Only contacts can see your profile'),
-        value: formState.isPrivateProfile,
-        onChanged: (value) {
-          // T115: Update form state when toggled
-          ref
-              .read(profileFormStateProvider(widget.profile).notifier)
-              .updatePrivacy(value);
-        },
       ),
     );
   }
@@ -310,12 +323,30 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     try {
       formNotifier.setLoading(true);
 
+      // Get auth token from auth provider
+      final authProvider = provider_pkg.Provider.of<AuthProvider>(context, listen: false);
+      final token = authProvider.token;
+
+      if (token == null) {
+        formNotifier.setLoading(false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Not authenticated - please login again'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
       // T063: Call API to update profile
       final apiService = ProfileApiService();
       final updatedProfile = await apiService.updateProfile(
         username: formState.username,
         bio: formState.bio,
         isPrivateProfile: formState.isPrivateProfile,
+        token: token,
       );
 
       formNotifier.setLoading(false);
@@ -329,6 +360,9 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
             backgroundColor: Colors.green,
           ),
         );
+
+        // Refresh profile data to show updated information
+        ref.refresh(userProfileProvider(widget.profile.userId));
 
         // Pop screen after successful save
         Navigator.pop(context);

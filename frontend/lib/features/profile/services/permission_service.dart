@@ -90,12 +90,9 @@ class PermissionService {
   /// Show user-friendly message about permission denial
   /// 
   /// Used when image_picker returns null (user denied permission)
-  /// Provides helpful feedback to the user
+  /// Logs the denial; UI layer responsibility to show snackbar/dialog to user
   static void showPermissionDeniedMessage(String what) {
     print('[PermissionService] $what permission denied by user');
-    // TODO: Show snackbar or dialog to user
-    // In the UI layer, check for null returns from image_picker and show:
-    // - Camera: "Camera access is required to take photos"
-    // - Gallery: "Photo library access is required to select images"
+    // UI layer should display appropriate message when image_picker returns null
   }
 }

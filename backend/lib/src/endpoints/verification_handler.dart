@@ -58,8 +58,7 @@ Future<Response> sendVerificationEmail(
     await rateLimitService.recordAttempt('verify_email:$email');
 
     // Generate token and send email
-    // TODO: Use verificationService.createVerificationToken when database is available
-    final token = await tokenService.generateToken();
+    final token = await verificationService.createVerificationToken(userId);
     
     // Build verification email
     final emailMessage = emailService.buildVerificationEmail(
@@ -134,12 +133,14 @@ Future<Response> verifyEmailToken(
       );
     }
 
-    // TODO: Use verificationService.verifyAndConsumeToken when database is available
-    // For now, accept any valid token format
+    // Verify token using verification service
+    final verifiedUserId = await verificationService.verifyAndConsumeToken(token);
+    
     return Response.ok(
       jsonEncode({
         'success': true,
-        'message': 'Email verified successfully! (Database integration pending)',
+        'message': 'Email verified successfully!',
+        'user_id': verifiedUserId,
       }),
       headers: {'Content-Type': 'application/json'},
     );

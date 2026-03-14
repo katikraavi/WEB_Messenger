@@ -77,7 +77,7 @@ class UserProfile {
   /// Deserializes [UserProfile] from JSON Map
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     return UserProfile(
-      userId: json['userId'] as String,
+      userId: (json['userId'] ?? json['id']) as String,
       username: json['username'] as String,
       profilePictureUrl: json['profilePictureUrl'] as String?,
       aboutMe: json['aboutMe'] as String? ?? '',

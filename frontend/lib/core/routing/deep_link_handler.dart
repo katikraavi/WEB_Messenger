@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uni_links/uni_links.dart';
+// import 'package:uni_links/uni_links.dart'; // TODO: Add uni_links dependency when implementing deep links
 import 'dart:async';
 import 'dart:io';
 
@@ -22,14 +22,16 @@ class DeepLinkHandler {
   ///         messenger://reset?token=TOKEN
   static void _initAndroidDeepLinks(BuildContext context) {
     _deepLinkSubscription?.cancel();
-    _deepLinkSubscription = uriLinkStream.listen(
-      (String link) {
-        _handleDeepLink(context, link);
-      },
-      onError: (error) {
-        print('[DeepLink] Error: $error');
-      },
-    );
+    // TODO: Implement deep link handling once uni_links is added to dependencies
+    //  _deepLinkSubscription = uriLinkStream.listen(
+    //   (String link) {
+    //     _handleDeepLink(context, link);
+    //   },
+    //   onError: (error) {
+    //     print('[DeepLink] Error: $error');
+    //   },
+    // );
+    print('[DeepLink] Android deep link support not yet enabled');
   }
 
   /// Handle iOS deep links
@@ -37,14 +39,16 @@ class DeepLinkHandler {
   ///         messenger://reset?token=TOKEN
   static void _initIOSDeepLinks(BuildContext context) {
     _deepLinkSubscription?.cancel();
-    _deepLinkSubscription = uriLinkStream.listen(
-      (String link) {
-        _handleDeepLink(context, link);
-      },
-      onError: (error) {
-        print('[DeepLink] Error: $error');
-      },
-    );
+    // TODO: Implement deep link handling once uni_links is added to dependencies
+    // _deepLinkSubscription = uriLinkStream.listen(
+    //   (String link) {
+    //     _handleDeepLink(context, link);
+    //   },
+    //   onError: (error) {
+    //     print('[DeepLink] Error: $error');
+    //   },
+    // );
+    print('[DeepLink] iOS deep link support not yet enabled');
   }
 
   /// Handle both Android and iOS deep links

@@ -1,13 +1,22 @@
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:uuid/uuid.dart';
+import 'package:postgres/postgres.dart';
 import '../models/user_model.dart';
 import '../services/user_service.dart';
+
+// Alias for cleaner code
+typedef Connection = PostgreSQLConnection;
 
 /// User endpoints handler for registration and profile management
 class UserEndpoints {
   static final _uuid = const Uuid();
-  static final _users = <String, User>{}; // In-memory storage (demo)
+  static late Connection _db;
+  
+  /// Initialize database connection for user endpoints
+  static void initializeDatabase(Connection database) {
+    _db = database;
+  }
 
   /// Route configuration
   static Router get router {
@@ -53,8 +62,12 @@ class UserEndpoints {
         );
       }
 
-      // Check if user exists
-      if (_users.values.any((u) => u.email == email || u.username == username)) {
+      // Check if user already exists
+      final existing = await _db.query(
+        'SELECT id FROM "users" WHERE email = @email OR username = @username',
+        substitutionValues: {'email': email, 'username': username},
+      );
+      if (existing.isNotEmpty) {
         return Response(409, body: '{"error": "User already exists"}');
       }
 
@@ -66,7 +79,19 @@ class UserEndpoints {
         plainPassword: password,
       );
 
-      _users[userId] = user;
+      // Insert user into database
+      await _db.execute(
+        '''INSERT INTO "users" (id, email, username, password_hash, email_verified, created_at)
+           VALUES (@id, @email, @username, @password_hash, @email_verified, @created_at)''',
+        substitutionValues: {
+          'id': userId,
+          'email': email,
+          'username': username,
+          'password_hash': user.passwordHash,
+          'email_verified': false,
+          'created_at': DateTime.now(),
+        },
+      );
 
       return Response.ok(
         _toJson(user),
@@ -94,14 +119,36 @@ class UserEndpoints {
         );
       }
 
-      final user = _users.values.firstWhere(
-        (u) => u.email == email,
-        orElse: () => throw Exception('User not found'),
+      // Query user from database by email
+      final result = await _db.query(
+        'SELECT id, email, username, password_hash, email_verified FROM "users" WHERE email = @email',
+        substitutionValues: {'email': email},
       );
-
-      if (!UserService.verifyPassword(password, user.passwordHash)) {
+      
+      if (result.isEmpty) {
         return Response(401, body: '{"error": "Invalid credentials"}');
       }
+      
+      final row = result.first.toColumnMap();
+      final userId = row['id'] as String;
+      final username = row['username'] as String;
+      final passwordHash = row['password_hash'] as String;
+      final emailVerified = row['email_verified'] as bool;
+      
+      // Verify password
+      if (!UserService.verifyPassword(password, passwordHash)) {
+        return Response(401, body: '{"error": "Invalid credentials"}');
+      }
+
+      // Create user object for response
+      final user = User(
+        id: userId,
+        email: email,
+        username: username,
+        passwordHash: passwordHash,
+        emailVerified: emailVerified,
+        createdAt: DateTime.now(),
+      );
 
       return Response.ok(
         _toJson(user),
@@ -115,46 +162,78 @@ class UserEndpoints {
   /// Get user profile
   static Future<Response> _getProfile(Request request, String userId) async {
     try {
-      final user = _users[userId];
-      if (user == null) {
-        return Response.notFound('{"error": "User not found"}');
+      // Query user from database
+      final result = await _db.query(
+        '''SELECT id, email, username, profile_picture_url, about_me, created_at
+           FROM "users" WHERE id = @id''',
+        substitutionValues: {'id': userId},
+      );
+      
+      if (result.isEmpty) {
+        return Response(404, body: '{"error": "User not found"}');
       }
-
+      
+      final row = result.first.toColumnMap();
+      final user = User.fromDatabase(row);
+      
       return Response.ok(
         _toJson(user),
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      return Response.internalServerError();
+      return Response.internalServerError(
+        body: '{"error": "Failed to fetch profile: $e"}',
+      );
     }
   }
 
   /// Update user profile
   static Future<Response> _updateProfile(Request request, String userId) async {
     try {
-      final user = _users[userId];
-      if (user == null) {
-        return Response.notFound('{"error": "User not found"}');
-      }
-
       final json = await request.readAsString();
       final body = json.isEmpty ? {} : _parseJson(json);
 
-      final updated = UserService.updateProfile(
-        user: user,
-        email: body['email'] as String?,
-        profilePictureUrl: body['profile_picture_url'] as String?,
-        aboutMe: body['about_me'] as String?,
+      final email = body['email'] as String?;
+      final profilePictureUrl = body['profilePictureUrl'] as String?;
+      final aboutMe = body['aboutMe'] as String?;
+
+      // Update user in database
+      await _db.execute(
+        '''UPDATE "user" 
+           SET email = COALESCE(@email, email),
+               profile_picture_url = COALESCE(@picture_url, profile_picture_url),
+               about_me = COALESCE(@about_me, about_me)
+           WHERE id = @id''',
+        substitutionValues: {
+          'email': email,
+          'picture_url': profilePictureUrl,
+          'about_me': aboutMe,
+          'id': userId,
+        },
       );
 
-      _users[userId] = updated;
+      // Fetch updated user
+      final result = await _db.query(
+        '''SELECT id, email, username, profile_picture_url, about_me, created_at
+           FROM "users" WHERE id = @id''',
+        substitutionValues: {'id': userId},
+      );
+
+      if (result.isEmpty) {
+        return Response(404, body: '{"error": "User not found"}');
+      }
+
+      final row = result.first.toColumnMap();
+      final user = User.fromDatabase(row);
 
       return Response.ok(
-        _toJson(updated),
+        _toJson(user),
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      return Response.internalServerError();
+      return Response.internalServerError(
+        body: '{"error": "Failed to update profile: $e"}',
+      );
     }
   }
 

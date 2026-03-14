@@ -1,7 +1,11 @@
 import '../models/user_profile.dart';
 import '../models/profile_image.dart';
 import '../models/user_model.dart';
+import 'package:postgres/postgres.dart';
 import 'dart:io';
+
+// Alias for cleaner code
+typedef Connection = PostgreSQLConnection;
 
 /// User Profile Service
 /// Business logic for user profile management, image validation, storage
@@ -14,14 +18,14 @@ import 'dart:io';
 
 class ProfileService {
   final String uploadsDir;
+  final Connection _db;
   
-  // TODO: Inject database connection
-  // This would be passed in via constructor for dependency injection
-  // late final Database _db;
+  ProfileService({
+    required Connection database,
+    this.uploadsDir = '/uploads/profiles',
+  }) : _db = database;
 
-  ProfileService({this.uploadsDir = '/uploads/profiles'});
-
-  /// Fetches user profile from database [T023]
+  /// Fetches user profile from database
   /// 
   /// Arguments:
   ///   - userId: User ID to fetch profile for
@@ -33,14 +37,21 @@ class ProfileService {
   /// HTTP: 200 = success, 404 = user not found, 500 = server error
   Future<User?> getProfile(String userId) async {
     try {
-      // TODO: Implement database query
-      // SELECT id, email, username, password_hash, email_verified,
-      //        profile_picture_url, about_me, is_private_profile,
-      //        created_at, profile_updated_at
-      // FROM users WHERE id = userId
-      
-      // Placeholder implementation
-      return null;
+      final result = await _db.query(
+        '''SELECT id, email, username, password_hash, email_verified,
+                  profile_picture_url, about_me, is_private_profile, 
+                  profile_updated_at, created_at
+           FROM "users"
+           WHERE id = @id''',
+        substitutionValues: {'id': userId},
+      );
+
+      if (result.isEmpty) {
+        return null;
+      }
+
+      final row = result.first.toColumnMap();
+      return User.fromDatabase(row);
     } catch (e) {
       print('[ProfileService] Error fetching profile: $e');
       rethrow;
@@ -87,18 +98,21 @@ class ProfileService {
       final cleanUsername = sanitizeText(username, 32);
       final cleanBio = sanitizeText(bio, 500);
 
-      // TODO: Implement database update
-      // UPDATE users SET 
-      //   username = ?, 
-      //   about_me = ?, 
-      //   is_private_profile = ?,
-      //   profile_updated_at = NOW()
-      // WHERE id = ?
+      // 3. Update database
+      await _db.execute(
+        '''UPDATE "users"
+           SET username = @username,
+               about_me = @about_me
+           WHERE id = @id''',
+        substitutionValues: {
+          'username': cleanUsername,
+          'about_me': cleanBio,
+          'id': userId,
+        },
+      );
 
-      // 3. Return updated user
-      // return await getProfile(userId);
-      
-      return null; // Placeholder
+      // 4. Fetch and return updated user
+      return await getProfile(userId);
     } catch (e) {
       print('[ProfileService] Error updating profile: $e');
       rethrow;
@@ -150,29 +164,27 @@ class ProfileService {
       }
 
       // 2. Store image file
-      // TODO: Images need dimension validation via image package decoding
-      // For now, just store the file as-is
       final imageUrl = await storeImage(imageFile, userId);
       
       if (imageUrl == null) {
         throw Exception('Failed to store image');
       }
 
-      // 3. Create ProfileImage record in database
-      // TODO: INSERT INTO profile_image (image_id, user_id, image_url, file_size, format, uploaded_at)
-      //       VALUES (gen_random_uuid(), userId, imageUrl, fileSize, formatFromExtension, NOW())
+      // 3. Soft-delete previous image if exists
+      await _db.execute(
+        '''UPDATE profile_image SET deleted_at = NOW() 
+           WHERE user_id = @id AND deleted_at IS NULL''',
+        substitutionValues: {'id': userId},
+      );
 
-      // 4. Soft-delete previous image if exists
-      // TODO: UPDATE profile_image SET deleted_at = NOW() 
-      //       WHERE user_id = userId AND deleted_at IS NULL AND image_url != imageUrl
+      // 4. Update User.profilePictureUrl
+      await _db.execute(
+        '''UPDATE "users" SET profile_picture_url = @url WHERE id = @id''',
+        substitutionValues: {'url': imageUrl, 'id': userId},
+      );
 
-      // 5. Update User.profilePictureUrl
-      // TODO: UPDATE users SET profile_picture_url = imageUrl, profile_updated_at = NOW() WHERE id = userId
-
-      // 6. Return updated user
-      // return await getProfile(userId);
-      
-      return null; // Placeholder
+      // 5. Return updated user
+      return await getProfile(userId);
     } catch (e) {
       print('[ProfileService] Error uploading image: $e');
       rethrow;
@@ -209,17 +221,21 @@ class ProfileService {
         throw Exception('User has no custom profile picture to delete (404)');
       }
 
-      // TODO: Soft-delete ProfileImage record
-      // UPDATE profile_image SET deleted_at = NOW() 
-      // WHERE user_id = userId AND deleted_at IS NULL
+      // 3. Soft-delete ProfileImage record
+      await _db.execute(
+        '''UPDATE profile_image SET deleted_at = NOW() 
+           WHERE user_id = @id AND deleted_at IS NULL''',
+        substitutionValues: {'id': userId},
+      );
 
-      // TODO: Clear User.profilePictureUrl
-      // UPDATE users SET profile_picture_url = NULL, profile_updated_at = NOW() WHERE id = userId
+      // 4. Clear User.profilePictureUrl
+      await _db.execute(
+        '''UPDATE "users" SET profile_picture_url = NULL WHERE id = @id''',
+        substitutionValues: {'id': userId},
+      );
 
-      // 3. Return updated user
-      // return await getProfile(userId);
-      
-      return null; // Placeholder
+      // 5. Return updated user
+      return await getProfile(userId);
     } catch (e) {
       print('[ProfileService] Error deleting image: $e');
       rethrow;
@@ -295,8 +311,8 @@ class ProfileService {
     }
   }
 
-  /// Delete image file
-  Future<bool> deleteImage(String filePath) async {
+  /// Delete image file from disk
+  Future<bool> deleteImageFile(String filePath) async {
     try {
       final fullPath = '$uploadsDir/$filePath';
       final file = File(fullPath);
@@ -306,7 +322,7 @@ class ProfileService {
       }
       return false;
     } catch (e) {
-      print('[ProfileService] Error deleting image: $e');
+      print('[ProfileService] Error deleting image file: $e');
       return false;
     }
   }
@@ -341,6 +357,59 @@ class ProfileService {
     }
 
     return errors.isEmpty ? null : errors;
+  }
+
+  /// Update user's profile picture URL in database [T031]
+  /// 
+  /// Arguments:
+  ///   - userId: User ID to update
+  ///   - pictureUrl: New profile picture URL
+  /// 
+  /// Returns: Updated User object with new profile picture URL
+  /// 
+  /// HTTP: 200 = success, 404 = user not found, 500 = server error
+  Future<User?> updateProfilePicture({
+    required String userId,
+    required String pictureUrl,
+  }) async {
+    try {
+      await _db.execute(
+        '''UPDATE "users"
+           SET profile_picture_url = @url
+           WHERE id = @id''',
+        substitutionValues: {'url': pictureUrl, 'id': userId},
+      );
+
+      // Fetch and return updated user
+      return await getProfile(userId);
+    } catch (e) {
+      print('[ProfileService] Error updating profile picture: $e');
+      rethrow;
+    }
+  }
+
+  /// Delete profile picture from database [T032]
+  /// 
+  /// Arguments:
+  ///   - userId: User ID to delete picture for
+  /// 
+  /// Returns: Updated User object (profilePictureUrl = null)
+  /// 
+  /// HTTP: 200 = success, 404 = user not found, 500 = server error
+  Future<bool> deleteProfilePicture(String userId) async {
+    try {
+      await _db.execute(
+        '''UPDATE "users"
+           SET profile_picture_url = NULL
+           WHERE id = @id''',
+        substitutionValues: {'id': userId},
+      );
+
+      return true;
+    } catch (e) {
+      print('[ProfileService] Error deleting profile picture: $e');
+      rethrow;
+    }
   }
 }
 

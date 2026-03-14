@@ -1,0 +1,430 @@
+Resolving dependencies...
+Downloading packages...
+  flutter_riverpod 2.6.1 (3.3.1 available)
+  flutter_secure_storage 9.2.4 (10.0.0 available)
+  flutter_secure_storage_linux 1.2.3 (3.0.0 available)
+  flutter_secure_storage_macos 3.1.3 (4.0.0 available)
+  flutter_secure_storage_platform_interface 1.1.2 (2.0.1 available)
+  flutter_secure_storage_web 1.2.1 (2.1.0 available)
+  flutter_secure_storage_windows 3.1.2 (4.1.0 available)
+  js 0.6.7 (0.7.2 available)
+  matcher 0.12.18 (0.12.19 available)
+  meta 1.18.0 (1.18.1 available)
+  permission_handler 11.4.0 (12.0.1 available)
+  permission_handler_android 12.1.0 (13.0.1 available)
+  riverpod 2.6.1 (3.2.1 available)
+  test_api 0.7.9 (0.7.10 available)
+  win32 5.15.0 (6.0.0 available)
+Got dependencies!
+15 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart
+00:00 +0: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-1: Initial state - form fields pre-populated with original values
+00:00 +0 ~1: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +0 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +1 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+[Profile] State: updateUsername → username="jan..."isDirty=true
+00:00 +2 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +3 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +4 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +5 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +6 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +7 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +8 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +9 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +10 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +11 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +12 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +13 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +14 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +15 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +16 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +17 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +18 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +19 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +20 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +21 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +22 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +23 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +24 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +25 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +26 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +27 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +28 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +29 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +30 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +31 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +32 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +33 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +34 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +35 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +36 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +37 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +38 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +39 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-2: Editing username sets isDirty=true and enables Save button
+00:00 +40 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_view_screen_test.dart: ProfileViewScreen Widget Tests (T045-T048) T045: ProfileViewScreen renders without errors
+00:00 +41 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_view_screen_test.dart: ProfileViewScreen Widget Tests (T045-T048) T045: ProfileViewScreen renders without errors
+00:00 +42 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_view_screen_test.dart: ProfileViewScreen Widget Tests (T045-T048) T045: ProfileViewScreen renders without errors
+00:00 +43 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_view_screen_test.dart: ProfileViewScreen Widget Tests (T045-T048) T045: ProfileViewScreen renders without errors
+00:00 +44 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_view_screen_test.dart: ProfileViewScreen Widget Tests (T045-T048) T045: ProfileViewScreen renders without errors
+00:00 +45 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_view_screen_test.dart: ProfileViewScreen Widget Tests (T045-T048) T045: ProfileViewScreen renders without errors
+00:00 +46 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_view_screen_test.dart: ProfileViewScreen Widget Tests (T045-T048) T045: ProfileViewScreen renders without errors
+00:00 +47 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_view_screen_test.dart: ProfileViewScreen Widget Tests (T045-T048) T045: ProfileViewScreen renders without errors
+00:00 +48 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_view_screen_test.dart: ProfileViewScreen Widget Tests (T045-T048) T045: ProfileViewScreen renders without errors
+00:00 +49 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:00 +50 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:00 +51 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:00 +52 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:00 +53 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:00 +54 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:00 +55 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:00 +56 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:00 +57 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:00 +58 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:00 +59 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:00 +60 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:00 +61 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:00 +62 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:00 +63 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:00 +64 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:00 +65 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:00 +66 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+[Profile] State: updateUsername → username="mod..."isDirty=true
+00:01 +67 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:01 +68 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:01 +69 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:01 +70 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:01 +71 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:01 +72 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:01 +73 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:01 +74 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:01 +75 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:01 +76 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:01 +77 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:01 +78 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:01 +79 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:01 +80 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:01 +81 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:01 +82 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:01 +83 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:01 +84 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:01 +85 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:01 +86 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:01 +87 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:01 +88 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:01 +89 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T064-3: Cancel button reverts unsaved changes
+00:01 +90 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_view_screen_test.dart: ProfileViewScreen Widget Tests (T045-T048) T038: Edit button shows for own profile
+00:01 +91 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_view_screen_test.dart: ProfileViewScreen Widget Tests (T045-T048) T038: Edit button shows for own profile
+00:01 +92 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T065-1: Invalid username (too short) shows error message
+00:01 +93 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T065-1: Invalid username (too short) shows error message
+00:01 +94 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T065-1: Invalid username (too short) shows error message
+00:01 +95 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T065-1: Invalid username (too short) shows error message
+00:01 +96 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T065-1: Invalid username (too short) shows error message
+00:01 +97 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T065-1: Invalid username (too short) shows error message
+00:01 +98 ~2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T065-1: Invalid username (too short) shows error message
+══╡ EXCEPTION CAUGHT BY WIDGETS ╞═══════════════════════════════════════════════════════════════════
+The following RangeError was thrown while calling onChanged:
+RangeError (end): Invalid value: Not in inclusive range 0..1: 3
+
+When the exception was thrown, this was the stack:
+#0      RangeError.checkValidRange (dart:core/errors.dart:392:9)
+#1      _StringBase.substring (dart:core-patch/string_patch.dart:437:27)
+#2      ProfileFormStateNotifier.updateUsername (package:frontend/features/profile/providers/profile_form_state_notifier.dart:54:81)
+#3      _ProfileEditScreenState._buildUsernameField.<anonymous closure> (package:frontend/features/profile/screens/profile_edit_screen.dart:200:18)
+#4      new TextFormField.<anonymous closure>.onChangedHandler (package:flutter/src/material/text_form_field.dart:226:25)
+#5      EditableTextState._formatAndSetValue (package:flutter/src/widgets/editable_text.dart:4594:27)
+#6      EditableTextState.updateEditingValue (package:flutter/src/widgets/editable_text.dart:3576:7)
+#7      TextInput._updateEditingValue (package:flutter/src/services/text_input.dart:2366:43)
+#8      TextInput._handleTextInputInvocation (package:flutter/src/services/text_input.dart:2212:29)
+#9      TextInput._loudlyHandleTextInputInvocation (package:flutter/src/services/text_input.dart:2095:20)
+#10     MethodChannel._handleAsMethodCall (package:flutter/src/services/platform_channel.dart:607:55)
+#11     MethodChannel.setMethodCallHandler.<anonymous closure> (package:flutter/src/services/platform_channel.dart:597:55)
+#12     TestDefaultBinaryMessenger.handlePlatformMessage (package:flutter_test/src/test_default_binary_messenger.dart:99:42)
+#13     TestTextInput.updateEditingValue (package:flutter_test/src/test_text_input.dart:211:71)
+#14     TestTextInput.enterText (package:flutter_test/src/test_text_input.dart:187:5)
+#15     WidgetTester.enterText.<anonymous closure> (package:flutter_test/src/widget_tester.dart:1161:21)
+<asynchronous suspension>
+#16     TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#17     main.<anonymous closure>.<anonymous closure> (file:///home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart:65:7)
+<asynchronous suspension>
+#18     testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#19     TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1800:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:01 +98 ~2 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +98 ~2 -1: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T065-1: Invalid username (too short) shows error message [E]
+  Test failed. See exception logs above.
+  The test description was: T065-1: Invalid username (too short) shows error message
+  
+00:01 +99 ~2 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +100 ~2 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +101 ~2 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +102 ~2 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +103 ~2 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +104 ~2 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +104 ~2 -1: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T065-2: Invalid username (too long) shows error message
+[Profile] State: updateUsername → username="aaa..."isDirty=true
+00:01 +105 ~2 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +106 ~2 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +107 ~2 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +108 ~2 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +109 ~2 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +110 ~2 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +111 ~2 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +111 ~3 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +111 ~4 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +111 ~5 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +111 ~6 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +111 ~7 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +111 ~8 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +111 ~9 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +112 ~9 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +112 ~9 -1: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T065-3: Invalid bio (too long) shows error message
+[Profile] State: updateBio → bio_length=500, isDirty=true
+00:01 +113 ~9 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +114 ~9 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +115 ~9 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +116 ~9 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +117 ~9 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +118 ~9 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +119 ~9 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +120 ~9 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +121 ~9 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +122 ~9 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +123 ~9 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +124 ~9 -1: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +124 ~9 -1: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T065-4: Form field stays populated on validation error
+══╡ EXCEPTION CAUGHT BY WIDGETS ╞═══════════════════════════════════════════════════════════════════
+The following RangeError was thrown while calling onChanged:
+RangeError (end): Invalid value: Not in inclusive range 0..2: 3
+
+When the exception was thrown, this was the stack:
+#0      RangeError.checkValidRange (dart:core/errors.dart:392:9)
+#1      _StringBase.substring (dart:core-patch/string_patch.dart:437:27)
+#2      ProfileFormStateNotifier.updateUsername (package:frontend/features/profile/providers/profile_form_state_notifier.dart:54:81)
+#3      _ProfileEditScreenState._buildUsernameField.<anonymous closure> (package:frontend/features/profile/screens/profile_edit_screen.dart:200:18)
+#4      new TextFormField.<anonymous closure>.onChangedHandler (package:flutter/src/material/text_form_field.dart:226:25)
+#5      EditableTextState._formatAndSetValue (package:flutter/src/widgets/editable_text.dart:4594:27)
+#6      EditableTextState.updateEditingValue (package:flutter/src/widgets/editable_text.dart:3576:7)
+#7      TextInput._updateEditingValue (package:flutter/src/services/text_input.dart:2366:43)
+#8      TextInput._handleTextInputInvocation (package:flutter/src/services/text_input.dart:2212:29)
+#9      TextInput._loudlyHandleTextInputInvocation (package:flutter/src/services/text_input.dart:2095:20)
+#10     MethodChannel._handleAsMethodCall (package:flutter/src/services/platform_channel.dart:607:55)
+#11     MethodChannel.setMethodCallHandler.<anonymous closure> (package:flutter/src/services/platform_channel.dart:597:55)
+#12     TestDefaultBinaryMessenger.handlePlatformMessage (package:flutter_test/src/test_default_binary_messenger.dart:99:42)
+#13     TestTextInput.updateEditingValue (package:flutter_test/src/test_text_input.dart:211:71)
+#14     TestTextInput.enterText (package:flutter_test/src/test_text_input.dart:187:5)
+#15     WidgetTester.enterText.<anonymous closure> (package:flutter_test/src/widget_tester.dart:1161:21)
+<asynchronous suspension>
+#16     TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#17     main.<anonymous closure>.<anonymous closure> (file:///home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart:104:7)
+<asynchronous suspension>
+#18     testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#19     TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1800:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:01 +124 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +124 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_edit_screen_test.dart: ProfileEditScreen - T067 Widget Tests T065-4: Form field stays populated on validation error [E]
+  Test failed. See exception logs above.
+  The test description was: T065-4: Form field stays populated on validation error
+  
+00:01 +125 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +126 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +127 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +128 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +129 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/integration/features/profile/profile_flow_integration_test.dart: Profile Feature Integration Tests Complete Edit/Upload/Save/Verify Flow Form structure loads correctly
+00:01 +130 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:01 +131 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:01 +132 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:01 +133 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:01 +134 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:01 +135 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:01 +136 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:01 +137 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:01 +138 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:01 +139 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:01 +140 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:01 +141 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:01 +142 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:01 +143 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:01 +144 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:01 +145 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:02 +146 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:02 +147 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:02 +148 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:02 +149 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:02 +150 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:02 +151 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:02 +152 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:02 +153 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:02 +154 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:02 +155 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:02 +156 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:02 +157 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:02 +158 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:02 +159 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:02 +160 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:02 +161 ~9 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:02 +161 ~10 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:02 +161 ~11 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:02 +161 ~12 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:02 +161 ~13 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:02 +161 ~14 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:02 +161 ~15 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:02 +161 ~16 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:02 +162 ~16 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:02 +163 ~16 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:02 +164 ~16 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:02 +165 ~16 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:02 +166 ~16 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:02 +167 ~16 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:02 +168 ~16 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:02 +169 ~16 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:02 +170 ~16 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests displays text input field
+00:02 +171 ~16 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_result_list_widget_test.dart: SearchResultListWidget Tests displays loading state
+00:02 +172 ~16 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_result_list_widget_test.dart: SearchResultListWidget Tests displays loading state
+00:02 +173 ~16 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_result_list_widget_test.dart: SearchResultListWidget Tests displays loading state
+00:02 +174 ~16 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_result_list_widget_test.dart: SearchResultListWidget Tests displays loading state
+00:02 +175 ~16 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_result_list_widget_test.dart: SearchResultListWidget Tests displays loading state
+00:02 +176 ~16 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_result_list_widget_test.dart: SearchResultListWidget Tests displays loading state
+00:02 +177 ~16 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_result_list_widget_test.dart: SearchResultListWidget Tests displays loading state
+00:02 +178 ~16 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_result_list_widget_test.dart: SearchResultListWidget Tests displays loading state
+00:02 +179 ~16 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_result_list_widget_test.dart: SearchResultListWidget Tests displays loading state
+00:02 +180 ~16 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_result_list_widget_test.dart: SearchResultListWidget Tests displays loading state
+00:02 +181 ~16 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_result_list_widget_test.dart: SearchResultListWidget Tests displays loading state
+00:02 +182 ~16 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests allows typing text
+00:02 +183 ~16 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests allows typing text
+00:02 +184 ~16 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests allows typing text
+00:02 +184 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests allows typing text
+00:02 +185 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests allows typing text
+00:02 +186 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests allows typing text
+00:02 +187 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests allows typing text
+00:02 +188 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests allows typing text
+00:02 +189 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests allows typing text
+00:02 +190 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests allows typing text
+00:02 +191 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests allows typing text
+00:02 +192 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests allows typing text
+00:02 +193 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests allows typing text
+00:02 +194 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests allows typing text
+00:02 +195 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_image_upload_widget_test.dart: ProfileImageUploadWidget - Widget Tests (T094-T101) T099-T101: Integration & State Persistence T101-5: Rapid rebuilds handled
+00:02 +196 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_image_upload_widget_test.dart: ProfileImageUploadWidget - Widget Tests (T094-T101) T099-T101: Integration & State Persistence T101-5: Rapid rebuilds handled
+00:02 +197 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_image_upload_widget_test.dart: ProfileImageUploadWidget - Widget Tests (T094-T101) T099-T101: Integration & State Persistence T101-5: Rapid rebuilds handled
+00:02 +198 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_image_upload_widget_test.dart: ProfileImageUploadWidget - Widget Tests (T094-T101) T099-T101: Integration & State Persistence T101-5: Rapid rebuilds handled
+00:02 +199 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/widget/features/profile/profile_image_upload_widget_test.dart: ProfileImageUploadWidget - Widget Tests (T094-T101) T099-T101: Integration & State Persistence T101-5: Rapid rebuilds handled
+00:02 +200 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests debounce delays onQueryChanged callback
+00:02 +201 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests debounce delays onQueryChanged callback
+00:02 +202 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests debounce delays onQueryChanged callback
+00:02 +203 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_result_list_widget_test.dart: SearchResultListWidget Tests displays error state
+00:02 +204 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_result_list_widget_test.dart: SearchResultListWidget Tests displays error state
+00:02 +205 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/profile/network_throttling_test.dart: Phase 11: Network Performance Tests T145: 3G Network Throttling API request completes under 3G latency
+00:02 +206 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/profile/network_throttling_test.dart: Phase 11: Network Performance Tests T145: 3G Network Throttling API request completes under 3G latency
+00:02 +207 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/profile/network_throttling_test.dart: Phase 11: Network Performance Tests T145: 3G Network Throttling API request completes under 3G latency
+00:02 +208 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/profile/network_throttling_test.dart: Phase 11: Network Performance Tests T145: 3G Network Throttling API request completes under 3G latency
+00:02 +209 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/profile/network_throttling_test.dart: Phase 11: Network Performance Tests T145: 3G Network Throttling API request completes under 3G latency
+00:02 +210 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/profile/network_throttling_test.dart: Phase 11: Network Performance Tests T145: 3G Network Throttling API request completes under 3G latency
+00:02 +211 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/profile/network_throttling_test.dart: Phase 11: Network Performance Tests T145: 3G Network Throttling API request completes under 3G latency
+00:02 +212 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/profile/network_throttling_test.dart: Phase 11: Network Performance Tests T145: 3G Network Throttling API request completes under 3G latency
+00:02 +213 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/profile/network_throttling_test.dart: Phase 11: Network Performance Tests T145: 3G Network Throttling API request completes under 3G latency
+00:02 +214 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/profile/network_throttling_test.dart: Phase 11: Network Performance Tests T145: 3G Network Throttling API request completes under 3G latency
+00:02 +215 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/profile/network_throttling_test.dart: Phase 11: Network Performance Tests T145: 3G Network Throttling API request completes under 3G latency
+00:02 +216 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/profile/network_throttling_test.dart: Phase 11: Network Performance Tests T145: 3G Network Throttling API request completes under 3G latency
+[Profile] State: performance → api_request_3g completed in 252ms
+00:02 +217 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_result_list_widget_test.dart: SearchResultListWidget Tests tapping result triggers onTap callback
+00:02 +218 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests pressing Enter key calls onSearch
+00:03 +219 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/search/widgets/search_bar_widget_test.dart: SearchBarWidget Tests pressing Enter key calls onSearch
+00:03 +220 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/profile/network_throttling_test.dart: Phase 11: Network Performance Tests T145: 3G Network Throttling Image upload under 3G bandwidth
+00:03 +221 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/profile/network_throttling_test.dart: Phase 11: Network Performance Tests T145: 3G Network Throttling Image upload under 3G bandwidth
+00:03 +222 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/profile/network_throttling_test.dart: Phase 11: Network Performance Tests T145: 3G Network Throttling Image upload under 3G bandwidth
+00:03 +223 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/profile/network_throttling_test.dart: Phase 11: Network Performance Tests T145: 3G Network Throttling Image upload under 3G bandwidth
+00:03 +224 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/profile/network_throttling_test.dart: Phase 11: Network Performance Tests T145: 3G Network Throttling Image upload under 3G bandwidth
+00:03 +225 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/profile/network_throttling_test.dart: Phase 11: Network Performance Tests T145: 3G Network Throttling Image upload under 3G bandwidth
+[Profile] State: performance → image_upload_3g completed in 8011ms
+00:10 +226 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/profile/network_throttling_test.dart: Phase 11: Network Performance Tests T145: 3G Network Throttling Profile page load under 3G
+[Profile] State: performance → profile_page_load_3g completed in 3168ms
+00:14 +227 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/profile/network_throttling_test.dart: Phase 11: Network Performance Tests T145: 3G Network Throttling Timeout handling on 3G
+[Profile] State: performance → timeout_test_3g completed in 25061ms
+00:39 +228 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/profile/network_throttling_test.dart: Phase 11: Network Performance Tests T145: 3G Network Throttling User can cancel slow upload on 3G
+00:40 +229 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/profile/network_throttling_test.dart: Phase 11: Network Performance Tests T145: 3G Network Throttling Cache helps with second load on 3G
+[Profile] State: performance → load_profile_no_cache completed in 3001ms
+[Profile] State: performance → load_profile_with_cache completed in 52ms
+00:43 +230 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/profile/network_throttling_test.dart: Phase 11: Network Performance Tests Network Speed Comparison 3G vs 4G vs WiFi performance
+[Profile] State: performance → download_3g completed in 8000ms
+[Profile] State: performance → download_4g completed in 801ms
+[Profile] State: performance → download_wifi completed in 261ms
+00:52 +231 ~17 -2: /home/katikraavi/mobile-messenger/frontend/test/features/profile/network_throttling_test.dart: Phase 11: Network Performance Tests (tearDownAll)
+Performance Profile Summary:
+9 operations tracked
+
+api_request_3g:
+  Calls: 1
+  Avg: 252.0ms
+  Min: 252.0ms
+  Max: 252.0ms
+  Success Rate: 100.0%
+
+image_upload_3g:
+  Calls: 1
+  Avg: 8011.0ms
+  Min: 8011.0ms
+  Max: 8011.0ms
+  Success Rate: 100.0%
+
+profile_page_load_3g:
+  Calls: 1
+  Avg: 3168.0ms
+  Min: 3168.0ms
+  Max: 3168.0ms
+  Success Rate: 100.0%
+
+timeout_test_3g:
+  Calls: 1
+  Avg: 25061.0ms
+  Min: 25061.0ms
+  Max: 25061.0ms
+  Success Rate: 100.0%
+
+load_profile_no_cache:
+  Calls: 1
+  Avg: 3001.0ms
+  Min: 3001.0ms
+  Max: 3001.0ms
+  Success Rate: 100.0%
+
+load_profile_with_cache:
+  Calls: 1
+  Avg: 52.0ms
+  Min: 52.0ms
+  Max: 52.0ms
+  Success Rate: 100.0%
+
+download_3g:
+  Calls: 1
+  Avg: 8000.0ms
+  Min: 8000.0ms
+  Max: 8000.0ms
+  Success Rate: 100.0%
+
+download_4g:
+  Calls: 1
+  Avg: 801.0ms
+  Min: 801.0ms
+  Max: 801.0ms
+  Success Rate: 100.0%
+
+download_wifi:
+  Calls: 1
+  Avg: 261.0ms
+  Min: 261.0ms
+  Max: 261.0ms
+  Success Rate: 100.0%
+
+
+00:52 +231 ~17 -2: Some tests failed.

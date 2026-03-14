@@ -4,11 +4,19 @@ import '../models/profile_form_state.dart';
 import '../models/user_profile.dart';
 import '../utils/validators.dart';
 import '../utils/image_validator.dart';
+import '../utils/profile_logger.dart';
 
 /// StateNotifier for managing profile edit form state
 /// 
 /// Handles form field updates, validation, dirty flag tracking,
 /// and form reset operations. Persists original profile for comparison.
+/// 
+/// Phase 11 Edge Cases [T136, T146-T152]:
+/// - T136: Last write wins for concurrent edits (state updates are atomic)
+/// - T146: Null safety checks on all nullable fields
+/// - T150: Form changes during network delay (state maintained)
+/// - T151: App backgrounding (state restored via provider)
+
 class ProfileFormStateNotifier extends StateNotifier<ProfileFormState> {
   final UserProfile originalProfile;
 
@@ -17,7 +25,7 @@ class ProfileFormStateNotifier extends StateNotifier<ProfileFormState> {
           ProfileFormState(
             userId: originalProfile.userId,
             username: originalProfile.username,
-            bio: originalProfile.aboutMe,
+            bio: originalProfile.aboutMe ?? '', // T146: Null safety
             isPrivateProfile: originalProfile.isPrivateProfile,
             isDirty: false,
             isLoading: false,
@@ -29,33 +37,46 @@ class ProfileFormStateNotifier extends StateNotifier<ProfileFormState> {
   /// 
   /// T051: Trim input, detect if different from original,
   /// set isDirty=true if changed, clear any previous error
+  /// T146: Null safety check for empty username
   void updateUsername(String value) {
+    // T146: Validate input is not null (Dart non-nullable strings can't be null, but defensive programming)
     final trimmedUsername = value.trim();
+    
+    // T149: Edge case - empty username after trim (same as no change if original is empty)
     final isDirty = trimmedUsername != originalProfile.username;
 
     state = state.copyWith(
       username: trimmedUsername,
-      isDirty: isDirty || (state.bio != originalProfile.aboutMe),
+      isDirty: isDirty || (state.bio != (originalProfile.aboutMe ?? '')),
       error: null,
     );
+    
+    final displayUsername = trimmedUsername.length > 3 ? '${trimmedUsername.substring(0, 3)}...' : trimmedUsername;
+    ProfileLogger.logStateChange('updateUsername', 'username="$displayUsername"isDirty=$isDirty');
   }
 
   /// Update bio field and detect dirty state
   /// 
   /// T052: Trim input to max 500 chars, detect if different from original,
   /// set isDirty=true if changed, clear any previous error
+  /// T149: Edge case - empty bio (placeholder should display)
   void updateBio(String value) {
     final trimmedBio = value.trim();
     // Enforce max 500 character limit
     final constrainedBio =
         trimmedBio.length > 500 ? trimmedBio.substring(0, 500) : trimmedBio;
-    final isDirty = constrainedBio != originalProfile.aboutMe;
+    
+    // T149: Empty bio is valid (placeholder will display)
+    final originalBio = originalProfile.aboutMe ?? '';
+    final isDirty = constrainedBio != originalBio;
 
     state = state.copyWith(
       bio: constrainedBio,
       isDirty: isDirty || (state.username != originalProfile.username),
       error: null,
     );
+    
+    ProfileLogger.logStateChange('updateBio', 'bio_length=${constrainedBio.length}, isDirty=$isDirty');
   }
 
   /// Update privacy setting
@@ -68,23 +89,28 @@ class ProfileFormStateNotifier extends StateNotifier<ProfileFormState> {
       isPrivateProfile: isPrivate,
       isDirty: isDirty ||
           (state.username != originalProfile.username) ||
-          (state.bio != originalProfile.aboutMe),
+          (state.bio != (originalProfile.aboutMe ?? '')),
       error: null,
     );
+    
+    ProfileLogger.logStateChange('updatePrivacy', 'isPrivate=$isPrivate, isDirty=$isDirty');
   }
 
   /// Reset form to original values
   /// 
   /// T054: Revert all fields to original, set isDirty=false
+  /// T151: Used when app returns from background or user cancels
   void reset() {
     state = state.copyWith(
       username: originalProfile.username,
-      bio: originalProfile.aboutMe,
+      bio: originalProfile.aboutMe ?? '', // T146: Null safety
       isPrivateProfile: originalProfile.isPrivateProfile,
       isDirty: false,
       error: null,
       isLoading: false,
     );
+    
+    ProfileLogger.logStateChange('reset', 'Form reverted to original');
   }
 
   /// Validate form fields
@@ -92,18 +118,27 @@ class ProfileFormStateNotifier extends StateNotifier<ProfileFormState> {
   /// T055: Check username format (3-32 chars, alphanumeric+underscore)
   /// Check bio length (max 500 chars)
   /// Return true if valid, set error if invalid
+  /// T146: Handle null/empty cases gracefully
   bool validate() {
-    // Validate username
+    // Validate username - empty is invalid per spec (min 3 chars)
+    if (state.username.trim().isEmpty) {
+      state = state.copyWith(error: ValidationError.invalidUsername);
+      ProfileLogger.logValidation('username', false, 'empty');
+      return false;
+    }
+    
     final usernameError = Validators.validateUsername(state.username);
     if (usernameError != null) {
       state = state.copyWith(error: usernameError);
+      ProfileLogger.logValidation('username', false, usernameError.toString());
       return false;
     }
 
-    // Validate bio
+    // T149: Validate bio - empty is valid (placeholder shows)
     final bioError = Validators.validateBio(state.bio);
     if (bioError != null) {
       state = state.copyWith(error: bioError);
+      ProfileLogger.logValidation('bio', false, bioError.toString());
       return false;
     }
 
@@ -112,6 +147,8 @@ class ProfileFormStateNotifier extends StateNotifier<ProfileFormState> {
       error: null,
       clearError: true,
     );
+    
+    ProfileLogger.logValidation('form', true, null);
     return true;
   }
 

@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:provider/provider.dart' as provider_pkg;
 import '../../../utils/copyable_error_widget.dart';
 import '../providers/profile_image_provider.dart';
 import '../services/image_picker_service.dart';
+import '../widgets/image_picker_permissions_handler.dart';
+import '../widgets/image_upload_progress_widget.dart';
+import '../../auth/providers/auth_provider.dart';
 
 class ProfileImageUploadWidget extends ConsumerWidget {
   final String? currentImageUrl;
@@ -75,9 +79,12 @@ class ProfileImageUploadWidget extends ConsumerWidget {
                       ? null
                       : () async {
                     try {
+                      final authProvider = provider_pkg.Provider.of<AuthProvider>(context, listen: false);
+                      final token = authProvider.token;
+                      
                       await ref
                           .read(profileImageProvider.notifier)
-                          .deleteImage();
+                          .deleteImage(token: token);
                       if (context.mounted &&
                           imageState.error == null) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -97,79 +104,105 @@ class ProfileImageUploadWidget extends ConsumerWidget {
         const SizedBox(height: 16),
 
         // Image picker buttons
+        // T138: Accessibility labels for gallery and camera buttons
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            ElevatedButton.icon(
-              icon: const Icon(Icons.photo_library),
-              label: const Text('Gallery'),
-              onPressed: imageState.isUploading
-                  ? null
-                  : () async {
-                try {
-                  final image =
-                  await ImagePickerService.pickImageFromGallery();
-                  if (image != null) {
-                    // Comprehensive validation with specific error messages
-                    final validationError =
-                        await ImagePickerService.validateImageComprehensive(image);
-                    if (validationError != null) {
-                      if (context.mounted) {
-                        showCopyableErrorSnackBar(context, validationError.message);
-                      }
-                      return;
+            Tooltip(
+              message: 'Pick image from gallery',
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.photo_library),
+                label: const Text('Gallery'),
+                onPressed: imageState.isUploading
+                    ? null
+                    : () async {
+                  try {
+                    // T133: Request gallery permission before opening picker
+                    final hasPermission = await ImagePickerPermissionsHandler
+                        .requestGalleryPermission(context);
+                    if (!hasPermission) {
+                      return; // User denied permission
                     }
-                    await ref
-                        .read(profileImageProvider.notifier)
-                        .selectImage(image.path);
+
+                    final image =
+                    await ImagePickerService.pickImageFromGallery();
+                    if (image != null) {
+                      // Comprehensive validation with specific error messages
+                      final validationError =
+                          await ImagePickerService.validateImageComprehensive(image);
+                      if (validationError != null) {
+                        if (context.mounted) {
+                          showCopyableErrorSnackBar(context, validationError.message);
+                        }
+                        return;
+                      }
+                      await ref
+                          .read(profileImageProvider.notifier)
+                          .selectImage(image.path);
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      showCopyableErrorSnackBar(context, 'Error: $e');
+                    }
                   }
-                } catch (e) {
-                  if (context.mounted) {
-                    showCopyableErrorSnackBar(context, 'Error: $e');
-                  }
-                }
-              },
+                },
+              ),
             ),
             const SizedBox(width: 12),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.camera_alt),
-              label: const Text('Camera'),
-              onPressed: imageState.isUploading
-                  ? null
-                  : () async {
-                try {
-                  final image =
-                  await ImagePickerService.pickImageFromCamera();
-                  if (image != null) {
-                    // Comprehensive validation with specific error messages
-                    final validationError =
-                        await ImagePickerService.validateImageComprehensive(image);
-                    if (validationError != null) {
-                      if (context.mounted) {
-                        showCopyableErrorSnackBar(context, validationError.message);
-                      }
-                      return;
+            Tooltip(
+              message: 'Take photo with camera',
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.camera_alt),
+                label: const Text('Camera'),
+                onPressed: imageState.isUploading
+                    ? null
+                    : () async {
+                  try {
+                    // T133: Request camera permission before opening picker
+                    final hasPermission = await ImagePickerPermissionsHandler
+                        .requestCameraPermission(context);
+                    if (!hasPermission) {
+                      return; // User denied permission
                     }
-                    await ref
-                        .read(profileImageProvider.notifier)
-                        .selectImage(image.path);
+
+                    final image =
+                    await ImagePickerService.pickImageFromCamera();
+                    if (image != null) {
+                      // Comprehensive validation with specific error messages
+                      final validationError =
+                          await ImagePickerService.validateImageComprehensive(image);
+                      if (validationError != null) {
+                        if (context.mounted) {
+                          showCopyableErrorSnackBar(context, validationError.message);
+                        }
+                        return;
+                      }
+                      await ref
+                          .read(profileImageProvider.notifier)
+                          .selectImage(image.path);
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      showCopyableErrorSnackBar(context, 'Error: $e');
+                    }
                   }
-                } catch (e) {
-                  if (context.mounted) {
-                    showCopyableErrorSnackBar(context, 'Error: $e');
-                  }
-                }
-              },
+                },
+              ),
             ),
           ],
         ),
 
         // Upload progress
+        // T142: Enhanced image upload progress display
         if (imageState.isUploading) ...[
           const SizedBox(height: 16),
-          LinearProgressIndicator(value: imageState.uploadProgress),
-          const SizedBox(height: 8),
-          Text('Uploading... ${(imageState.uploadProgress * 100).toStringAsFixed(0)}%'),
+          ImageUploadProgressWidget(
+            progress: imageState.uploadProgress,
+            bytesUploaded: imageState.bytesUploaded ?? 0,
+            totalBytes: imageState.totalBytes ?? 0,
+            displayFormat: 'simple',
+            onCancel: null, // Could add cancel functionality later
+          ),
         ],
 
         // Upload button
@@ -180,7 +213,10 @@ class ProfileImageUploadWidget extends ConsumerWidget {
             icon: const Icon(Icons.cloud_upload),
             label: const Text('Upload'),
             onPressed: () async {
-              await ref.read(profileImageProvider.notifier).uploadImage();
+              final authProvider = provider_pkg.Provider.of<AuthProvider>(context, listen: false);
+              final token = authProvider.token;
+              
+              await ref.read(profileImageProvider.notifier).uploadImage(token: token);
               if (context.mounted && imageState.error == null) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Image uploaded successfully!')),

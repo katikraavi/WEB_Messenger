@@ -58,6 +58,28 @@ class User {
     );
   }
 
+  /// Deserialize from database row (column map)
+  factory User.fromDatabase(Map<String, dynamic> row) {
+    return User(
+      id: row['id'] as String,
+      email: row['email'] as String,
+      username: row['username'] as String,
+      passwordHash: row['password_hash'] as String,
+      emailVerified: row['email_verified'] as bool? ?? false,
+      profilePictureUrl: row['profile_picture_url'] as String?,
+      aboutMe: row['about_me'] as String?,
+      isPrivateProfile: row['is_private_profile'] as bool? ?? false,
+      createdAt: row['created_at'] is DateTime 
+          ? row['created_at'] as DateTime
+          : DateTime.parse(row['created_at'] as String),
+      profileUpdatedAt: row['profile_updated_at'] != null
+          ? row['profile_updated_at'] is DateTime
+              ? row['profile_updated_at'] as DateTime
+              : DateTime.parse(row['profile_updated_at'] as String)
+          : null,
+    );
+  }
+
   /// Create copy with modifications
   User copyWith({
     String? email,

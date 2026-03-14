@@ -61,8 +61,7 @@ Future<Response> requestPasswordReset(
     await rateLimitService.recordAttempt('password_reset:$email');
 
     // Generate token and send email
-    // TODO: Use passwordResetService.createResetToken when database is available
-    final token = await tokenService.generateToken();
+    final token = await passwordResetService.createResetToken(userId, email);
     
     // Build password reset email
     final emailMessage = emailService.buildPasswordResetEmail(
@@ -163,12 +162,14 @@ Future<Response> confirmPasswordReset(
       );
     }
 
-    // TODO: Use passwordResetService.verifyResetToken when database is available
-    // For now, accept any valid token format
+    // Verify reset token and update password
+    final resetUserId = await passwordResetService.verifyResetToken(token, newPassword);
+    
     return Response.ok(
       jsonEncode({
         'success': true,
-        'message': 'Password reset successfully! (Database integration pending)',
+        'message': 'Password reset successfully!',
+        'user_id': resetUserId,
       }),
       headers: {'Content-Type': 'application/json'},
     );

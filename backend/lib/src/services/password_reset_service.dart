@@ -1,6 +1,9 @@
 import 'package:postgres/postgres.dart';
 import 'token_service.dart';
 
+// Alias for cleaner code
+typedef Connection = PostgreSQLConnection;
+
 /// Service for managing password reset tokens and password resets
 class PasswordResetService {
   final Connection connection;
@@ -24,15 +27,15 @@ class PasswordResetService {
       
       // Invalidate any existing reset tokens for this user
       await connection.execute(
-        'UPDATE password_reset_token SET used_at = CURRENT_TIMESTAMP WHERE user_id = \$1 AND used_at IS NULL',
-        parameters: [userId],
+        'UPDATE password_reset_token SET used_at = CURRENT_TIMESTAMP WHERE user_id = @id AND used_at IS NULL',
+        substitutionValues: {'id': userId},
       );
       
       // Insert new token
       await connection.execute(
         '''INSERT INTO password_reset_token (user_id, token_hash, expires_at)
-           VALUES (\$1, \$2, \$3)''',
-        parameters: [userId, tokenHash, expiresAt],
+           VALUES (@user_id, @token_hash, @expires_at)''',
+        substitutionValues: {'user_id': userId, 'token_hash': tokenHash, 'expires_at': expiresAt},
       );
       
       return token;
@@ -50,8 +53,8 @@ class PasswordResetService {
       // Find the token
       final result = await connection.query(
         '''SELECT user_id, expires_at, used_at FROM password_reset_token 
-           WHERE token_hash = \$1''',
-        parameters: [tokenHash],
+           WHERE token_hash = @hash''',
+        substitutionValues: {'hash': tokenHash},
       );
       
       if (result.isEmpty) {
@@ -88,8 +91,8 @@ class PasswordResetService {
       // Find the token
       final result = await connection.query(
         '''SELECT user_id, expires_at, used_at FROM password_reset_token 
-           WHERE token_hash = \$1''',
-        parameters: [tokenHash],
+           WHERE token_hash = @hash''',
+        substitutionValues: {'hash': tokenHash},
       );
       
       if (result.isEmpty) {
@@ -114,21 +117,21 @@ class PasswordResetService {
       // Mark token as used
       await connection.execute(
         '''UPDATE password_reset_token SET used_at = CURRENT_TIMESTAMP 
-           WHERE token_hash = \$1''',
-        parameters: [tokenHash],
+           WHERE token_hash = @hash''',
+        substitutionValues: {'hash': tokenHash},
       );
       
       // Update user password and last_password_changed
       await connection.execute(
-        '''UPDATE "user" SET password_hash = \$1, last_password_changed = CURRENT_TIMESTAMP 
-           WHERE id = \$2''',
-        parameters: [newPasswordHash, userId],
+        '''UPDATE "users" SET password_hash = @hash, last_password_changed = CURRENT_TIMESTAMP 
+           WHERE id = @id''',
+        substitutionValues: {'hash': newPasswordHash, 'id': userId},
       );
       
       // Clear rate limit counter for this user (successful reset)
       await connection.execute(
-        '''DELETE FROM password_reset_attempt WHERE user_id = \$1''',
-        parameters: [userId],
+        '''DELETE FROM password_reset_attempt WHERE user_id = @id''',
+        substitutionValues: {'id': userId},
       );
       
       return true;

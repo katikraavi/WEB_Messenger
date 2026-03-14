@@ -6,6 +6,9 @@ import 'password_hasher.dart';
 import 'jwt_service.dart';
 import '../models/auth_result.dart';
 
+// Alias for cleaner code
+typedef Connection = PostgreSQLConnection;
+
 /// Handles user authentication operations (registration and login)
 /// Provides registration, login, and user lookup functionality
 class UserAuthService {
@@ -98,8 +101,8 @@ class UserAuthService {
 
       // Check if email already exists
       final emailExists = await _connection.query(
-        'SELECT id FROM users WHERE LOWER(email) = LOWER(\$1)',
-        [email],
+        'SELECT id FROM "users" WHERE LOWER(email) = LOWER(@email)',
+        substitutionValues: {'email': email},
       );
 
       if (emailExists.isNotEmpty) {
@@ -111,8 +114,8 @@ class UserAuthService {
 
       // Check if username already exists
       final usernameExists = await _connection.query(
-        'SELECT id FROM users WHERE LOWER(username) = LOWER(\$1)',
-        [username],
+        'SELECT id FROM "users" WHERE LOWER(username) = LOWER(@username)',
+        substitutionValues: {'username': username},
       );
 
       if (usernameExists.isNotEmpty) {
@@ -131,19 +134,17 @@ class UserAuthService {
 
       final result = await _connection.query(
         '''
-        INSERT INTO users (id, email, username, password_hash, full_name, created_at, updated_at)
-        VALUES (\$1, \$2, \$3, \$4, \$5, \$6, \$7)
+        INSERT INTO "users" (id, email, username, password_hash, created_at)
+        VALUES (@id, @email, @username, @password_hash, @created_at)
         RETURNING id, email, username
         ''',
-        [
-          userId,
-          email,
-          username,
-          passwordHash,
-          fullName ?? '',
-          now,
-          now,
-        ],
+        substitutionValues: {
+          'id': userId,
+          'email': email,
+          'username': username,
+          'password_hash': passwordHash,
+          'created_at': now,
+        },
       );
 
       if (result.isEmpty) {
@@ -188,8 +189,8 @@ class UserAuthService {
     try {
       // Look up user by email
       final result = await _connection.query(
-        'SELECT id, email, username, password_hash FROM users WHERE LOWER(email) = LOWER(\$1)',
-        [email],
+        'SELECT id, email, username, password_hash, email_verified FROM "users" WHERE LOWER(email) = LOWER(@email)',
+        substitutionValues: {'email': email},
       );
 
       if (result.isEmpty) {
@@ -218,8 +219,8 @@ class UserAuthService {
       // Update last login timestamp
       try {
         await _connection.execute(
-          'UPDATE users SET last_login_at = \$1 WHERE id = \$2',
-          [DateTime.now(), userId],
+          'UPDATE "users" SET last_login_at = @now WHERE id = @id',
+          substitutionValues: {'now': DateTime.now(), 'id': userId},
         );
       } catch (e) {
         // Non-critical: don't fail login if last_login_at update fails
@@ -254,8 +255,8 @@ class UserAuthService {
   Future<AuthResult?> getUserById(String userId) async {
     try {
       final result = await _connection.query(
-        'SELECT id, email, username FROM users WHERE id = \$1',
-        [userId],
+        'SELECT id, email, username FROM "users" WHERE id = @id',
+        substitutionValues: {'id': userId},
       );
 
       if (result.isEmpty) {
@@ -279,8 +280,8 @@ class UserAuthService {
   Future<bool> userExists(String userId) async {
     try {
       final result = await _connection.query(
-        'SELECT 1 FROM users WHERE id = \$1',
-        [userId],
+        'SELECT 1 FROM "users" WHERE id = @id',
+        substitutionValues: {'id': userId},
       );
       return result.isNotEmpty;
     } catch (e) {

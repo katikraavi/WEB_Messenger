@@ -196,8 +196,9 @@ class JwtService {
 
   /// Base64 URL-safe decoding
   static String _decodeBase64(String input) {
-    // Add padding if needed
-    final padded = input + '=' * (4 - input.length % 4);
+    // Add padding if needed (0, 1, or 2 characters maximum)
+    final paddingNeeded = (4 - input.length % 4) % 4;
+    final padded = input + '=' * paddingNeeded;
     return utf8.decode(base64Url.decode(padded));
   }
 

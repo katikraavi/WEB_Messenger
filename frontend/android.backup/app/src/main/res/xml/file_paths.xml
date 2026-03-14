@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Cache files for temporary images -->
+    <cache-path name="image_cache" path="." />
+    
+    <!-- External cache directory for large temporary files -->
+    <external-cache-path name="image_external_cache" path="." />
+    
+    <!-- External files directory -->
+    <external-files-path name="image_external_files" path="Pictures" />
+    
+    <!-- Root of external storage -->
+    <external-path name="image_external_storage" path="." />
+</paths>

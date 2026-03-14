@@ -187,19 +187,21 @@ void main() {
       });
     });
 
-    // Utility function tests (commented - would be used if utility methods added later)
-    group('Utility Functions (Future Enhancement)', () {
-      test('T093-1: formatFileSize would handle file sizes (not yet implemented)', () {
-        // TODO: Add formatFileSize method to ImageValidator
-        // final result = ImageValidator.formatFileSize(1024);
-        // expect(result, contains('1'));
-        // expect(result, contains('KB'));
+    // Utility function tests
+    group('Utility Functions', () {
+      test('T093-1: formatFileSize handles file sizes correctly', () {
+        expect(ImageValidator.formatFileSize(1024), equals('1.00 KB'));
+        expect(ImageValidator.formatFileSize(1048576), equals('1.00 MB'));
+        expect(ImageValidator.formatFileSize(512), equals('512 B'));
+        expect(ImageValidator.formatFileSize(1536), equals('1.50 KB'));
       });
 
-      test('T093-2: isLandscape would check orientation (not yet implemented)', () {
-        // TODO: Add isLandscape method to ImageValidator
-        // final result = ImageValidator.isLandscape(1920, 1080);
-        // expect(result, isTrue);
+      test('T093-2: isLandscape checks orientation correctly', () {
+        expect(ImageValidator.isLandscape(1920, 1080), isTrue);
+        expect(ImageValidator.isLandscape(1080, 1920), isFalse);
+        expect(ImageValidator.isLandscape(1080, 1080), isFalse);
+        expect(ImageValidator.isLandscape(2000, 1000), isTrue);
+        expect(ImageValidator.isLandscape(1000, 2000), isFalse);
       });
     });
 
