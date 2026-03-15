@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:frontend/core/services/api_client.dart';
+import 'package:frontend/core/push_notifications/push_notification_handler.dart';
 import 'package:frontend/features/auth/models/auth_models.dart';
 import 'package:frontend/features/auth/providers/auth_provider.dart';
 import 'package:frontend/features/auth/screens/auth_flow_screen.dart';
@@ -26,11 +27,25 @@ class MessengerApp extends StatefulWidget {
 class _MessengerAppState extends State<MessengerApp> {
   bool _isConnected = false;
   bool _isInitializing = true;
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
 
   @override
   void initState() {
     super.initState();
     _initializeBackendConnection();
+    _initializePushNotifications();
+  }
+
+  /// Initialize push notifications
+  /// 
+  /// Sets up Firebase Cloud Messaging to receive and handle push notifications
+  Future<void> _initializePushNotifications() async {
+    try {
+      await PushNotificationHandler().initialize(navigatorKey: _navigatorKey);
+      print('[App] Push notifications initialized');
+    } catch (e) {
+      print('[App Error] Failed to initialize push notifications: $e');
+    }
   }
 
   /// Wait for backend connection to be established
@@ -54,6 +69,7 @@ class _MessengerAppState extends State<MessengerApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: _navigatorKey,
       title: 'Mobile Messenger',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
@@ -67,6 +83,9 @@ class _MessengerAppState extends State<MessengerApp> {
         useMaterial3: true,
       ),
       themeMode: ThemeMode.system,
+      routes: {
+        '/invitations': (context) => const InvitationsScreen(),
+      },
       home: _buildHome(),
     );
   }

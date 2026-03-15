@@ -1,5 +1,6 @@
 import 'package:serverpod/serverpod.dart';
 import '../services/invite_service.dart';
+import '../services/firebase_notification_service.dart';
 import '../models/chat_invite.dart';
 
 /// Invites endpoint
@@ -27,6 +28,7 @@ class InvitesEndpoint extends Endpoint {
   /// - FR-001: No self-invites
   /// - FR-002: No invites to existing chats
   /// - FR-003: Create invite record
+  /// - T048: Send push notification to recipient
   /// 
   /// Returns: ChatInvite (201)
   /// Errors: 400 (validation), 401 (auth), 404 (not found), 409 (duplicate)
@@ -42,6 +44,24 @@ class InvitesEndpoint extends Endpoint {
         senderId: userId,
         recipientId: recipientId,
       );
+      
+      // T048: Send push notification to recipient
+      try {
+        final notificationService = FirebaseNotificationService();
+        // Get sender name from database for notification
+        // In production, this would fetch the actual sender name
+        final senderName = 'User'; // TODO: Fetch from users table
+        
+        await notificationService.sendInvitationNotification(
+          recipientUserId: recipientId,
+          senderName: senderName,
+          inviteId: invite.id,
+        );
+      } catch (e) {
+        // Log notification error but don't fail the request
+        print('[Notification Error] Failed to send push notification: $e');
+      }
+      
       return invite;
     } on Exception catch (e) {
       final msg = e.toString();
