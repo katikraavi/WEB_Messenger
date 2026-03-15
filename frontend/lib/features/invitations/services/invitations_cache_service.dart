@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Local cache storage for offline support
@@ -11,7 +10,6 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 class InvitationsCacheService {
   static const String _pendingInvitesKey = 'pending_invites_cache';
   static const String _sentInvitesKey = 'sent_invites_cache';
-  static const String _cacheTimestampKey = 'invites_cache_timestamp';
   
   final FlutterSecureStorage _secureStorage;
   

@@ -275,23 +275,22 @@ void main() {
       // 1. Mock sendInvite throws HttpException
       // 2. Tap send button
       // 3. Verify error dialog shows
-        // 4. Dialog displays user-friendly error message:
-          // - "You cannot send an invitation to yourself."
-        // - "You've already sent an invitation to this user."
-        // - "You're already chatting with this user."
-      });
+      // 4. Dialog displays user-friendly error message:
+      //    - "You cannot send an invitation to yourself."
+      //    - "You've already sent an invitation to this user."
+      //    - "You're already chatting with this user."
+    });
 
-      testWidgets('should show empty state when no users found', (tester) async {
-        // Test:
-        // 1. Type search that matches no users
-        // 2. Verify empty state message
-      });
+    testWidgets('should show empty state when no users found', (tester) async {
+      // Test:
+      // 1. Type search that matches no users
+      // 2. Verify empty state message
+    });
 
-      testWidgets('should show empty state message for initial empty search', (tester) async {
-        // Test:
-        // 1. Render with no users available
-        // 2. Verify "No users found" message
-      });
+    testWidgets('should show empty state message for initial empty search', (tester) async {
+      // Test:
+      // 1. Render with no users available
+      // 2. Verify "No users found" message
     });
   });
 }

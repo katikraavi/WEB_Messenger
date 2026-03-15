@@ -152,7 +152,7 @@ class OfflineActionQueue {
     try {
       final queue = await _getQueue();
       
-      final stats = {
+      final stats = <String, dynamic>{
         'totalActions': queue.length,
         'sendInvite': 0,
         'acceptInvite': 0,
@@ -162,9 +162,9 @@ class OfflineActionQueue {
       
       for (var action in queue) {
         final type = action['type'] as String;
-        if (type == actionSendInvite) stats['sendInvite']++;
-        if (type == actionAcceptInvite) stats['acceptInvite']++;
-        if (type == actionDeclineInvite) stats['declineInvite']++;
+        if (type == actionSendInvite) stats['sendInvite'] = (stats['sendInvite'] as int) + 1;
+        if (type == actionAcceptInvite) stats['acceptInvite'] = (stats['acceptInvite'] as int) + 1;
+        if (type == actionDeclineInvite) stats['declineInvite'] = (stats['declineInvite'] as int) + 1;
       }
       
       if (queue.isNotEmpty) {
