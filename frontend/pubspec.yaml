@@ -57,6 +57,9 @@ dependencies:
   
   # Permission handling for camera and photo library access
   permission_handler: ^12.0.0
+  
+  # Freezed code generation for immutable data classes
+  freezed_annotation: ^2.4.1
 
 dev_dependencies:
   flutter_test:
@@ -68,6 +71,10 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  
+  # Code generation for Freezed models
+  freezed: ^2.4.5
+  build_runner: ^2.4.6
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
