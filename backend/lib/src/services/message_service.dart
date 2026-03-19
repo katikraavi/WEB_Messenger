@@ -404,122 +404,7 @@ class MessageService {
   /// - editedByUserId: UUID of user making the edit
   /// 
   /// Returns: Updated Message object
-  Future<Message> editMessage(
-    String messageId,
-    String newEncryptedContent,
-    String editedByUserId,
-  ) async {
-    try {
-      // Validate encrypted content format
-      try {
-        base64Decode(newEncryptedContent);
-      } catch (e) {
-        throw ArgumentError('Invalid encrypted content: must be valid Base64');
-      }
 
-      // Get current message to store as previous_content
-      final currentMessage = await getMessageById(messageId);
-      if (currentMessage == null) {
-        throw ArgumentError('Message not found: $messageId');
-      }
-
-      // Verify the editor is the sender
-      if (currentMessage.senderId != editedByUserId) {
-        throw ArgumentError('Only the message sender can edit a message');
-      }
-
-      // Get the next edit number
-      final editCountResult = await connection.query(
-        '''
-        SELECT COALESCE(MAX(edit_number), 0) + 1 as next_edit_number
-        FROM message_edits
-        WHERE message_id = @messageId
-        ''',
-        substitutionValues: {'messageId': messageId},
-      );
-
-      final nextEditNumber = editCountResult.first[0] as int;
-
-      // Store the current content as a previous_content entry
-      final editId = const Uuid().v4();
-      await connection.execute(
-        '''
-        INSERT INTO message_edits (id, message_id, edit_number, previous_content, edited_at, edited_by)
-        VALUES (@id, @messageId, @editNumber, @previousContent, NOW(), @editedBy)
-        ''',
-        substitutionValues: {
-          'id': editId,
-          'messageId': messageId,
-          'editNumber': nextEditNumber,
-          'previousContent': currentMessage.encryptedContent,
-          'editedBy': editedByUserId,
-        },
-      );
-
-      // Update the message with new content and edited_at timestamp
-      await connection.execute(
-        '''
-        UPDATE $_tableName
-        SET encrypted_content = @encryptedContent, edited_at = NOW()
-        WHERE id = @messageId
-        ''',
-        substitutionValues: {
-          'messageId': messageId,
-          'encryptedContent': newEncryptedContent,
-        },
-      );
-
-      // Fetch and return updated message
-      final updated = await getMessageById(messageId);
-      if (updated == null) {
-        throw Exception('Message not found after edit');
-      }
-
-      return updated;
-    } catch (e) {
-      throw Exception('Failed to edit message: $e');
-    }
-  }
-
-  /// Soft-delete a message (marks as deleted but preserves in database)
-  /// 
-  /// Parameters:
-  /// - messageId: The message to delete
-  /// - deletedByUserId: UUID of user deleting the message
-  /// 
-  /// Returns: true if deletion was successful
-  Future<bool> deleteMessage(
-    String messageId,
-    String deletedByUserId,
-  ) async {
-    try {
-      // Verify the deleter is the sender
-      final message = await getMessageById(messageId);
-      if (message == null) {
-        throw ArgumentError('Message not found: $messageId');
-      }
-
-      if (message.senderId != deletedByUserId) {
-        throw ArgumentError('Only the message sender can delete a message');
-      }
-
-      // Soft-delete by marking is_deleted = true and setting deleted_at
-      await connection.execute(
-        '''
-        UPDATE $_tableName
-        SET is_deleted = TRUE, deleted_at = NOW()
-        WHERE id = @messageId
-        ''',
-        substitutionValues: {'messageId': messageId},
-      );
-
-      return true;
-    } catch (e) {
-      throw Exception('Failed to delete message: $e');
-    }
-  }
-
-  /// Edit a message (T049, US4)
   /// 
   /// Validates that:
   /// - Message exists
@@ -614,6 +499,47 @@ class MessageService {
       return Message.fromPostgres(updatedResults.first);
     } catch (e) {
       throw Exception('Failed to edit message: $e');
+    }
+  }
+
+  /// Soft-delete a message (marks as deleted but preserves in database)
+  /// 
+  /// Parameters:
+  /// - messageId: The message to delete
+  /// - deletedByUserId: UUID of user deleting the message
+  /// 
+  /// Returns: Updated Message with deleted_at timestamp
+  Future<Message> deleteMessage(String messageId, String deletedByUserId) async {
+    try {
+      // Verify the deleter is the sender
+      final message = await getMessageById(messageId);
+      if (message == null) {
+        throw ArgumentError('Message not found: $messageId');
+      }
+
+      if (message.senderId != deletedByUserId) {
+        throw ArgumentError('Only the message sender can delete a message');
+      }
+
+      // Soft-delete by marking is_deleted = true and setting deleted_at
+      await connection.execute(
+        '''
+        UPDATE $_tableName
+        SET is_deleted = TRUE, deleted_at = NOW()
+        WHERE id = @messageId
+        ''',
+        substitutionValues: {'messageId': messageId},
+      );
+
+      // Fetch and return updated message
+      final updated = await getMessageById(messageId);
+      if (updated == null) {
+        throw Exception('Message not found after delete');
+      }
+
+      return updated;
+    } catch (e) {
+      throw Exception('Failed to delete message: $e');
     }
   }
 

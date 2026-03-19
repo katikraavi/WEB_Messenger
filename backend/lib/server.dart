@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
@@ -11,15 +12,18 @@ import 'src/services/migration_runner.dart';
 import 'src/services/jwt_service.dart';
 import 'src/services/auth_exception.dart';
 import 'src/services/chat_service.dart';
+import 'src/services/encryption_service.dart';
+import 'src/services/service_config.dart';
 import 'src/endpoints/verification_handler.dart';
 import 'src/endpoints/password_reset_handler.dart';
+import 'src/services/verification_service.dart';
 import 'src/endpoints/profile.dart' as profileEndpoint;
 import 'src/models/user_search_result.dart';
 import 'src/models/chat_invite_model.dart';
 import 'src/handlers/chat_handlers.dart';
 import 'src/handlers/message_handlers.dart';
 import 'src/handlers/media_handlers.dart';
-// import 'src/handlers/websocket_handler.dart';
+import 'src/handlers/websocket_handler.dart';
 
 // Alias for cleaner code
 typedef Connection = PostgreSQLConnection;
@@ -67,11 +71,45 @@ void main() async {
 
   // Initialize services
   final tokenService = TokenService();
-  final emailService = EmailService();
+  final emailService = EmailService(
+    smtpHost: Platform.environment['SMTP_HOST'],
+    smtpPort: int.tryParse(Platform.environment['SMTP_PORT'] ?? ''),
+    senderEmail: Platform.environment['SMTP_FROM_EMAIL'],
+    senderName: Platform.environment['SMTP_FROM_NAME'] ?? 'Mobile Messenger',
+    smtpUser: Platform.environment['SMTP_USER'],
+    smtpPassword: Platform.environment['SMTP_PASSWORD'],
+    smtpSecure:
+        (Platform.environment['SMTP_SECURE'] ?? 'false').toLowerCase() == 'true',
+  );
+  if (Platform.environment['SMTP_HOST'] != null) {
+    print('[✓] Email: SMTP → ${Platform.environment['SMTP_HOST']}:${Platform.environment['SMTP_PORT'] ?? '?'}');
+  } else {
+    print('[INFO] Email: No SMTP configured — tokens returned in API response (dev mode)');
+  }
+  final verificationService = VerificationService(
+    connection: dbConnection,
+    tokenService: tokenService,
+  );
   final rateLimitService = RateLimitService(
     maxAttempts: 5,
     windowDuration: Duration(hours: 1),
   );
+
+  // Initialize encryption service with master key from environment
+  final encryptionMasterKey = Platform.environment['ENCRYPTION_MASTER_KEY'];
+  late EncryptionService encryptionService;
+  
+  if (encryptionMasterKey != null && encryptionMasterKey.isNotEmpty) {
+    encryptionService = EncryptionService(masterEncryptionKey: encryptionMasterKey);
+    print('[✓] Encryption service initialized with master key');
+  } else {
+    print('[WARNING] ENCRYPTION_MASTER_KEY not set - encryption disabled. Set this in production!');
+    // Create dummy service that returns plaintext
+    encryptionService = EncryptionService(masterEncryptionKey: 'default-insecure-key-development-only');
+  }
+
+  // Initialize service config for handlers to access services
+  ServiceConfig.initialize(encryptionService);
 
   print('[INFO] Services initialized');
 
@@ -88,6 +126,8 @@ void main() async {
         emailService,
         rateLimitService,
         dbConnection,
+        encryptionService,
+        verificationService,
       ));
 
   final server = await shelf_io.serve(handler, InternetAddress.anyIPv4, port);
@@ -111,6 +151,8 @@ Handler _createHandler(
   EmailService emailService,
   RateLimitService rateLimitService,
   Connection database,
+  EncryptionService encryptionService,
+  VerificationService verificationService,
 ) {
   return (Request request) async {
     try {
@@ -155,7 +197,8 @@ Handler _createHandler(
 
       // Auth endpoints (registration - public)
       if (path == 'auth/register' && method == 'POST') {
-        return await _handleRegister(request, database);
+        return await _handleRegister(
+          request, database, tokenService, emailService, verificationService);
       }
 
       // Auth endpoints (login - public)
@@ -180,7 +223,7 @@ Handler _createHandler(
           tokenService,
           emailService,
           rateLimitService,
-          null, // VerificationService - deferred
+          verificationService,
         );
       }
 
@@ -188,7 +231,7 @@ Handler _createHandler(
         return await verifyEmailToken(
           request,
           tokenService,
-          null, // VerificationService - deferred
+          verificationService,
         );
       }
 
@@ -899,25 +942,21 @@ Handler _createHandler(
       }
 
       // Chat API endpoints (019-chat-list feature)
-      // WebSocket endpoint for real-time messaging (T034, T035) - DISABLED FOR MVP
+      // WebSocket endpoint for real-time messaging (T034, T035)
       // GET /ws/messages - Upgrade to WebSocket, authenticate, handle real-time events
-      // TODO: Enable WebSocket support in production
-      /*
       if (path == 'ws/messages' && method == 'GET') {
         try {
-          print('[WebSocket] Upgrade request for /ws/messages');
-          // Use WebSocketHandler to create the WebSocket upgrade handler
-          final wsHandler = WebSocketHandler.createWebSocketHandler(database);
+          // Let shelf_web_socket handle the upgrade, pass database for handler to use
+          final wsHandler = WebSocketHandler.createWebSocketHandler(database, request: request);
           return await wsHandler(request);
         } catch (e) {
-          print('[WebSocket] ❌ Error handling WebSocket upgrade: $e');
+          print('[WebSocket] ❌ Error in WebSocket handler: $e');
           return Response.internalServerError(
-            body: jsonEncode({'error': 'WebSocket upgrade failed: $e'}),
+            body: jsonEncode({'error': 'WebSocket error: $e'}),
             headers: {'Content-Type': 'application/json'},
           );
         }
       }
-      */
 
       // GET /api/chats - Fetch active chats for current user
       if (path == 'api/chats' && method == 'GET') {
@@ -1115,6 +1154,31 @@ Handler _createHandler(
         }
       }
 
+      // PUT /api/chats/{chatId}/messages/status - Update message status (T020 - Message Status System)
+      if (path.startsWith('api/chats/') && 
+          path.endsWith('/messages/status') &&
+          method == 'PUT') {
+        try {
+          final parts = path.split('/');
+          // Path format: api/chats/{chatId}/messages/status
+          if (parts.length >= 4 && parts[0] == 'api' && parts[1] == 'chats' && parts[3] == 'messages') {
+            final chatId = parts[2];
+            return await MessageHandlers.updateMessageStatus(request, chatId, database);
+          }
+        } on AuthException catch (e) {
+          return Response(401,
+            body: jsonEncode({'error': 'Invalid token'}),
+            headers: {'Content-Type': 'application/json'},
+          );
+        } catch (e) {
+          print('[MessageHandler] ❌ Error updating message status: $e');
+          return Response(500,
+            body: jsonEncode({'error': 'Failed to update message status: $e'}),
+            headers: {'Content-Type': 'application/json'},
+          );
+        }
+      }
+
       // POST /api/media/upload - Upload a media file (T070)
       if (path == 'api/media/upload' && method == 'POST') {
         try {
@@ -1303,13 +1367,21 @@ Middleware _corsMiddleware() {
 
 
 /// Handle POST /auth/register
-Future<Response> _handleRegister(Request request, Connection database) async {
+Future<Response> _handleRegister(
+  Request request,
+  Connection database,
+  TokenService tokenService,
+  EmailService emailService,
+  VerificationService verificationService,
+) async {
+  // Validate required fields
+  final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
+  final email = (body['email'] as String?).toString().toLowerCase();
+  final username = body['username'] as String?;
+  final password = body['password'] as String?;
+  print('[Register] Incoming registration request: email=$email, username=$username');
   try {
-    final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
-
-    final email = (body['email'] as String?).toString().toLowerCase();
-    final username = body['username'] as String?;
-    final password = body['password'] as String?;
+    // ...existing code...
 
     // Validate required fields
     if (email.isEmpty) {
@@ -1340,31 +1412,35 @@ Future<Response> _handleRegister(Request request, Connection database) async {
       );
     }
 
-    // Check for duplicate email/username in database
-    final duplicateCheck = await database.query(
-      'SELECT id FROM "users" WHERE email = @email OR username = @username',
-      substitutionValues: {'email': email, 'username': username},
+    // Check for duplicate email in database
+    final emailCheck = await database.query(
+      'SELECT email FROM "users" WHERE email = @email',
+      substitutionValues: {'email': email},
     );
-    
-    if (duplicateCheck.isNotEmpty) {
-      final row = duplicateCheck.first.toColumnMap();
-      final existingEmail = row['email'];
-      if (existingEmail == email) {
-        return Response(409,
-          body: jsonEncode({'error': 'Email already registered'}),
-          headers: {'Content-Type': 'application/json'},
-        );
-      } else {
-        return Response(409,
-          body: jsonEncode({'error': 'Username already taken'}),
-          headers: {'Content-Type': 'application/json'},
-        );
-      }
+    print('[Register] Email check results: ${emailCheck.map((row) => row.toColumnMap()).toList()}');
+    if (emailCheck.isNotEmpty) {
+      print('[Register] Email already registered: $email');
+      return Response(409,
+        body: jsonEncode({'error': 'Email already registered'}),
+        headers: {'Content-Type': 'application/json'},
+      );
     }
-
-    // Hash password (bcrypt-like)
-    final passwordHash = _hashPassword(password);
+    // Check for duplicate username in database
+    final usernameCheck = await database.query(
+      'SELECT username FROM "users" WHERE username = @username',
+      substitutionValues: {'username': username},
+    );
+    print('[Register] Username check results: ${usernameCheck.map((row) => row.toColumnMap()).toList()}');
+    if (usernameCheck.isNotEmpty) {
+      print('[Register] Username already taken: $username');
+      return Response(409,
+        body: jsonEncode({'error': 'Username already taken'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+    final passwordHash = _hashPassword(password!);
     final userId = const Uuid().v4(); // Just UUID, no prefix
+    print('[Register] Creating new user: email=$email, username=$username, userId=$userId');
 
     // Insert user into database
     await database.execute(
@@ -1380,12 +1456,59 @@ Future<Response> _handleRegister(Request request, Connection database) async {
       },
     );
 
+    print('[Register] Registration successful: userId=$userId');
+
+    // Auto-send verification email
+    String? devToken;
+    try {
+      final token = await verificationService
+          .createVerificationToken(userId)
+          .timeout(
+            const Duration(seconds: 3),
+            onTimeout: () => throw TimeoutException(
+              'Verification token creation timed out',
+            ),
+          );
+      final appBaseUrl = Platform.environment['APP_BASE_URL'] ?? 'http://localhost:8081';
+      final verificationLink = '$appBaseUrl/auth/verify-email/confirm?token=$token';
+      final emailMsg = emailService.buildVerificationEmail(
+        recipientEmail: email,
+        recipientName: username!,
+        verificationLink: verificationLink,
+        expiresIn: '24 hours',
+        registeredAt: DateTime.now().toUtc().toString().substring(0, 19).replaceAll('T', ' ') + ' UTC',
+      );
+      devToken = token; // kept for dev response
+      // Dispatch email in background so registration response is never blocked by SMTP latency.
+      unawaited(
+        emailService
+            .sendEmail(emailMsg)
+            .then((_) {
+              print('[Register] Verification email dispatched to $email');
+            })
+            .catchError((err) {
+              print('[Register][WARNING] Async verification email failed: $err');
+            }),
+      );
+    } catch (emailErr) {
+      // Never fail registration because of email
+      print('[Register][WARNING] Could not send verification email: $emailErr');
+    }
+
+    final bool isDev = !bool.fromEnvironment('dart.vm.product');
+    final responseBody = <String, dynamic>{
+      'user_id': userId,
+      'email': email,
+      'username': username,
+    };
+    if (isDev && devToken != null) {
+      responseBody['dev_verification_token'] = devToken;
+      responseBody['dev_note'] =
+          'Development mode: use this token with POST /auth/verify-email/confirm {"token":"..."}';
+    }
+
     return Response(201,
-      body: jsonEncode({
-        'user_id': userId,
-        'email': email,
-        'username': username,
-      }),
+      body: jsonEncode(responseBody),
       headers: {'Content-Type': 'application/json'},
     );
   } catch (e, st) {

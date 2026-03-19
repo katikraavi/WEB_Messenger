@@ -1,8 +1,11 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:shelf/shelf.dart';
 import 'package:postgres/postgres.dart';
 import '../services/media_storage_service.dart';
 import 'package:uuid/uuid.dart';
+
+typedef Connection = PostgreSQLConnection;
 
 /// Message Handlers for Media Operations (T070-T072)
 class MediaHandlers {
@@ -27,7 +30,7 @@ class MediaHandlers {
       );
 
       final decoded = jsonDecode(utf8.decode(payload)) as Map<String, dynamic>;
-      return decoded['userId'] as String?;
+      return decoded['user_id'] as String?;
     } catch (e) {
       print('[MediaHandlers] Error extracting user ID: $e');
       return null;
@@ -63,17 +66,20 @@ class MediaHandlers {
         return Response(401, body: jsonEncode({'error': 'Invalid token'}));
       }
 
-      // Parse multipart form (simplified - uses raw stream)
+      // Parse request (accepts both multipart/form-data and application/octet-stream)
       final contentType = request.headers['Content-Type'] ?? '';
-      if (!contentType.contains('multipart/form-data')) {
+      if (!contentType.contains('multipart/form-data') && 
+          !contentType.contains('application/octet-stream')) {
         return Response(400,
-            body: jsonEncode({'error': 'Expected multipart/form-data'}));
+            body: jsonEncode({'error': 'Expected multipart/form-data or application/octet-stream'}));
       }
 
       // For now, read raw bytes and extract metadata from headers
       // In production, use http_parser package for proper multipart handling
       final bodyBytes = await request.read().toList();
-      final fileBytes = bodyBytes.isNotEmpty ? bodyBytes[0] : Uint8List(0);
+      final fileBytes = bodyBytes.isNotEmpty 
+        ? Uint8List.fromList(bodyBytes[0] as List<int>)
+        : Uint8List(0);
 
       // Get MIME type from Content-Type header
       final fileMimeType = request.headers['X-File-Type'] ?? 'application/octet-stream';

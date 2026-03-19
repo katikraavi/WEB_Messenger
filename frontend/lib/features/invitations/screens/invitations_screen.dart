@@ -17,11 +17,14 @@ class InvitationsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     print('[InvitationsScreen] Building unified invitations screen');
-    
+
+    // Watch real-time updates from WebSocket to enable automatic refresh
+    ref.watch(invitationRealtimeUpdatesProvider);
+
     // Watch network status
     final networkStatus = ref.watch(networkStatusProvider);
     final isOffline = networkStatus['isOffline'] as bool;
-    
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Invitations'),
@@ -57,8 +60,7 @@ class InvitationsScreen extends ConsumerWidget {
       body: Column(
         children: [
           // Network status warning
-          if (isOffline)
-            _buildOfflineWarning(networkStatus),
+          if (isOffline) _buildOfflineWarning(networkStatus),
           // Invitations list - wrapped in Consumer to listen to auth changes
           Expanded(
             child: provider.Consumer<AuthProvider>(
@@ -73,21 +75,25 @@ class InvitationsScreen extends ConsumerWidget {
       ),
     );
   }
-  
+
   /// Build offline/degraded connection warning banner
   Widget _buildOfflineWarning(Map<String, dynamic> networkStatus) {
     final state = networkStatus['state'] as NetworkState;
     final description = networkStatus['description'] as String;
-    
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      color: state == NetworkState.offline ? Colors.red[100] : Colors.orange[100],
+      color: state == NetworkState.offline
+          ? Colors.red[100]
+          : Colors.orange[100],
       child: Row(
         children: [
           Icon(
             state == NetworkState.offline ? Icons.cloud_off : Icons.cloud_queue,
-            color: state == NetworkState.offline ? Colors.red[700] : Colors.orange[700],
+            color: state == NetworkState.offline
+                ? Colors.red[700]
+                : Colors.orange[700],
             size: 20,
           ),
           const SizedBox(width: 8),
@@ -96,7 +102,9 @@ class InvitationsScreen extends ConsumerWidget {
               '$description - Please check your connection',
               style: TextStyle(
                 fontSize: 12,
-                color: state == NetworkState.offline ? Colors.red[700] : Colors.orange[700],
+                color: state == NetworkState.offline
+                    ? Colors.red[700]
+                    : Colors.orange[700],
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -114,7 +122,7 @@ class _UnifiedInvitationsList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     print('[InvitationsList] Building unified invitations list');
-    
+
     // Watch both pending and sent invites
     final pendingInvites = ref.watch(pendingInvitesProvider);
     final sentInvites = ref.watch(sentInvitesProvider);
@@ -127,8 +135,10 @@ class _UnifiedInvitationsList extends ConsumerWidget {
       data: (pending) {
         return sentInvites.when(
           data: (sent) {
-            print('[InvitationsList] ✅ Loaded ${pending.length} pending + ${sent.length} sent invites');
-            
+            print(
+              '[InvitationsList] ✅ Loaded ${pending.length} pending + ${sent.length} sent invites',
+            );
+
             // Create unified list
             final allInvitations = [
               ...pending.map((i) => {'type': 'incoming', 'data': i}),
@@ -148,7 +158,8 @@ class _UnifiedInvitationsList extends ConsumerWidget {
                       onPressed: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (context) => const SendInvitePickerScreen(),
+                            builder: (context) =>
+                                const SendInvitePickerScreen(),
                           ),
                         );
                       },
@@ -168,10 +179,15 @@ class _UnifiedInvitationsList extends ConsumerWidget {
                 final isIncoming = item['type'] == 'incoming';
                 final invite = item['data'] as ChatInviteModel;
                 final isProcessing =
-                    acceptMutation.isLoading || declineMutation.isLoading || cancelMutation.isLoading;
+                    acceptMutation.isLoading ||
+                    declineMutation.isLoading ||
+                    cancelMutation.isLoading;
 
                 return Card(
-                  margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 0),
+                  margin: const EdgeInsets.symmetric(
+                    vertical: 8,
+                    horizontal: 0,
+                  ),
                   child: Padding(
                     padding: const EdgeInsets.all(12),
                     child: Column(
@@ -181,22 +197,26 @@ class _UnifiedInvitationsList extends ConsumerWidget {
                             // Avatar
                             CircleAvatar(
                               radius: 24,
-                              backgroundImage:
-                                  isIncoming
-                                      ? (invite.senderAvatarUrl != null
-                                          ? NetworkImage(invite.senderAvatarUrl!)
-                                          : null)
-                                      : (invite.recipientAvatarUrl != null
-                                          ? NetworkImage(invite.recipientAvatarUrl!)
-                                          : null),
-                              child: (isIncoming
-                                      ? invite.senderAvatarUrl
-                                      : invite.recipientAvatarUrl) ==
-                                  null
-                                  ? Text(isIncoming
-                                      ? invite.senderName.substring(0, 1)
-                                      : (invite.recipientName ?? 'U')
-                                          .substring(0, 1))
+                              backgroundImage: isIncoming
+                                  ? (invite.senderAvatarUrl != null
+                                        ? NetworkImage(invite.senderAvatarUrl!)
+                                        : null)
+                                  : (invite.recipientAvatarUrl != null
+                                        ? NetworkImage(
+                                            invite.recipientAvatarUrl!,
+                                          )
+                                        : null),
+                              child:
+                                  (isIncoming
+                                          ? invite.senderAvatarUrl
+                                          : invite.recipientAvatarUrl) ==
+                                      null
+                                  ? Text(
+                                      isIncoming
+                                          ? invite.senderName.substring(0, 1)
+                                          : (invite.recipientName ?? 'U')
+                                                .substring(0, 1),
+                                    )
                                   : null,
                             ),
                             const SizedBox(width: 12),
@@ -209,7 +229,10 @@ class _UnifiedInvitationsList extends ConsumerWidget {
                                     children: [
                                       Expanded(
                                         child: Text(
-                                          isIncoming ? invite.senderName : (invite.recipientName ?? 'Unknown'),
+                                          isIncoming
+                                              ? invite.senderName
+                                              : (invite.recipientName ??
+                                                    'Unknown'),
                                           style: const TextStyle(
                                             fontSize: 16,
                                             fontWeight: FontWeight.bold,
@@ -255,26 +278,39 @@ class _UnifiedInvitationsList extends ConsumerWidget {
                                       : () async {
                                           try {
                                             await ref
-                                                .read(acceptInviteMutationProvider.notifier)
+                                                .read(
+                                                  acceptInviteMutationProvider
+                                                      .notifier,
+                                                )
                                                 .acceptInvite(invite.id);
                                             if (context.mounted) {
-                                              ref.refresh(pendingInvitesProvider);
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(
+                                              ref.refresh(
+                                                pendingInvitesProvider,
+                                              );
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
                                                 const SnackBar(
                                                   content: Text(
-                                                      'Invitation accepted! Chat created.'),
-                                                  duration: Duration(seconds: 2),
+                                                    'Invitation accepted! Chat created.',
+                                                  ),
+                                                  duration: Duration(
+                                                    seconds: 2,
+                                                  ),
                                                   backgroundColor: Colors.green,
                                                 ),
                                               );
                                             }
                                           } catch (e) {
                                             if (context.mounted) {
-                                              final errorMessage = InviteErrorHandler
-                                                  .getUserFriendlyMessage(e);
+                                              final errorMessage =
+                                                  InviteErrorHandler.getUserFriendlyMessage(
+                                                    e,
+                                                  );
                                               InviteErrorHandler.logError(
-                                                  'Accept Invite', e);
+                                                'Accept Invite',
+                                                e,
+                                              );
                                               _showErrorDialog(
                                                 context,
                                                 'Accept Failed',
@@ -284,18 +320,23 @@ class _UnifiedInvitationsList extends ConsumerWidget {
                                                   try {
                                                     await ref
                                                         .read(
-                                                            acceptInviteMutationProvider
-                                                                .notifier)
-                                                        .acceptInvite(invite.id);
+                                                          acceptInviteMutationProvider
+                                                              .notifier,
+                                                        )
+                                                        .acceptInvite(
+                                                          invite.id,
+                                                        );
                                                     if (context.mounted) {
                                                       ref.refresh(
-                                                          pendingInvitesProvider);
+                                                        pendingInvitesProvider,
+                                                      );
                                                       ScaffoldMessenger.of(
-                                                              context)
-                                                          .showSnackBar(
+                                                        context,
+                                                      ).showSnackBar(
                                                         const SnackBar(
                                                           content: Text(
-                                                              'Invitation accepted! Chat created.'),
+                                                            'Invitation accepted! Chat created.',
+                                                          ),
                                                           backgroundColor:
                                                               Colors.green,
                                                         ),
@@ -303,13 +344,16 @@ class _UnifiedInvitationsList extends ConsumerWidget {
                                                     }
                                                   } catch (retryError) {
                                                     if (context.mounted) {
-                                                      final retryMessage = InviteErrorHandler
-                                                          .getUserFriendlyMessage(
-                                                              retryError);
+                                                      final retryMessage =
+                                                          InviteErrorHandler.getUserFriendlyMessage(
+                                                            retryError,
+                                                          );
                                                       _showErrorDialog(
                                                         context,
                                                         'Accept Failed',
-                                                        retryMessage,                                                        error: retryError,                                                      );
+                                                        retryMessage,
+                                                        error: retryError,
+                                                      );
                                                     }
                                                   }
                                                 },
@@ -333,16 +377,25 @@ class _UnifiedInvitationsList extends ConsumerWidget {
                                       : () async {
                                           try {
                                             await ref
-                                                .read(declineInviteMutationProvider.notifier)
+                                                .read(
+                                                  declineInviteMutationProvider
+                                                      .notifier,
+                                                )
                                                 .declineInvite(invite.id);
                                             if (context.mounted) {
-                                              ref.refresh(pendingInvitesProvider);
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(
+                                              ref.refresh(
+                                                pendingInvitesProvider,
+                                              );
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
                                                 const SnackBar(
-                                                  content:
-                                                      Text('Invitation declined'),
-                                                  duration: Duration(seconds: 2),
+                                                  content: Text(
+                                                    'Invitation declined',
+                                                  ),
+                                                  duration: Duration(
+                                                    seconds: 2,
+                                                  ),
                                                   backgroundColor:
                                                       Colors.deepOrange,
                                                 ),
@@ -350,10 +403,14 @@ class _UnifiedInvitationsList extends ConsumerWidget {
                                             }
                                           } catch (e) {
                                             if (context.mounted) {
-                                              final errorMessage = InviteErrorHandler
-                                                  .getUserFriendlyMessage(e);
+                                              final errorMessage =
+                                                  InviteErrorHandler.getUserFriendlyMessage(
+                                                    e,
+                                                  );
                                               InviteErrorHandler.logError(
-                                                  'Decline Invite', e);
+                                                'Decline Invite',
+                                                e,
+                                              );
                                               _showErrorDialog(
                                                 context,
                                                 'Decline Failed',
@@ -362,19 +419,23 @@ class _UnifiedInvitationsList extends ConsumerWidget {
                                                   try {
                                                     await ref
                                                         .read(
-                                                            declineInviteMutationProvider
-                                                                .notifier)
+                                                          declineInviteMutationProvider
+                                                              .notifier,
+                                                        )
                                                         .declineInvite(
-                                                            invite.id);
+                                                          invite.id,
+                                                        );
                                                     if (context.mounted) {
                                                       ref.refresh(
-                                                          pendingInvitesProvider);
+                                                        pendingInvitesProvider,
+                                                      );
                                                       ScaffoldMessenger.of(
-                                                              context)
-                                                          .showSnackBar(
+                                                        context,
+                                                      ).showSnackBar(
                                                         const SnackBar(
                                                           content: Text(
-                                                              'Invitation declined'),
+                                                            'Invitation declined',
+                                                          ),
                                                           backgroundColor:
                                                               Colors.deepOrange,
                                                         ),
@@ -382,9 +443,10 @@ class _UnifiedInvitationsList extends ConsumerWidget {
                                                     }
                                                   } catch (retryError) {
                                                     if (context.mounted) {
-                                                      final retryMessage = InviteErrorHandler
-                                                          .getUserFriendlyMessage(
-                                                              retryError);
+                                                      final retryMessage =
+                                                          InviteErrorHandler.getUserFriendlyMessage(
+                                                            retryError,
+                                                          );
                                                       _showErrorDialog(
                                                         context,
                                                         'Decline Failed',
@@ -415,14 +477,20 @@ class _UnifiedInvitationsList extends ConsumerWidget {
                                   : () async {
                                       try {
                                         await ref
-                                            .read(cancelInviteMutationProvider.notifier)
+                                            .read(
+                                              cancelInviteMutationProvider
+                                                  .notifier,
+                                            )
                                             .cancelInvite(invite.id);
                                         if (context.mounted) {
                                           ref.refresh(sentInvitesProvider);
-                                          ScaffoldMessenger.of(context)
-                                              .showSnackBar(
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
                                             const SnackBar(
-                                              content: Text('Invitation canceled'),
+                                              content: Text(
+                                                'Invitation canceled',
+                                              ),
                                               duration: Duration(seconds: 2),
                                               backgroundColor: Colors.grey,
                                             ),
@@ -430,10 +498,14 @@ class _UnifiedInvitationsList extends ConsumerWidget {
                                         }
                                       } catch (e) {
                                         if (context.mounted) {
-                                          final errorMessage = InviteErrorHandler
-                                              .getUserFriendlyMessage(e);
+                                          final errorMessage =
+                                              InviteErrorHandler.getUserFriendlyMessage(
+                                                e,
+                                              );
                                           InviteErrorHandler.logError(
-                                              'Cancel Invite', e);
+                                            'Cancel Invite',
+                                            e,
+                                          );
                                           _showErrorDialog(
                                             context,
                                             'Cancel Failed',
@@ -442,16 +514,21 @@ class _UnifiedInvitationsList extends ConsumerWidget {
                                               try {
                                                 await ref
                                                     .read(
-                                                        cancelInviteMutationProvider
-                                                            .notifier)
+                                                      cancelInviteMutationProvider
+                                                          .notifier,
+                                                    )
                                                     .cancelInvite(invite.id);
                                                 if (context.mounted) {
-                                                  ref.refresh(sentInvitesProvider);
-                                                  ScaffoldMessenger.of(context)
-                                                      .showSnackBar(
+                                                  ref.refresh(
+                                                    sentInvitesProvider,
+                                                  );
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
                                                     const SnackBar(
-                                                      content:
-                                                          Text('Invitation canceled'),
+                                                      content: Text(
+                                                        'Invitation canceled',
+                                                      ),
                                                       backgroundColor:
                                                           Colors.grey,
                                                     ),
@@ -460,9 +537,9 @@ class _UnifiedInvitationsList extends ConsumerWidget {
                                               } catch (retryError) {
                                                 if (context.mounted) {
                                                   final retryMessage =
-                                                      InviteErrorHandler
-                                                          .getUserFriendlyMessage(
-                                                              retryError);
+                                                      InviteErrorHandler.getUserFriendlyMessage(
+                                                        retryError,
+                                                      );
                                                   _showErrorDialog(
                                                     context,
                                                     'Cancel Failed',
@@ -634,12 +711,13 @@ void _showErrorDialog(
   VoidCallback? onRetry,
   dynamic error,
 }) {
-  final isOffline = InviteErrorHandler.indicatesOfflineState(error) ||
+  final isOffline =
+      InviteErrorHandler.indicatesOfflineState(error) ||
       (error?.toString().contains('Connection') ?? false);
   final isRecoverable = InviteErrorHandler.isRecoverableError(error);
   final suggestion = InviteErrorHandler.getRecoverySuggestion(error);
   final severity = InviteErrorHandler.getErrorSeverity(error);
-  
+
   showDialog(
     context: context,
     builder: (context) => AlertDialog(
@@ -647,7 +725,9 @@ void _showErrorDialog(
         children: [
           Icon(
             severity == ErrorSeverity.critical ? Icons.error : Icons.warning,
-            color: severity == ErrorSeverity.critical ? Colors.red : Colors.orange,
+            color: severity == ErrorSeverity.critical
+                ? Colors.red
+                : Colors.orange,
             size: 24,
           ),
           const SizedBox(width: 8),
@@ -661,8 +741,14 @@ void _showErrorDialog(
           children: [
             Text(message),
             if (isOffline) ...[const SizedBox(height: 12), _buildOfflineHint()],
-            if (isRecoverable && !isOffline) ...[const SizedBox(height: 12), _buildRecoveryHint(suggestion)],
-            if (suggestion.isNotEmpty) ...[const SizedBox(height: 12), _buildSuggestionChips(suggestion)],
+            if (isRecoverable && !isOffline) ...[
+              const SizedBox(height: 12),
+              _buildRecoveryHint(suggestion),
+            ],
+            if (suggestion.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _buildSuggestionChips(suggestion),
+            ],
           ],
         ),
       ),
@@ -687,7 +773,9 @@ void _showErrorDialog(
               // Show Toast instead of immediate retry
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Waiting for connection... Please check your network.'),
+                  content: Text(
+                    'Waiting for connection... Please check your network.',
+                  ),
                   duration: Duration(seconds: 3),
                   backgroundColor: Colors.orange,
                 ),
@@ -752,7 +840,7 @@ Widget _buildRecoveryHint(String suggestion) {
 /// Build suggestion action chips
 Widget _buildSuggestionChips(String suggestionText) {
   final suggestions = suggestionText.split('•').map((s) => s.trim()).toList();
-  
+
   return Wrap(
     spacing: 6,
     children: suggestions

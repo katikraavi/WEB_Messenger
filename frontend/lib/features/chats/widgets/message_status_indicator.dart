@@ -76,6 +76,9 @@ class _MessageStatusIndicatorState extends State<MessageStatusIndicator>
       return const SizedBox.shrink();
     }
 
+    final status = widget.message.status;
+    print('[MessageStatusIndicator] 📊 Building status indicator for ${widget.message.id}: status=$status');
+
     return ScaleTransition(
       scale: _scaleAnimation,
       child: SlideTransition(
@@ -92,10 +95,13 @@ class _MessageStatusIndicatorState extends State<MessageStatusIndicator>
     final isDelivered = status == 'delivered';
 
     if (isRead) {
-      return _buildDoubleCheckmark(isBlue: true);
+      print('[MessageStatusIndicator] � Rendering YELLOW checkmarks (read) for ${widget.message.id}');
+      return _buildDoubleCheckmark(isYellow: true);
     } else if (isDelivered) {
-      return _buildDoubleCheckmark(isBlue: false);
+      print('[MessageStatusIndicator] ⚫ Rendering GRAY double checkmarks (delivered) for ${widget.message.id}');
+      return _buildDoubleCheckmark(isYellow: false);
     } else {
+      print('[MessageStatusIndicator] ⚪ Rendering GRAY single checkmark (sent) for ${widget.message.id}');
       return _buildSingleCheckmark();
     }
   }
@@ -103,25 +109,25 @@ class _MessageStatusIndicatorState extends State<MessageStatusIndicator>
   /// Build single checkmark icon (sent status)
   Widget _buildSingleCheckmark() {
     return Tooltip(
-      message: 'Sent',
+      message: 'Sent ✓',
       child: Icon(
         Icons.check,
         size: 14,
-        color: Colors.blue.shade200,
+        color: Colors.grey.shade500,
         semanticLabel: 'Message sent',
       ),
     );
   }
 
   /// Build double checkmark icon (delivered or read status)
-  Widget _buildDoubleCheckmark({required bool isBlue}) {
+  Widget _buildDoubleCheckmark({required bool isYellow}) {
     return Tooltip(
-      message: isBlue ? 'Read' : 'Delivered',
+      message: isYellow ? 'Read ✓✓ (YELLOW)' : 'Delivered ✓✓',
       child: CustomPaint(
         size: const Size(14, 12),
         painter: DoubleCheckmarkPainter(
-          color: isBlue ? Colors.blue : Colors.blue.shade200,
-          strokeWidth: 1.5,
+          color: isYellow ? Colors.yellow.shade700 : Colors.grey.shade500,
+          strokeWidth: 2.0,
         ),
       ),
     );

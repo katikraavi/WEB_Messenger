@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'invite_service.dart';
+import '../../features/chats/widgets/user_avatar_widget.dart';
 
 class SearchUsersScreen extends StatefulWidget {
   final Function(User)? onUserSelected;
@@ -70,14 +71,10 @@ class _SearchUsersScreenState extends State<SearchUsersScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircleAvatar(
+            UserAvatarWidget(
+              imageUrl: user.profilePictureUrl,
               radius: 40,
-              backgroundImage: user.profilePictureUrl != null
-                  ? NetworkImage(user.profilePictureUrl!)
-                  : null,
-              child: user.profilePictureUrl == null
-                  ? const Icon(Icons.person, size: 40)
-                  : null,
+              username: user.username,
             ),
             const SizedBox(height: 16),
             Text(user.username, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),

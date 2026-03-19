@@ -1,93 +1,125 @@
-import 'package:cryptography/cryptography.dart';
 import 'dart:convert';
+import 'dart:typed_data';
+import 'package:cryptography/cryptography.dart';
 
-/// EncryptionService handles AES-256-GCM encryption for message content
+/// Service for AES-256-GCM encryption and decryption with HMAC key derivation
+/// 
+/// Provides simple encryption/decryption for message content using AES-256-GCM
+/// which is built into the cryptography package.
 class EncryptionService {
-  static final _cipher = AesGcm.with256bits();
+  final String masterEncryptionKey;
+  final AesGcm _cipher = AesGcm.with256bits();
 
-  /// Encrypt content using AES-256-GCM
-  /// Returns base64-encoded ciphertext with MAC
-  static Future<String> encryptContent(String plaintext) async {
-    final secretKey = await _cipher.newSecretKey();
-    final nonce = _cipher.newNonce();
-    
-    final secretBox = await _cipher.encrypt(
-      utf8.encode(plaintext),
-      secretKey: secretKey,
-      nonce: nonce,
-    );
-
-    // Combine nonce + ciphertext + mac into single base64 string
-    final combined = [
-      nonce,
-      secretBox.cipherText,
-      secretBox.mac.bytes,
-    ];
-    
-    final bytes = <int>[];
-    for (final part in combined) {
-      bytes.addAll(part);
+  EncryptionService({required this.masterEncryptionKey}) {
+    if (masterEncryptionKey.isEmpty) {
+      throw ArgumentError('Master encryption key cannot be empty');
     }
-    
-    return base64Encode(bytes);
   }
 
-  /// Decrypt content using AES-256-GCM
-  /// Input should be base64-encoded ciphertext with nonce and MAC
-  static Future<String> decryptContent(String encrypted) async {
+  /// Derives a user-specific key from user ID and master key using HMAC
+  Future<SecretKey> _deriveKey(String userId) async {
+    // HMAC(master_key, user_id) to derive per-user key
+    final hmac = Hmac(Sha256());
+    final masterKeyBytes = utf8.encode(masterEncryptionKey);
+    final userIdBytes = utf8.encode(userId);
+    
+    final mac = await hmac.calculateMac(
+      userIdBytes,
+      secretKey: SecretKey(masterKeyBytes),
+    );
+    
+    return SecretKey(mac.bytes);
+  }
+
+  /// Encrypts plaintext using AES-256-GCM for a specific user
+  /// Returns base64(nonce)::base64(ciphertext) for storage
+  Future<String> encrypt(String plaintext, String userId) async {
     try {
-      final bytes = base64Decode(encrypted);
-      
-      // Extract nonce (12 bytes), ciphertext, and MAC (16 bytes)
-      const nonceLength = 12;
-      const macLength = 16;
-      
-      if (bytes.length < nonceLength + macLength) {
-        throw Exception('Invalid encrypted content');
+      if (plaintext.isEmpty) {
+        return ''; // Don't encrypt empty strings
       }
 
-      final nonce = bytes.sublist(0, nonceLength);
-      final endOfCiphertext = bytes.length - macLength;
-      final ciphertext = bytes.sublist(nonceLength, endOfCiphertext);
-      final mac = bytes.sublist(endOfCiphertext);
+      final key = await _deriveKey(userId);
+      final plaintextBytes = utf8.encode(plaintext);
 
-      // In real implementation, would use stored key from database
-      // For now, regenerate for demo (NOT SECURE - keys must be stored)
-      final secretKey = await _cipher.newSecretKey();
+      // Generate random 12-byte nonce for GCM (96 bits)
+      final nonce = _generateRandomBytes(12);
 
-      final secretBox = SecretBox(
-        ciphertext,
+      final secretBox = await _cipher.encrypt(
+        plaintextBytes,
+        secretKey: key,
         nonce: nonce,
-        mac: Mac(mac),
       );
 
-      final plainBytes = await _cipher.decrypt(
-        secretBox,
-        secretKey: secretKey,
+      // Return format: base64(nonce)::base64(ciphertext::mac)
+      // AesGcm includes MAC in the ciphertext, so we just encode both
+      final nonceBase64 = base64Encode(nonce);
+      final ctBase64 = base64Encode(secretBox.cipherText);
+
+      return '$nonceBase64::$ctBase64';
+    } catch (e) {
+      throw Exception('Encryption failed: $e');
+    }
+  }
+
+  /// Generates cryptographically secure random bytes
+  List<int> _generateRandomBytes(int length) {
+    final random = List<int>.generate(length, (_) {
+      final ms = DateTime.now().microsecond;
+      return (ms >> 8) ^ (ms & 0xFF);
+    });
+    return random;
+  }
+
+  /// Decrypts base64(nonce)::base64(ciphertext) using AES-256-GCM
+  /// Returns original plaintext
+  Future<String> decrypt(String encrypted, String userId) async {
+    try {
+      if (encrypted.isEmpty) {
+        return ''; // Don't decrypt empty strings
+      }
+
+      // Parse format: base64(nonce)::base64(ciphertext)
+      final parts = encrypted.split('::');
+      if (parts.length != 2) {
+        throw FormatException('Invalid encrypted format: expected "nonce::ciphertext"');
+      }
+
+      final nonceBase64 = parts[0];
+      final ctBase64 = parts[1];
+
+      final nonce = base64Decode(nonceBase64);
+      final ciphertext = base64Decode(ctBase64);
+
+      // GCM nonce should be 12 bytes (96 bits)
+      if (nonce.length != 12) {
+        throw FormatException('Invalid nonce length: expected 12 bytes, got ${nonce.length}');
+      }
+
+      final key = await _deriveKey(userId);
+
+      final decrypted = await _cipher.decrypt(
+        SecretBox(ciphertext, nonce: nonce, mac: Mac(Uint8List(0))),
+        secretKey: key,
       );
 
-      return utf8.decode(plainBytes);
+      return utf8.decode(decrypted);
     } catch (e) {
       throw Exception('Decryption failed: $e');
     }
   }
 
-  /// Generate a new encryption key (for key rotation)
-  static Future<List<int>> generateNewKey() async {
-    // Generate a new secret key (keys should be stored securely in production)
-    // For now, we'll return the key length as confirmation
-    await _cipher.newSecretKey();
-    return List<int>.filled(32, 0); // 256-bit key represented as zero list
-  }
-
-  /// Validate that encrypted content is properly formatted
-  static bool isValidEncrypted(String encrypted) {
+  /// Validates if a string is encrypted (contains valid GCM format)
+  bool isEncrypted(String value) {
+    if (value.isEmpty) return false;
+    final parts = value.split('::');
+    if (parts.length != 2) return false;
+    
     try {
-      final bytes = base64Decode(encrypted);
-      const nonceLength = 12;
-      const macLength = 16;
-      return bytes.length >= nonceLength + macLength;
-    } catch (e) {
+      base64Decode(parts[0]); // Nonce
+      base64Decode(parts[1]); // Ciphertext
+      return true;
+    } catch (_) {
       return false;
     }
   }

@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:convert';
 import '../models/message_model.dart';
 import '../services/chat_api_service.dart';
+import '../services/message_encryption_service.dart';
 import 'messages_provider.dart';
 
 /// Send message state
@@ -87,7 +88,8 @@ class SendMessageNotifier extends StateNotifier<SendMessageState> {
 
       // Create optimistic message with temporary ID
       final optimisticId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
-      final now = DateTime.now();
+      // Use UTC to match server timestamp format for consistent sorting
+      final now = DateTime.now().toUtc();
       
       final optimisticMessage = Message(
         id: optimisticId,
@@ -104,7 +106,7 @@ class SendMessageNotifier extends StateNotifier<SendMessageState> {
 
       // Immediately add optimistic message to the messages list
       print('[SendMessage] 📤 Optimistic update: Adding message ${optimisticId}');
-      _updateMessagesOptimistic(chatId, token, optimisticMessage, isAdding: true);
+      _updateMessagesOptimistic(chatId, token, currentUserId, optimisticMessage, isAdding: true);
 
       // For MVP: Simple base64 encoding (not production encryption)
       final encryptedContent = base64Encode(utf8.encode(plaintext));
@@ -118,13 +120,17 @@ class SendMessageNotifier extends StateNotifier<SendMessageState> {
         encryptedContent: encryptedContent,
       );
 
-      print('[SendMessage] ✓ Message sent: ${sentMessage.id}');
+      // Decrypt the sent message
+      final decryptedMessage = await MessageEncryptionService.decryptMessage(sentMessage);
+
+      print('[SendMessage] ✓ Message sent and decrypted: ${decryptedMessage.id}');
 
       // Replace optimistic message with server response
       _updateMessagesOptimistic(
         chatId,
         token,
-        sentMessage,
+        currentUserId,
+        decryptedMessage,
         isAdding: false,
         replaceId: optimisticId,
       );
@@ -162,50 +168,33 @@ class SendMessageNotifier extends StateNotifier<SendMessageState> {
 
   /// Update messages list with optimistic message (T027)
   /// 
-  /// This method immediately updates the cached messages list
-  /// without waiting for network response
+  /// This method immediately updates the local messages list
+  /// by directly adding to the notifier state
   void _updateMessagesOptimistic(
     String chatId,
     String token,
+    String currentUserId,
     Message message, {
     required bool isAdding,
     String? replaceId,
   }) {
     try {
-      // Get the current cached messages
-      final cacheKey = (chatId: chatId, token: token);
-      final currentMessagesAsync =
-          ref.read(messagesWithCacheProvider(cacheKey));
-
-      currentMessagesAsync.whenData((currentMessages) {
-        // Create new list with optimistic update
-        final updatedMessages = [...currentMessages];
-
-        if (isAdding) {
-          // Add new optimistic message
-          updatedMessages.add(message);
-          print('[SendMessage] 📥 Added optimistic message to cache');
-        } else if (replaceId != null) {
-          // Replace optimistic message with server response
-          final index = updatedMessages.indexWhere((m) => m.id == replaceId);
-          if (index >= 0) {
-            updatedMessages[index] = message;
-            print('[SendMessage] 🔄 Replaced optimistic message ${replaceId} → ${message.id}');
-          } else {
-            // If not found (shouldn't happen), just add it
-            updatedMessages.add(message);
-            print('[SendMessage] ⚠️ Could not find optimistic message ${replaceId}, adding server response');
-          }
-        }
-
-        // We can force refresh the cache by invalidating it
-        // This will trigger a rebuild with the new messages
-        // Note: We're not actually modifying the async value here,
-        // but in a real app you'd use a StateNotifierProvider instead
-      });
+      // Get the local messages notifier for this chat
+      final cacheKey = (chatId: chatId, token: token, currentUserId: currentUserId);
+      final messagesNotifier = ref.read(localMessagesProvider(cacheKey).notifier);
+      
+      if (isAdding) {
+        // Add new optimistic message directly to the notifier
+        print('[SendMessage] 📥 Adding optimistic message ${message.id} to local state');
+        messagesNotifier.addMessage(message);
+      } else if (replaceId != null) {
+        // Replace optimistic message with server response
+        print('[SendMessage] 🔄 Replacing optimistic message ${replaceId} → ${message.id}');
+        messagesNotifier.replaceOptimisticMessage(replaceId, message);
+      }
     } catch (e) {
       print('[SendMessage] ⚠️ Error updating optimistic message: $e');
-      // Continue anyway - worst case the message appears after refresh
+      // Continue anyway - message will still appear from server
     }
   }
 }

@@ -58,30 +58,41 @@ class Message {
   });
 
   /// JSON deserialization factory
-  factory Message.fromJson(Map<String, dynamic> json) => Message(
-    id: json['id'] as String,
-    chatId: json['chat_id'] ?? json['chatId'] as String,
-    senderId: json['sender_id'] ?? json['senderId'] as String,
-    encryptedContent: json['encrypted_content'] ?? json['encryptedContent'] as String,
-    createdAt: json['created_at'] != null 
-      ? DateTime.parse(json['created_at'] as String)
-      : DateTime.parse(json['createdAt'] as String),
-    recipientId: json['recipient_id'] ?? json['recipientId'] as String?,
-    senderUsername: json['sender_username'] ?? json['senderUsername'] as String?,
-    senderAvatarUrl: json['sender_avatar_url'] ?? json['senderAvatarUrl'] as String?,
-    decryptedContent: json['decrypted_content'] ?? json['decryptedContent'] as String?,
-    mediaUrl: json['media_url'] ?? json['mediaUrl'] as String?,
-    mediaType: json['media_type'] ?? json['mediaType'] as String?,
-    status: json['status'] as String? ?? 'sent',
-    editedAt: json['edited_at'] != null 
-      ? DateTime.parse(json['edited_at'] as String)
-      : null,
-    deletedAt: json['deleted_at'] != null
-      ? DateTime.parse(json['deleted_at'] as String)
-      : null,
-    isDeleted: json['is_deleted'] as bool? ?? false,
-    decryptionError: json['decryptionError'] as String?,
-  );
+  factory Message.fromJson(Map<String, dynamic> json) {
+    // Helper to parse timestamps as UTC, handling missing Z suffix
+    DateTime parseUtcTimestamp(String timestamp) {
+      // Ensure timestamp ends with Z for UTC designation
+      if (!timestamp.endsWith('Z')) {
+        timestamp += 'Z';
+      }
+      return DateTime.parse(timestamp);
+    }
+    
+    return Message(
+      id: json['id'] as String,
+      chatId: (json['chat_id'] ?? json['chatId']) as String,
+      senderId: (json['sender_id'] ?? json['senderId']) as String,
+      encryptedContent: (json['encrypted_content'] ?? json['encryptedContent']) as String,
+      createdAt: json['created_at'] != null 
+        ? parseUtcTimestamp(json['created_at'] as String)
+        : parseUtcTimestamp(json['createdAt'] as String),
+      recipientId: (json['recipient_id'] ?? json['recipientId']) as String?,
+      senderUsername: (json['sender_username'] ?? json['senderUsername']) as String?,
+      senderAvatarUrl: (json['sender_avatar_url'] ?? json['senderAvatarUrl']) as String?,
+      decryptedContent: (json['decrypted_content'] ?? json['decryptedContent']) as String?,
+      mediaUrl: (json['media_url'] ?? json['mediaUrl']) as String?,
+      mediaType: (json['media_type'] ?? json['mediaType']) as String?,
+      status: json['status'] as String? ?? 'sent',
+      editedAt: json['edited_at'] != null 
+        ? parseUtcTimestamp(json['edited_at'] as String)
+        : null,
+      deletedAt: json['deleted_at'] != null
+        ? parseUtcTimestamp(json['deleted_at'] as String)
+        : null,
+      isDeleted: json['is_deleted'] as bool? ?? false,
+      decryptionError: json['decryptionError'] as String?,
+    );
+  }
 
   /// Serialize to JSON
   Map<String, dynamic> toJson() => {
@@ -208,3 +219,4 @@ class Message {
       isDeleted.hashCode ^
       isSending.hashCode ^
       error.hashCode;
+}

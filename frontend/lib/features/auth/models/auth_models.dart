@@ -55,12 +55,14 @@ class AuthResponse {
   final String email;
   final String username;
   final String? token;
+  final String? devVerificationToken;
 
   AuthResponse({
     required this.userId,
     required this.email,
     required this.username,
     this.token,
+    this.devVerificationToken,
   });
 
   Map<String, dynamic> toJson() => {
@@ -76,6 +78,7 @@ class AuthResponse {
     final email = json['email'] ?? '';
     final username = json['username'] ?? '';
     final token = json['token'];
+    final devVerificationToken = json['dev_verification_token'] as String?;
 
     // Validate required fields
     if (userId.isEmpty || email.isEmpty || username.isEmpty) {
@@ -87,6 +90,7 @@ class AuthResponse {
       email: email as String,
       username: username as String,
       token: token as String?,
+      devVerificationToken: devVerificationToken,
     );
   }
 }

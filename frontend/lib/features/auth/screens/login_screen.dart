@@ -10,12 +10,16 @@ class LoginScreen extends StatefulWidget {
   final VoidCallback? onLoginSuccess;
   final VoidCallback? onNavigateToRegistration;
   final VoidCallback? onNavigateToForgotPassword;
+  final String? initialEmail;
+  final String? initialPassword;
 
   const LoginScreen({
     Key? key,
     this.onLoginSuccess,
     this.onNavigateToRegistration,
     this.onNavigateToForgotPassword,
+    this.initialEmail,
+    this.initialPassword,
   }) : super(key: key);
 
   @override
@@ -34,6 +38,30 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _obscurePassword = true;
   bool _rememberMe = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _applyInitialCredentials();
+  }
+
+  @override
+  void didUpdateWidget(covariant LoginScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialEmail != widget.initialEmail ||
+        oldWidget.initialPassword != widget.initialPassword) {
+      _applyInitialCredentials();
+    }
+  }
+
+  void _applyInitialCredentials() {
+    if (widget.initialEmail?.isNotEmpty == true) {
+      _emailController.text = widget.initialEmail!;
+    }
+    if (widget.initialPassword?.isNotEmpty == true) {
+      _passwordController.text = widget.initialPassword!;
+    }
+  }
 
   @override
   void dispose() {
@@ -253,6 +281,38 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                   onPressed: () {
                                     _fillTestAccount('diane@test.org', 'diane123');
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  icon: const Icon(Icons.person, size: 18),
+                                  label: const Text('TestUser1'),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                    side: BorderSide(color: Colors.amber.shade400),
+                                  ),
+                                  onPressed: () {
+                                    _fillTestAccount('testuser1@example.com', 'testuser1pass');
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  icon: const Icon(Icons.person, size: 18),
+                                  label: const Text('TestUser2'),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                    side: BorderSide(color: Colors.amber.shade400),
+                                  ),
+                                  onPressed: () {
+                                    _fillTestAccount('testuser2@example.com', 'testuser2pass');
                                   },
                                 ),
                               ),

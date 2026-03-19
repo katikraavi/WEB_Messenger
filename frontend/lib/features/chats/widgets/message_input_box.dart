@@ -182,12 +182,13 @@ class _MessageInputBoxState extends State<MessageInputBox> {
           // Message input field
           Expanded(
             child: Focus(
-              onFocus: (_) {
-                // Focus - could start typing
-              },
-              onBlur: (_) {
-                // Blur - stop typing
-                _handleInputBlur();
+              onFocusChange: (isFocused) {
+                if (isFocused) {
+                  // Focus - could start typing
+                } else {
+                  // Blur - stop typing
+                  _handleInputBlur();
+                }
               },
               child: TextField(
                 controller: _controller,

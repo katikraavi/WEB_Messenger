@@ -4,6 +4,8 @@ import 'package:postgres/postgres.dart';
 import 'package:uuid/uuid.dart';
 import 'package:path/path.dart' as path;
 
+typedef Connection = PostgreSQLConnection;
+
 /// Media Storage Model
 class MediaFile {
   final String id;

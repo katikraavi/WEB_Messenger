@@ -5,7 +5,7 @@
 
 set -e
 
-BASE_URL="http://localhost:8080"
+BASE_URL="http://localhost:8081"
 WAIT_TIME=1
 
 echo "===================================="

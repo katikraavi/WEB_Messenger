@@ -8,6 +8,11 @@ enum WebSocketEventType {
   // Real-time message delivery
   messageCreated,
   messageReceived,
+  messageEdited,
+  messageDeleted,
+  
+  // Message status updates (sent, delivered, read)
+  messageStatusChanged,
   
   // Chat archival events
   chatArchived,
@@ -62,6 +67,17 @@ class WebSocketEvent {
 /// - Handles connection lifecycle (ping/pong, reconnection)
 /// - Routes events to specific listeners
 class WebSocketService {
+  /// Singleton instance - ensures all parts of the app use the same service
+  static final WebSocketService _instance = WebSocketService._();
+  
+  /// Private constructor for singleton pattern
+  WebSocketService._();
+  
+  /// Factory constructor - returns singleton instance
+  factory WebSocketService() {
+    return _instance;
+  }
+  
   /// Map of active WebSocket connections: chatId -> List<connection>
   final Map<String, List<WebSocketChannel>> _activeConnections = {};
   
@@ -93,27 +109,11 @@ class WebSocketService {
         _activeConnections[chatId] = [];
       }
       _activeConnections[chatId]!.add(channel);
+      print('[WebSocketService] ✓ Added connection for chat $chatId (total: ${_activeConnections[chatId]!.length})');
     });
 
-    // Listen for messages on this connection
-    channel.stream.listen(
-      (message) {
-        try {
-          final json = jsonDecode(message) as Map<String, dynamic>;
-          final event = WebSocketEvent.fromJson(json);
-          _emitEvent(event);
-        } catch (e) {
-          print('[WebSocket] Error parsing message: $e');
-        }
-      },
-      onDone: () {
-        _removeConnection(chatId, channel);
-      },
-      onError: (error) {
-        print('[WebSocket] Connection error: $error');
-        _removeConnection(chatId, channel);
-      },
-    );
+    // NOTE: Do NOT listen to channel.stream here - it's already being listened to
+    // in websocket_handler.dart. Listening twice causes "Stream has already been listened to" error.
   }
 
   /// Remove a connection from the active list
@@ -150,14 +150,18 @@ class WebSocketService {
   /// Broadcast an event to all connections in a chat (synchronous variant)
   void broadcastToChat(String chatId, WebSocketEvent event) {
     final connections = _activeConnections[chatId];
-    if (connections == null || connections.isEmpty) return;
+    if (connections == null || connections.isEmpty) {
+      print('[WebSocketService] ⚠️ No connections for chat $chatId (event type: ${event.type})');
+      return;
+    }
 
     final message = jsonEncode(event.toJson());
+    print('[WebSocketService] 📡 Broadcasting to chat $chatId (${connections.length} connections): event=${event.type}, data=${event.data}');
     for (final channel in connections) {
       try {
         channel.sink.add(message);
       } catch (e) {
-        print('[WebSocket] Error sending to connection: $e');
+        print('[WebSocket] ❌ Error sending to connection: $e');
       }
     }
   }

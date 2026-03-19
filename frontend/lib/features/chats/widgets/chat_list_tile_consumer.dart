@@ -1,52 +1,47 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/chat_model.dart';
-import '../models/message_model.dart';
-import '../providers/user_profile_provider.dart';
+import '../services/chat_api_service.dart';
 import '../providers/active_chats_provider.dart';
 import '../providers/archived_chats_provider.dart';
-import '../services/chat_api_service.dart';
+import '../providers/user_profile_provider.dart';
+import 'user_avatar_widget.dart';
 import '../screens/chat_detail_screen.dart';
 
-/// Consumer widget for displaying a single chat in the chat list
-/// 
-/// This widget fetches the other user's profile information and displays it
 class ChatListTileConsumer extends ConsumerWidget {
-  /// The chat to display
-  final Chat chat;
-
-  /// The other participant's user ID
   final String otherUserId;
-
-  /// The last message in this chat (if any)
-  final Message? lastMessage;
-
-  /// The current user's ID
-  final String currentUserId;
-
-  /// Auth token for API calls
   final String token;
+  final Chat chat;
+  final String currentUserId;
+  final String? lastMessage;
 
   const ChatListTileConsumer({
     Key? key,
-    required this.chat,
     required this.otherUserId,
-    required this.currentUserId,
     required this.token,
+    required this.chat,
+    required this.currentUserId,
     this.lastMessage,
   }) : super(key: key);
 
-  /// Get a preview of the last message for display
-  String _getMessagePreview(Message message) {
-    final content = message.decryptedContent ?? '[Encrypted message]';
-    return content.length > 50 ? '${content.substring(0, 50)}...' : content;
+  String _truncatePreview(String preview) {
+    return preview.length > 50 ? '${preview.substring(0, 50)}...' : preview;
+  }
+
+  String _formatTimestamp(DateTime timestamp) {
+    final now = DateTime.now();
+    if (now.difference(timestamp).inDays == 0) {
+      return '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}';
+    } else if (now.difference(timestamp).inDays == 1) {
+      return 'Yesterday';
+    } else {
+      return '${timestamp.day}/${timestamp.month}/${timestamp.year}';
+    }
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Fetch the other user's profile
     final userProfileAsync = ref.watch(userProfileProvider((otherUserId, token)));
-
     return userProfileAsync.when(
       loading: () => ListTile(
         leading: CircleAvatar(
@@ -74,35 +69,41 @@ class ChatListTileConsumer extends ConsumerWidget {
         },
       ),
       data: (userProfile) {
-        // Display the chat tile with fetched user info
-        return ListTile(
-          // Leading: Avatar with profile picture or default image
-          leading: CircleAvatar(
-            radius: 24,
-            backgroundImage: userProfile.profilePictureUrl != null
-                ? NetworkImage(userProfile.profilePictureUrl!)
-                : const AssetImage('assets/images/profile/defailtProfilePic.jpg'),
-            backgroundColor: Colors.grey[300],
-          ),
+        // No bold/unread logic, always normal style
 
-          // Title: Other participant's username
+        return ListTile(
+          leading: userProfile.profilePictureUrl != null && userProfile.profilePictureUrl!.isNotEmpty
+            ? UserAvatarWidget(
+                imageUrl: userProfile.profilePictureUrl!,
+                radius: 24,
+                username: userProfile.username,
+              )
+            : CircleAvatar(
+                radius: 24,
+                backgroundImage: AssetImage('assets/images/profile/defaultProfilePic.jpg'),
+                child: Text(
+                  userProfile.username != null && userProfile.username!.isNotEmpty
+                    ? userProfile.username![0].toUpperCase()
+                    : '?',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
           title: Text(
-            userProfile.username,
+            userProfile.username ?? 'Unknown',
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
             ),
             overflow: TextOverflow.ellipsis,
           ),
-
-          // Subtitle: Last message preview + timestamp
           subtitle: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Last message preview (truncated)
               Expanded(
                 child: Text(
-                  lastMessage != null ? _getMessagePreview(lastMessage!) : 'No messages yet',
+                  chat.lastMessagePreview == null || chat.lastMessagePreview!.isEmpty
+                    ? 'No messages yet'
+                    : _truncatePreview(chat.lastMessagePreview!),
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.grey[600],
@@ -111,88 +112,32 @@ class ChatListTileConsumer extends ConsumerWidget {
                   maxLines: 1,
                 ),
               ),
-              // Timestamp
-              if (lastMessage != null)
-                Padding(
-                  padding: const EdgeInsets.only(left: 8.0),
-                  child: Text(
-                    lastMessage!.getDisplayTime(),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[500],
-                    ),
+              Padding(
+                padding: const EdgeInsets.only(left: 8.0),
+                child: Text(
+                  chat.lastMessageTimestamp != null
+                    ? _formatTimestamp(chat.lastMessageTimestamp!)
+                    : _formatTimestamp(chat.updatedAt),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[500],
                   ),
                 ),
+              ),
             ],
           ),
-
-          // Tap handler - navigate to chat detail screen
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (context) => ChatDetailScreen(
                   chatId: chat.id,
                   otherUserId: otherUserId,
-                  otherUserName: userProfile.username,
+                  otherUserName: userProfile.username ?? 'Unknown',
                   otherUserAvatarUrl: userProfile.profilePictureUrl,
                 ),
               ),
             );
           },
-
-          // Visual feedback
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-
-          // Trailing menu button with archive option
-          trailing: PopupMenuButton<String>(
-            onSelected: (value) async {
-              if (value == 'archive') {
-                try {
-                  const baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://localhost:8081');
-                  final chatService = ChatApiService(baseUrl: baseUrl);
-                  
-                  await chatService.archiveChat(
-                    token: token,
-                    chatId: chat.id,
-                  );
-                  
-                  // Refresh both active and archived chats
-                  ref.refresh(activeChatListProvider(token));
-                  ref.refresh(archivedChatsProvider(token));
-                  
-                  // Show feedback
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Chat archived')),
-                  );
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Failed to archive: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
-            },
-            itemBuilder: (BuildContext context) {
-              return [
-                PopupMenuItem<String>(
-                  value: 'archive',
-                  child: Row(
-                    children: [
-                      Icon(Icons.archive_outlined, color: Colors.orange),
-                      SizedBox(width: 8),
-                      Text('Archive'),
-                    ],
-                  ),
-                ),
-              ];
-            },
-            icon: Icon(
-              Icons.more_vert,
-              color: Colors.grey[400],
-            ),
-          ),
         );
       },
     );

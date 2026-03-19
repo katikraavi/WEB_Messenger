@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/auth_models.dart';
 
@@ -19,6 +20,13 @@ class AuthException implements Exception {
 class AuthService {
   // Using localhost to connect to Docker container (accessible via 127.0.0.1 on host)
   static const String _baseUrl = 'http://localhost:8081';
+  static const bool _debugLogs = false;
+
+  static void _log(String message) {
+    if (_debugLogs) {
+      debugPrint(message);
+    }
+  }
 
   /// Get the base URL (can be overridden for testing)
   static String get baseUrl => _baseUrl;
@@ -27,6 +35,7 @@ class AuthService {
   /// 
   /// Throws [AuthException] on error
   static Future<AuthResponse> register(RegistrationRequest request) async {
+      _log('[Frontend Register] Sending registration request: email=${request.email}, username=${request.username}');
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/auth/register'),
@@ -36,31 +45,36 @@ class AuthService {
         const Duration(seconds: 10),
         onTimeout: () => throw AuthException('Request timeout - check your connection'),
       );
+      _log('[Frontend Register] Response status: ${response.statusCode}, body: ${response.body}');
 
       if (response.statusCode == 201) {
         try {
           final data = jsonDecode(response.body) as Map<String, dynamic>;
+          _log('[Frontend Register] Registration successful: $data');
           return AuthResponse.fromJson(data);
         } catch (parseError) {
-          print('[AuthService] Error parsing register response: $parseError');
-          print('[AuthService] Response body: ${response.body}');
+          _log('[Frontend Register] Error parsing register response: $parseError');
+          _log('[Frontend Register] Response body: ${response.body}');
           throw AuthException('Invalid server response - please try again', code: 'parse_error');
         }
       } else if (response.statusCode == 400) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         final details = data['details'] as List<dynamic>?;
         final error = details?.isNotEmpty == true ? details!.first : data['error'];
+        _log('[Frontend Register] Validation error: $error');
         throw AuthException(error?.toString() ?? 'Validation failed', code: 'validation_error');
       } else if (response.statusCode == 409) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
+        _log('[Frontend Register] Duplicate error: ${data['error']}');
         throw AuthException(data['error'] as String? ?? 'User already exists', code: 'user_exists');
       } else {
+        _log('[Frontend Register] Server error: status=${response.statusCode}, body=${response.body}');
         throw AuthException('Server error - please try again later', code: 'server_error');
       }
     } on AuthException {
       rethrow;
     } catch (e) {
-      print('[AuthService] Register network error: $e');
+      _log('[AuthService] Register network error: $e');
       throw AuthException('Network error - check your connection', code: 'network_error');
     }
   }
@@ -84,8 +98,8 @@ class AuthService {
           final data = jsonDecode(response.body) as Map<String, dynamic>;
           return AuthResponse.fromJson(data);
         } catch (parseError) {
-          print('[AuthService] Error parsing login response: $parseError');
-          print('[AuthService] Response body: ${response.body}');
+          _log('[AuthService] Error parsing login response: $parseError');
+          _log('[AuthService] Response body: ${response.body}');
           throw AuthException('Invalid server response - please try again', code: 'parse_error');
         }
       } else if (response.statusCode == 400) {
@@ -103,7 +117,7 @@ class AuthService {
     } on AuthException {
       rethrow;
     } catch (e) {
-      print('[AuthService] Login network error: $e');
+      _log('[AuthService] Login network error: $e');
       throw AuthException('Network error - check your connection', code: 'network_error');
     }
   }
@@ -155,7 +169,7 @@ class AuthService {
         throw AuthException('Failed to logout', code: 'logout_failed');
       }
     } catch (e) {
-      print('Logout error: $e');
+      _log('Logout error: $e');
       // Don't throw on logout - just log it
     }
   }

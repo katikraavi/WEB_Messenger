@@ -113,9 +113,20 @@ class ChatService {
   }) async {
     try {
       String query = '''
-        SELECT m.id, m.chat_id, m.sender_id, m.encrypted_content, m.created_at,
-               u.username as sender_username, u.profile_picture_url as sender_avatar
+        SELECT m.id,
+               m.chat_id,
+               m.sender_id,
+               m.recipient_id,
+               m.encrypted_content,
+               COALESCE(mds.status, m.status) as effective_status,
+               m.created_at,
+               m.edited_at,
+               m.deleted_at,
+               m.is_deleted,
+               u.username as sender_username,
+               u.profile_picture_url as sender_avatar
         FROM $_messagesTable m
+        LEFT JOIN message_delivery_status mds ON mds.message_id = m.id
         LEFT JOIN users u ON m.sender_id = u.id
         WHERE m.chat_id = @chatId
       ''';
@@ -140,8 +151,8 @@ class ChatService {
       return result.map((row) {
         final message = _rowToMessage(row);
         // Add sender username and avatar to response
-        message.senderUsername = row[5] as String?;
-        message.senderAvatarUrl = row[6] as String?;
+        message.senderUsername = row[10] as String?;
+        message.senderAvatarUrl = row[11] as String?;
         return message;
       }).toList();
     } catch (e) {
@@ -545,8 +556,13 @@ class ChatService {
       id: row[0] as String,
       chatId: row[1] as String,
       senderId: row[2] as String,
-      encryptedContent: row[3] as String,
-      createdAt: row[4] as DateTime,
+      recipientId: row[3] as String?,
+      encryptedContent: row[4] as String,
+      status: row[5] as String? ?? 'sent',
+      createdAt: row[6] as DateTime,
+      editedAt: row[7] as DateTime?,
+      deletedAt: row[8] as DateTime?,
+      isDeleted: row[9] as bool? ?? false,
     );
   }
 }

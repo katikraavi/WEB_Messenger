@@ -4,7 +4,7 @@ import 'package:postgres/postgres.dart';
 Future<void> up(Connection connection) async {
   try {
     await connection.execute('''
-      ALTER TABLE "user" 
+      ALTER TABLE "users" 
       ADD COLUMN verified_at TIMESTAMP WITH TIME ZONE;
     ''');
     print('[✓] Column added to user table: verified_at');
@@ -19,7 +19,7 @@ Future<void> up(Connection connection) async {
   try {
     // Create indexes for verification queries
     await connection.execute('''
-      CREATE INDEX idx_user_email_verified ON "user"(email_verified);
+      CREATE INDEX idx_user_email_verified ON "users"(email_verified);
     ''');
     print('[✓] Index created: idx_user_email_verified');
   } catch (e) {
@@ -30,7 +30,7 @@ Future<void> up(Connection connection) async {
   
   try {
     await connection.execute('''
-      CREATE INDEX idx_user_verified_at ON "user"(verified_at DESC);
+      CREATE INDEX idx_user_verified_at ON "users"(verified_at DESC);
     ''');
     print('[✓] Index created: idx_user_verified_at');
   } catch (e) {

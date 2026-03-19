@@ -76,6 +76,21 @@ class Message {
 
   /// JSON serialization factory
   factory Message.fromJson(Map<String, dynamic> json) => _$MessageFromJson(json);
+
+  /// Create Message from Postgres query result row
+  factory Message.fromPostgres(List row) {
+    return Message(
+      id: row[0] as String,
+      chatId: row[1] as String,
+      senderId: row[2] as String,
+      encryptedContent: row[3] as String,
+      status: row[6] as String? ?? 'sent',
+      createdAt: row[7] as DateTime,
+      editedAt: row[8] != null ? row[8] as DateTime : null,
+      isDeleted: row.length > 10 && row[10] != null ? row[10] as bool : false,
+      deletedAt: row.length > 9 && row[9] != null ? row[9] as DateTime : null,
+    );
+  }
   
   /// Convert to JSON (encrypted_content only, decryptedContent is never serialized)
   Map<String, dynamic> toJson() => _$MessageToJson(this);

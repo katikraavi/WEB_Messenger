@@ -188,7 +188,8 @@ class ChatHandlers {
       // Fetch messages
       final messages = await chatService.getMessages(chatId, limit: limit, beforeCursor: beforeCursor);
 
-      // Convert to JSON
+      // For MVP: Frontend will decrypt the encrypted_content on the client side
+      // Just pass through the messages as-is
       final response = {
         'messages': [for (final message in messages) message.toJson()],
         'count': messages.length,

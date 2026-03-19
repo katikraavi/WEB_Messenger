@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../../utils/secure_storage_wrapper.dart';
 import '../models/auth_models.dart';
@@ -11,6 +12,14 @@ import '../services/auth_service.dart';
 /// - Loading and error states
 /// - Token persistence using secure storage
 class AuthProvider extends ChangeNotifier {
+  static const bool _debugLogs = false;
+
+  static void _log(String message) {
+    if (_debugLogs) {
+      debugPrint(message);
+    }
+  }
+
   User? _user;
   String? _token;
   bool _isLoading = false;
@@ -23,6 +32,7 @@ class AuthProvider extends ChangeNotifier {
   String? get token => _token;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  String? get userId => _user?.userId;
   bool get isAuthenticated => _user != null && _token != null;
 
   /// Initialize auth provider - restore session if token exists
@@ -49,7 +59,16 @@ class AuthProvider extends ChangeNotifier {
         }
       }
     } catch (e) {
-      print('Error initializing auth: $e');
+      final errorText = e.toString().toLowerCase();
+      final isLinuxKeyringIssue = errorText.contains('libsecret') ||
+          errorText.contains('keyring') ||
+          errorText.contains('dbus');
+
+      if (isLinuxKeyringIssue) {
+        _log('[AuthProvider] Linux keyring unavailable, starting without persisted session');
+      } else {
+        _log('Error initializing auth: $e');
+      }
     }
     
     _isLoading = false;
@@ -57,6 +76,9 @@ class AuthProvider extends ChangeNotifier {
   }
 
   /// Register new user
+  String? _devVerificationToken;
+  String? get devVerificationToken => _devVerificationToken;
+
   Future<void> register(RegistrationRequest request) async {
     _isLoading = true;
     _error = null;
@@ -72,6 +94,9 @@ class AuthProvider extends ChangeNotifier {
         username: authResponse.username,
       );
       
+      // Capture dev token from registration response (only present in dev mode)
+      _devVerificationToken = authResponse.devVerificationToken;
+
       // Note: Token is NOT stored after registration (per spec)
       // User must login to get a token with persistent session
       _token = null;
@@ -82,6 +107,7 @@ class AuthProvider extends ChangeNotifier {
       _error = e.toString();
       _user = null;
       _token = null;
+      _devVerificationToken = null;
       notifyListeners();
       rethrow;
     }
@@ -94,22 +120,22 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      print('[AuthProvider] Login attempt for email: ${request.email}');
+      _log('[AuthProvider] Login attempt for email: ${request.email}');
       final authResponse = await AuthService.login(request);
-      print('[AuthProvider] Login response received');
-      print('[AuthProvider] User ID: ${authResponse.userId}');
-      print('[AuthProvider] Token: ${authResponse.token != null ? 'present' : 'null'}');
+      _log('[AuthProvider] Login response received');
+      _log('[AuthProvider] User ID: ${authResponse.userId}');
+      _log('[AuthProvider] Token: ${authResponse.token != null ? 'present' : 'null'}');
       
       // Store token securely
       _token = authResponse.token;
       if (_token != null) {
-        print('[AuthProvider] Storing token in secure storage');
+        _log('[AuthProvider] Storing token in secure storage');
         try {
           await _secureStorage.write(key: 'auth_token', value: _token!);
           await _secureStorage.write(key: 'user_id', value: authResponse.userId);
-          print('[AuthProvider] Token stored successfully');
+          _log('[AuthProvider] Token stored successfully');
         } catch (storageError) {
-          print('[AuthProvider] Error storing token: $storageError');
+          _log('[AuthProvider] Error storing token: $storageError');
           // Continue anyway - token is in memory
         }
       }
@@ -121,14 +147,14 @@ class AuthProvider extends ChangeNotifier {
         username: authResponse.username,
       );
       
-      print('[AuthProvider] User set: ${_user?.username}');
-      print('[AuthProvider] isAuthenticated: $isAuthenticated');
+      _log('[AuthProvider] User set: ${_user?.username}');
+      _log('[AuthProvider] isAuthenticated: $isAuthenticated');
       
       _isLoading = false;
       notifyListeners();
-      print('[AuthProvider] notifyListeners() called');
+      _log('[AuthProvider] notifyListeners() called');
     } catch (e) {
-      print('[AuthProvider] Login error: $e');
+      _log('[AuthProvider] Login error: $e');
       _isLoading = false;
       _error = e.toString();
       _user = null;
@@ -149,7 +175,7 @@ class AuthProvider extends ChangeNotifier {
         await AuthService.logout(_token!);
       }
     } catch (e) {
-      print('Logout error: $e');
+      _log('Logout error: $e');
     }
 
     // Clear local state

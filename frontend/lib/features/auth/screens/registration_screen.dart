@@ -7,7 +7,7 @@ import '../providers/auth_provider.dart';
 
 /// Registration screen for new users
 class RegistrationScreen extends StatefulWidget {
-  final Function(User, String)? onRegistrationSuccess;
+  final Function(User, String, String?, LoginRequest)? onRegistrationSuccess;
   final VoidCallback? onBackToLogin;
 
   const RegistrationScreen({
@@ -108,6 +108,15 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     });
   }
 
+  void _fillGeneratedTestAccount() {
+    final suffix = DateTime.now().millisecondsSinceEpoch.toString();
+    _fillTestAccount(
+      'test.$suffix@example.com',
+      'test_$suffix',
+      'Test User $suffix',
+    );
+  }
+
   Future<void> _handleRegistration(AuthProvider authProvider) async {
     // Clear any previous form-level errors
     if (mounted) {
@@ -133,22 +142,35 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         fullName: _fullNameController.text.trim(),
       );
 
-      await authProvider.register(request);
+      try {
+        // Only call authProvider.register() - it handles the API call internally
+        await authProvider.register(request);
 
-      if (mounted) {
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Account created successfully! Verify your email.'),
-            duration: Duration(seconds: 3),
-          ),
-        );
+        if (mounted) {
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Account created successfully! Verify your email.'),
+              duration: Duration(seconds: 8),
+            ),
+          );
 
-        // Navigate to email verification screen with user and email
-        if (authProvider.user != null) {
-          widget.onRegistrationSuccess?.call(
-            authProvider.user!,
-            request.email,
+          // Navigate to email verification screen with user and email
+          if (authProvider.user != null) {
+            widget.onRegistrationSuccess?.call(
+              authProvider.user!,
+              request.email,
+              authProvider.devVerificationToken,
+              LoginRequest(email: request.email, password: request.password),
+            );
+          }
+        }
+      } catch (e) {
+        // Show backend error details
+        if (mounted) {
+          showCopyableErrorSnackBar(
+            context,
+            'Registration failed: ${e.toString()}',
           );
         }
       }
@@ -198,6 +220,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                               color: Colors.orange,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'These presets may already exist. Use Generate Unique for a guaranteed new account.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.orange.shade900,
                             ),
                           ),
                           const SizedBox(height: 10),
@@ -258,7 +288,47 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                                     side: BorderSide(color: Colors.amber.shade400),
                                   ),
                                   onPressed: () {
-                                    _fillTestAccount('diane@example.com', 'diane', 'Diane Miller');
+                                    _fillTestAccount('diane@test.org', 'diane', 'Diane Miller');
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  icon: const Icon(Icons.auto_fix_high, size: 18),
+                                  label: const Text('Generate Unique'),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                    side: BorderSide(color: Colors.amber.shade400),
+                                  ),
+                                  onPressed: () {
+                                    _fillGeneratedTestAccount();
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  icon: const Icon(Icons.person, size: 18),
+                                  label: const Text('Reset Form'),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                    side: BorderSide(color: Colors.amber.shade400),
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _emailController.clear();
+                                      _usernameController.clear();
+                                      _passwordController.clear();
+                                      _fullNameController.clear();
+                                      _showPasswordStrength = false;
+                                      _fieldErrors.updateAll((_, value) => null);
+                                      _passwordStrengthErrors = [];
+                                    });
                                   },
                                 ),
                               ),

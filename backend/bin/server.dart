@@ -1,6 +1,7 @@
-import '../lib/server.dart';
+import '../lib/server.dart' as server;
 
-void main() async {
+void main() {
   // Server entry point is defined in lib/server.dart
-  // Just call the main() function there
+  // main() is async so we just call it and let it run in the background
+  server.main();
 }

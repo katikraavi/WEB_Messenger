@@ -43,14 +43,14 @@ class ChatListScreen extends ConsumerWidget {
 
     // Get active chats with token parameter
     print('[ChatListScreen] 📡 Watching activeChatListProvider for token: ${token.substring(0, 20)}...');
-    final activeChatsFuture = ref.watch(activeChatListProvider(token));
+    final activeChatsStream = ref.watch(activeChatListProvider(token));
 
     return RefreshIndicator(
       onRefresh: () async {
         // Refresh chats from backend
-        return ref.refresh(activeChatListProvider(token).future);
+        return ref.refresh(activeChatListProvider(token));
       },
-      child: activeChatsFuture.when(
+      child: activeChatsStream.when(
         // Loading state
         loading: () => const Center(
           child: CircularProgressIndicator(),
@@ -110,32 +110,20 @@ class ChatListScreen extends ConsumerWidget {
             );
           }
 
-          // Chat list
-          return ListView(
-            children: [
-              // Active chats list
-              ...List.generate(
-                chats.length,
-                (index) {
-                  final chat = chats[index];
-                  final otherUserId = chat.getOtherId(currentUserId);
-
-                  // Navigate to chat detail screen with other user ID and token
-                  return ChatListTileConsumer(
-                    chat: chat,
-                    otherUserId: otherUserId,
-                    currentUserId: currentUserId,
-                    token: token,
-                    lastMessage: null, // TODO: Load last message
-                  );
-                },
-              ),
-              // Archived chats section
-              ArchivedChatsSection(
-                token: token,
+          // Active chats list
+          return ListView.builder(
+            itemCount: chats.length,
+            itemBuilder: (context, index) {
+              final chat = chats[index];
+              final otherUserId = chat.getOtherId(currentUserId);
+              return ChatListTileConsumer(
+                chat: chat,
+                otherUserId: otherUserId,
                 currentUserId: currentUserId,
-              ),
-            ],
+                token: token,
+                lastMessage: chat.lastMessagePreview,
+              );
+            },
           );
         },
       ),

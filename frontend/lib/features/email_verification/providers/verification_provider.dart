@@ -75,6 +75,17 @@ class VerificationNotifier extends StateNotifier<VerificationState> {
   VerificationNotifier(this.verificationService)
       : super(VerificationState());
 
+  /// Seed state from a registration response (email already sent by backend)
+  void seedFromRegistration({required String email, required String devToken}) {
+    state = state.copyWith(
+      phase: VerificationPhase.pending,
+      userEmail: email,
+      isLoading: false,
+      successMessage: 'Verification email sent to $email',
+      devToken: devToken,
+    );
+  }
+
   /// Request verification email to be sent
   Future<void> sendVerificationEmail({
     required String email,

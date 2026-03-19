@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'dart:convert';
-import '../../auth/providers/auth_provider.dart' as auth;
+import '../../features/auth/providers/auth_provider.dart' as auth;
 
 /// WebSocket service (T038)
 /// 
@@ -221,56 +221,20 @@ final webSocketServiceProvider = Provider<WebSocketService>((ref) {
 final messageStreamProvider =
     StreamProvider<Map<String, dynamic>>((ref) async* {
   final wsService = ref.watch(webSocketServiceProvider);
-  final authNotifier = ref.watch(auth.authProvider);
-
-  // Extract token and user ID
-  String? token;
-  String? userId;
-  await authNotifier.whenData((user) {
-    token = user?.token;
-    userId = user?.userId;
-  });
-
-  if (token == null || userId == null) {
-    print('[MessageStream] Not authenticated');
-    return;
-  }
-
-  // Connect WebSocket if not already connected
-  if (!wsService.isConnected) {
-    try {
-      await wsService.connect(
-        token: token!,
-        userId: userId!,
-      );
-    } catch (e) {
-      print('[MessageStream] ❌ Failed to connect: $e');
-      throw Exception('Failed to connect WebSocket: $e');
-    }
-  }
-
+  
   // Stream events
   yield* wsService.eventStream;
 });
 
 /// Filtered message stream for a specific chat
-/// 
-/// Usage:
-/// ```dart
-/// final chatMessages = ref.watch(chatMessageStreamProvider('chat-1'));
-/// chatMessages.whenData((event) {
-///   print('Chat event: ${event['type']}');
-/// });
-/// ```
 final chatMessageStreamProvider =
     StreamProvider.family<Map<String, dynamic>, String>((ref, chatId) async* {
-  final messageStream = ref.watch(messageStreamProvider);
+  final wsService = ref.watch(webSocketServiceProvider);
 
-  yield* messageStream.whenData((event) async* {
-    if (event['chatId'] == chatId) {
-      yield event;
-    }
-  });
+  // Stream events filtered by chatId using yield from where clause
+  yield* wsService.eventStream.where((event) => 
+    event is Map && (event['chatId'] ?? event['chat_id']) == chatId
+  );
 });
 
 /// Send WebSocket event helper

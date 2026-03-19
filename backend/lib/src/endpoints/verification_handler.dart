@@ -3,6 +3,7 @@ import 'package:shelf/shelf.dart';
 import '../services/email_service.dart';
 import '../services/rate_limit_service.dart';
 import '../services/token_service.dart';
+import '../services/verification_service.dart';
 
 /// Handler for initiating email verification
 /// 
@@ -14,7 +15,7 @@ Future<Response> sendVerificationEmail(
   TokenService tokenService,
   EmailService emailService,
   RateLimitService rateLimitService,
-  dynamic verificationService, // Deferred - would be VerificationService when DB is available
+  VerificationService verificationService,
 ) async {
   try {
     // Parse request
@@ -112,7 +113,7 @@ Future<Response> sendVerificationEmail(
 Future<Response> verifyEmailToken(
   Request request,
   TokenService tokenService,
-  dynamic verificationService, // Deferred - would be VerificationService when DB is available
+  VerificationService verificationService,
 ) async {
   try {
     // Parse request

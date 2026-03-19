@@ -10,7 +10,7 @@ void main() {
     setUp(() {
       // Initialize with test base URL and mock auth token
       apiService = InviteApiService(
-        baseUrl: 'http://localhost:8080',
+        baseUrl: 'http://localhost:8081',
         authToken: 'test-jwt-token',
       );
     });
@@ -19,7 +19,7 @@ void main() {
       test('should make POST request to /api/invites/send with recipientId', () {
         // Test:
         // 1. Call sendInvite('user-123')
-        // 2. Verify HTTP POST to 'http://localhost:8080/api/invites/send'
+        // 2. Verify HTTP POST to 'http://localhost:8081/api/invites/send'
         // 3. Verify request body includes: {"recipientId": "user-123"}
         // 4. Verify Authorization header present
       });
@@ -62,7 +62,7 @@ void main() {
       test('should make GET request to /api/invites/pending', () {
         // Test:
         // 1. Call fetchPendingInvites()
-        // 2. Verify HTTP GET to 'http://localhost:8080/api/invites/pending'
+        // 2. Verify HTTP GET to 'http://localhost:8081/api/invites/pending'
         // 3. Verify Authorization header present
       });
 

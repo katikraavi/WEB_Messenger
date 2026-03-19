@@ -10,6 +10,10 @@ class Chat {
   final bool isParticipant2Archived;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final String? lastMessagePreview; // Preview text or media indicator
+  final DateTime? lastMessageTimestamp; // For ordering
+  final String? lastMessageSenderAvatarUrl; // For avatar preview
+  final String? lastMessageStatus; // For unread/bold logic
 
   const Chat({
     required this.id,
@@ -19,6 +23,10 @@ class Chat {
     required this.isParticipant2Archived,
     required this.createdAt,
     required this.updatedAt,
+    this.lastMessagePreview,
+    this.lastMessageTimestamp,
+    this.lastMessageSenderAvatarUrl,
+    this.lastMessageStatus,
   });
 
   /// JSON deserialization factory
@@ -33,6 +41,12 @@ class Chat {
                               json['isParticipant2Archived'] as bool? ?? false,
       createdAt: DateTime.parse(json['created_at'] as String? ?? json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String? ?? json['updatedAt'] as String),
+      lastMessagePreview: json['last_message_preview'] as String?,
+      lastMessageTimestamp: json['last_message_timestamp'] != null
+        ? DateTime.parse(json['last_message_timestamp'] as String)
+        : null,
+      lastMessageSenderAvatarUrl: json['last_message_sender_avatar_url'] as String?,
+      lastMessageStatus: json['last_message_status'] as String?,
     );
   }
 
@@ -45,11 +59,13 @@ class Chat {
     'is_participant_2_archived': isParticipant2Archived,
     'created_at': createdAt.toIso8601String(),
     'updated_at': updatedAt.toIso8601String(),
+    'last_message_preview': lastMessagePreview,
+    'last_message_timestamp': lastMessageTimestamp?.toIso8601String(),
+    'last_message_sender_avatar_url': lastMessageSenderAvatarUrl,
+    'last_message_status': lastMessageStatus,
   };
 
   /// Get the other participant's ID for the current user
-  /// 
-  /// Returns the participant ID that is NOT the current user
   String getOtherId(String currentUserId) {
     if (currentUserId == participant1Id) return participant2Id;
     if (currentUserId == participant2Id) return participant1Id;

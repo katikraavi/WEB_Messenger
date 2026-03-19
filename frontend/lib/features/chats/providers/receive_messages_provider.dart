@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:async';
 import '../models/message_model.dart';
-import '../../core/services/websocket_service.dart';
-import 'chat_api_service.dart';
+import '../../../core/services/websocket_service.dart';
+import '../services/chat_api_service.dart';
 
 /// Phase 4: Receive Messages & Read Receipts (T032-T035)
 /// 
@@ -240,30 +240,22 @@ class ReceiveMessagesListener {
   }
 }
 
-/// Receive messages listener provider (T032-T035)
+/// DEPRECATED: Use messageEventStreamProvider from websocket_provider.dart instead
+/// This provider is kept for backward compatibility but is no longer actively used
 /// 
-/// Provides the listener service for the entire app
+/// The new WebSocket-based implementation provides better real-time messaging
 final receiveMessagesListenerProvider = Provider<ReceiveMessagesListener?>((ref) {
-  // This would be initialized in main.dart with proper dependencies
-  // For now, return null - setup happens in app initialization
+  // Deprecated - WebSocket is now used for real-time messaging
+  // See messageEventStreamProvider in websocket_provider.dart
   return null;
 });
 
-/// Receive message stream provider (T037)
+/// DEPRECATED: Use messageEventStreamProvider from websocket_provider.dart instead
+/// This provider is kept for backward compatibility but is no longer actively used
 /// 
-/// Watches for incoming messages and updates the UI
+/// The new WebSocket-based implementation provides better real-time messaging
 final receiveMessageStreamProvider = StreamProvider<MessageReceivedEvent?>((ref) async* {
-  final listener = ref.watch(receiveMessagesListenerProvider);
-  
-  if (listener == null) {
-    print('[receiveMessageStreamProvider] ⚠️ Listener not initialized');
-    yield null;
-    return;
-  }
-
-  // Stream all received messages
-  await for (final event in listener.messageReceivedStream) {
-    print('[receiveMessageStreamProvider] 📨 Streaming received message: ${event.message.id}');
-    yield event;
-  }
+  // Deprecated - WebSocket is now used for real-time messaging
+  // See messageEventStreamProvider in websocket_provider.dart
+  yield null;
 });

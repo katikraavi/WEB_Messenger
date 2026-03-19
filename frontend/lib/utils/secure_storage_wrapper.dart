@@ -10,6 +10,14 @@ class SecureStorageWrapper {
   final Map<String, String> _memoryCache = {};
   bool _useMemoryFallback = false;
 
+  bool _isLinuxKeyringError(Object error) {
+    if (!Platform.isLinux) return false;
+    final errorText = error.toString().toLowerCase();
+    return errorText.contains('libsecret') ||
+        errorText.contains('keyring') ||
+        errorText.contains('dbus');
+  }
+
   SecureStorageWrapper._internal();
 
   factory SecureStorageWrapper() {
@@ -21,7 +29,6 @@ class SecureStorageWrapper {
   Future<String?> read({required String key}) async {
     // Check memory cache first if using fallback
     if (_useMemoryFallback && _memoryCache.containsKey(key)) {
-      print('[SecureStorage] Reading from memory cache: $key');
       return _memoryCache[key];
     }
 
@@ -29,7 +36,6 @@ class SecureStorageWrapper {
       final value = await _secureStorage.read(key: key).timeout(
         const Duration(seconds: 3),
         onTimeout: () {
-          print('[SecureStorage] Timeout reading from secure storage - using memory fallback');
           _useMemoryFallback = true;
           return null;
         },
@@ -38,26 +44,21 @@ class SecureStorageWrapper {
       if (value != null) {
         // Cache it in memory for future use
         _memoryCache[key] = value;
-        print('[SecureStorage] Successfully read from secure storage: $key');
       }
 
       return value;
     } catch (e) {
-      print('[SecureStorage] Error reading from secure storage: $e');
-
       // On Linux, keyring might fail - use memory fallback
-      if (Platform.isLinux &&
-          (e.toString().contains('Libsecret') ||
-              e.toString().contains('keyring') ||
-              e.toString().contains('DBus'))) {
-        print('[SecureStorage] Linux keyring error detected - switching to memory storage');
+      if (_isLinuxKeyringError(e)) {
         _useMemoryFallback = true;
 
         // Return cached value if available
         if (_memoryCache.containsKey(key)) {
-          print('[SecureStorage] Returning from memory cache: $key');
           return _memoryCache[key];
         }
+
+        // No cached value is still a valid fallback result.
+        return null;
       }
 
       // Rethrow other errors
@@ -71,7 +72,6 @@ class SecureStorageWrapper {
     try {
       // Always cache in memory
       _memoryCache[key] = value;
-      print('[SecureStorage] Cached in memory: $key');
 
       // Try to write to secure storage
       if (!_useMemoryFallback) {
@@ -79,17 +79,11 @@ class SecureStorageWrapper {
           await _secureStorage.write(key: key, value: value).timeout(
             const Duration(seconds: 3),
             onTimeout: () {
-              print('[SecureStorage] Write timeout - using memory fallback');
               _useMemoryFallback = true;
             },
           );
-          print('[SecureStorage] Successfully wrote to secure storage: $key');
         } catch (e) {
-          print('[SecureStorage] Error writing to secure storage: $e');
-          if (Platform.isLinux &&
-              (e.toString().contains('Libsecret') ||
-                  e.toString().contains('keyring'))) {
-            print('[SecureStorage] Linux keyring error - using memory fallback');
+          if (_isLinuxKeyringError(e)) {
             _useMemoryFallback = true;
           } else {
             rethrow;
@@ -97,7 +91,6 @@ class SecureStorageWrapper {
         }
       }
     } catch (e) {
-      print('[SecureStorage] Failed to write value: $e');
       rethrow;
     }
   }
@@ -107,7 +100,6 @@ class SecureStorageWrapper {
     try {
       // Remove from memory cache
       _memoryCache.remove(key);
-      print('[SecureStorage] Removed from memory: $key');
 
       // Try to delete from secure storage
       if (!_useMemoryFallback) {
@@ -115,21 +107,15 @@ class SecureStorageWrapper {
           await _secureStorage.delete(key: key).timeout(
             const Duration(seconds: 3),
           );
-          print('[SecureStorage] Successfully deleted from secure storage: $key');
         } catch (e) {
-          print('[SecureStorage] Error deleting from secure storage: $e');
-          if (Platform.isLinux &&
-              (e.toString().contains('Libsecret') ||
-                  e.toString().contains('keyring'))) {
-            print('[SecureStorage] Linux keyring error - memory deletion only');
+          if (_isLinuxKeyringError(e)) {
             // Not critical if delete fails
           } else {
             rethrow;
           }
         }
       }
-    } catch (e) {
-      print('[SecureStorage] Failed to delete value: $e');
+    } catch (_) {
       // Don't rethrow for delete operations
     }
   }
@@ -138,27 +124,20 @@ class SecureStorageWrapper {
   Future<void> deleteAll() async {
     try {
       _memoryCache.clear();
-      print('[SecureStorage] Cleared memory storage');
 
       if (!_useMemoryFallback) {
         try {
           await _secureStorage.deleteAll().timeout(
             const Duration(seconds: 3),
           );
-          print('[SecureStorage] Cleared secure storage');
         } catch (e) {
-          print('[SecureStorage] Error clearing secure storage: $e');
-          if (Platform.isLinux &&
-              (e.toString().contains('Libsecret') ||
-                  e.toString().contains('keyring'))) {
-            print('[SecureStorage] Linux keyring error - memory cleared only');
+          if (_isLinuxKeyringError(e)) {
           } else {
             rethrow;
           }
         }
       }
-    } catch (e) {
-      print('[SecureStorage] Failed to clear storage: $e');
+    } catch (_) {
     }
   }
 
@@ -168,6 +147,5 @@ class SecureStorageWrapper {
   /// Force use of memory storage (for testing or manual override)
   void forceMemoryMode() {
     _useMemoryFallback = true;
-    print('[SecureStorage] Forced to memory-only mode');
   }
 }

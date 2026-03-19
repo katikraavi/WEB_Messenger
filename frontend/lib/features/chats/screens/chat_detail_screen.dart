@@ -4,16 +4,27 @@ import 'package:provider/provider.dart' as provider_pkg;
 import 'dart:async';
 import '../models/message_model.dart' show Message;
 import '../providers/messages_provider.dart';
+import '../providers/message_status_provider.dart';
 import '../providers/send_message_provider.dart';
 import '../providers/typing_indicator_provider.dart';
+import '../providers/websocket_provider.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/message_input_box.dart';
 import '../widgets/typing_indicator.dart';
 import '../widgets/edit_message_dialog.dart';
+import '../widgets/user_avatar_widget.dart';
+
+String _displayName(String? value) {
+  if (value == null || value.isEmpty) {
+    return 'Unknown';
+  }
+
+  return value[0].toUpperCase() + value.substring(1);
+}
 import '../services/media_picker_service.dart';
 import '../services/media_upload_service.dart';
 import '../../auth/providers/auth_provider.dart' as auth;
-import '../../core/services/websocket_service.dart';
+import '../../../core/services/websocket_service.dart';
 
 /// Screen for displaying a single chat conversation (T042-T043, T025-T027)
 /// 
@@ -60,47 +71,156 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     context,
     listen: false,
   );
+  
+  // Map to track who is typing
+  final Map<String, bool> _typingUsers = {};
+  
+  // Track whether we've enabled viewer active mode
+  bool _viewerActiveEnabled = false;
 
   @override
   void initState() {
     super.initState();
     _scrollController = ScrollController();
+    
+    // Connect to WebSocket for real-time messaging after frame is built
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      _connectWebSocket();
+    });
+  }
+  
+  /// Connect to WebSocket and subscribe to chat
+  Future<void> _connectWebSocket() async {
+    try {
+      final authProvider = provider_pkg.Provider.of<auth.AuthProvider>(
+        context,
+        listen: false,
+      );
+      
+      final token = authProvider.token;
+      final userId = authProvider.user?.userId;
+      
+      if (token == null || userId == null) {
+        print('[ChatDetail] Cannot connect to WebSocket - not authenticated');
+        return;
+      }
+      
+      // Get the websocket service from riverpod
+      final wsNotifier = ref.read(messageWebSocketProvider.notifier);
+      
+      // Connect if not already connected
+      if (!ref.read(messageWebSocketProvider).isConnected) {
+        await wsNotifier.connect(token: token, userId: userId);
+      }
+      
+      // Subscribe to this chat
+      wsNotifier.subscribeToChat(widget.chatId);
+      
+      print('[ChatDetail] ✓ Connected to WebSocket for chat ${widget.chatId}');
+    } catch (e) {
+      print('[ChatDetail] WebSocket connection error: $e');
+    }
   }
 
   @override
   void dispose() {
+    // Note: We disable viewer in deactivate() before dispose() since that's safer
     _scrollController.dispose();
+    
+    // Unsubscribe from chat and optionally disconnect
+    try {
+      final wsNotifier = ref.read(messageWebSocketProvider.notifier);
+      wsNotifier.unsubscribeFromChat();
+      
+      // Optionally disconnect if leaving the app entirely
+      // For now, keep connection alive for other chats
+      // wsNotifier.disconnect();
+    } catch (e) {
+      print('[ChatDetail] Error disconnecting WebSocket: $e');
+    }
+    
     super.dispose();
+  }
+
+  /// Called when widget is removed from tree, before dispose
+  /// This is where we safely disable viewer mode
+  @override
+  void deactivate() {
+    print('[ChatDetail] 🚪 deactivate() called - disabling viewer mode for chat ${widget.chatId}');
+    
+    if (_viewerActiveEnabled) {
+      try {
+        final authProvider = provider_pkg.Provider.of<auth.AuthProvider>(
+          context,
+          listen: false,
+        );
+        final token = authProvider.token;
+        final userId = authProvider.user?.userId;
+        
+        if (token != null && userId != null) {
+          // Disable viewer mode - new messages should NOT auto-read
+          ref.read(
+            localMessagesProvider(
+              (chatId: widget.chatId, token: token, currentUserId: userId),
+            ).notifier,
+          ).setChatBeingViewed(false);
+          _viewerActiveEnabled = false;
+          print('[ChatDetail] ✓ Viewer mode disabled');
+        }
+      } catch (e) {
+        print('[ChatDetail] Error disabling viewer: $e');
+      }
+    }
+    
+    super.deactivate();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    // Trigger auto-mark-as-read when entering chat (T020)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final authProvider = provider_pkg.Provider.of<auth.AuthProvider>(
+          context,
+          listen: false,
+        );
+        
+        if (authProvider.token != null) {
+          // Trigger auto-read provider to mark unread messages as read
+          // This will cause the recipient to show "read" status (blue checkmarks) to the sender
+          print('[ChatDetail] 🔔 Triggering auto-mark-as-read for chat ${widget.chatId}');
+          ref.read(autoMarkAsReadProvider((
+            chatId: widget.chatId,
+            token: authProvider.token!,
+          )));
+        }
+      }
+    });
   }
   
   /// Send typing start/stop event via WebSocket (T044)
   void _sendTypingEvent(String eventType) {
     try {
-      final webSocketService = _webSocketService;
-      if (webSocketService == null) return;
-
-      webSocketService.sendEvent(
-        type: eventType,
-        chatId: widget.chatId,
-        data: {
-          'userId': provider_pkg.Provider.of<auth.AuthProvider>(
-            context,
-            listen: false,
-          ).user?.userId,
-          'username': provider_pkg.Provider.of<auth.AuthProvider>(
-            context,
-            listen: false,
-          ).user?.username,
-        },
-      );
+      final wsNotifier = ref.read(messageWebSocketProvider.notifier);
+      
+      if (eventType == 'typing.start') {
+        wsNotifier.sendTyping(widget.chatId);
+      } else if (eventType == 'typing.stop') {
+        wsNotifier.stopTyping(widget.chatId);
+      }
+      
+      print('[ChatDetail] Sent typing event: $eventType');
     } catch (e) {
       print('[ChatDetail] Typing event error: $e');
     }
   }
 
-  /// Scroll to bottom of message list
+  /// Scroll to bottom of message list (newest messages)
   void _scrollToBottom() {
-    Future.delayed(const Duration(milliseconds: 100), () {
+    // Schedule scroll after frame is built
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
@@ -405,31 +525,80 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       );
     }
 
-    // Watch messages for this chat (T042)
-    final messagesAsync = ref.watch(
-      messagesWithCacheProvider(
-        (chatId: widget.chatId, token: token),
+    // Watch messages for this chat (T042) - using localMessagesProvider for real-time updates
+    final messages = ref.watch(
+      localMessagesProvider(
+        (chatId: widget.chatId, token: token, currentUserId: currentUserId),
       ),
+    );
+
+    // Notify the notifier that this chat is now being viewed - new messages should be auto-read
+    ref.read(
+      localMessagesProvider(
+        (chatId: widget.chatId, token: token, currentUserId: currentUserId),
+      ).notifier,
+    ).setChatBeingViewed(true);
+    _viewerActiveEnabled = true;
+
+    // Auto-scroll to bottom when new messages arrive
+    ref.listen(
+      localMessagesProvider(
+        (chatId: widget.chatId, token: token, currentUserId: currentUserId),
+      ),
+      (previous, next) {
+        // Only scroll if we actually have new messages
+        if (previous != null && next.length > previous.length) {
+          _scrollToBottom();
+        }
+      },
     );
 
     // Watch send message state
     final sendState = ref.watch(sendMessageProvider);
 
+    // Watch message status updates via WebSocket (T020 - Message Status System)
+    ref.watch(messageStatusUpdateProvider).whenData((statusUpdate) {
+      if (statusUpdate != null) {
+        final (:messageId, :newStatus, :chatId) = statusUpdate;
+        print('[ChatDetail] 📡 Status update: $messageId -> $newStatus');
+        
+        // Handle status change via notifier
+        if (authProvider.token != null) {
+          ref.read(messageStatusNotifierProvider.notifier)
+              .handleStatusChange(messageId, newStatus, chatId: chatId, token: authProvider.token!);
+        }
+      }
+    });
+
+    // Watch typing indicator updates from WebSocket (T046)
+    ref.watch(typingIndicatorUpdatesProvider);
+
     return Scaffold(
       appBar: AppBar(
-        title: Row(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // Avatar with default image fallback
-            CircleAvatar(
-              radius: 16,
-              backgroundImage: widget.otherUserAvatarUrl != null
-                  ? NetworkImage(widget.otherUserAvatarUrl!)
-                  : const AssetImage('assets/images/profile/defailtProfilePic.jpg'),
-              backgroundColor: Colors.grey[300],
+            Row(
+              children: [
+                // Avatar with proper fallback handling
+                UserAvatarWidget(
+                  imageUrl: widget.otherUserAvatarUrl,
+                  radius: 16,
+                  username: widget.otherUserName,
+                ),
+                const SizedBox(width: 12),
+                // Name
+                Text(widget.otherUserName),
+              ],
             ),
-            const SizedBox(width: 12),
-            // Name
-            Text(widget.otherUserName),
+            Text(
+              'Signed in as: ${_displayName(authProvider.user?.username)}',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Colors.blue[900],
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ],
         ),
         centerTitle: false,
@@ -439,105 +608,24 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         children: [
           // Message history (T042, T025-T027)
           Expanded(
-            child: messagesAsync.when(
-              loading: () => const Center(
-                child: CircularProgressIndicator(),
-              ),
-              error: (error, st) => Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                    const SizedBox(height: 16),
-                    Text('Failed to load messages: $error'),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: () => ref.refresh(
-                        messagesWithCacheProvider(
-                          (chatId: widget.chatId, token: token),
-                        ),
-                      ),
-                      child: const Text('Retry'),
-                    ),
-                  ],
-                ),
-              ),
-              data: (messages) {
-                // Combine server messages with local optimistic pending messages (T027)
-                final allMessages = [
-                  ...messages,
-                  ..._pendingMessages,
-                ]..sort((a, b) => a.createdAt.compareTo(b.createdAt));
-
-                if (allMessages.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.chat_bubble_outline,
-                            size: 64, color: Colors.grey[400]),
-                        const SizedBox(height: 16),
-                        Text('No messages yet',
-                            style: Theme.of(context).textTheme.bodyLarge),
-                        const SizedBox(height: 8),
-                        Text('Start a conversation!',
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(color: Colors.grey[600])),
-                      ],
-                    ),
-                  );
-                }
-
-                // Schedule scroll to bottom after first frame
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  _scrollToBottom();
-                });
-
-                return RefreshIndicator(
-                  onRefresh: () async {
-                    await ref.refresh(
-                      messagesWithCacheProvider(
-                        (chatId: widget.chatId, token: token),
-                      ),
-                    );
-                  },
-                  child: ListView.builder(
-                    controller: _scrollController,
-                    itemCount: allMessages.length,
-                    itemBuilder: (context, index) {
-                      final message = allMessages[index];
-                      return MessageBubble(
-                        message: message,
-                        currentUserId: currentUserId,
-                        onRetry: message.hasError
-                            ? () => _handleRetry(message)
-                            : null,
-                        onLongPress: message.senderId == currentUserId
-                            ? () => _showMessageContextMenu(message, token)
-                            : null,
-                        onEdit: message.senderId == currentUserId
-                            ? (newContent) => _handleEditMessage(message, newContent, token)
-                            : null,
-                      );
-                    },
-                  ),
-                );
-              },
-            ),
+            child: _buildMessagesView(context, messages, token, currentUserId),
           ),
 
           // Typing indicator (T045, T047)
           Consumer(
             builder: (context, ref, child) {
+              // Get current user ID
+              final currentUserId = authProvider.user?.userId;
+              
+              // Watch typing users for this chat
               final typingUsers = ref.watch(
                 typingUsersForChatProvider(widget.chatId),
               );
               
+              // Filter out current user and map to usernames
               final typingUsernames = typingUsers
-                  .map((u) => u.username)
-                  .where((name) => name != authProvider.user?.username)
+                  .where((user) => user.userId != currentUserId)
+                  .map((user) => user.username)
                   .toList();
 
               return TypingIndicator(
@@ -550,30 +638,14 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           // Message input box (T023, T024, T027, T044)
           MessageInputBox(
             onSend: (text) async {
+              // Stop typing indicator when sending
+              ref.read(messageWebSocketProvider.notifier).stopTyping(widget.chatId);
+              
               // Get current user name from auth (for future display)
               final senderName = authProvider.user?.username ?? 'You';
 
-              // Create optimistic message immediately (T027)
-              final optimisticId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
-              final optimisticMessage = Message(
-                id: optimisticId,
-                chatId: widget.chatId,
-                senderId: currentUserId,
-                recipientId: widget.otherUserId,
-                encryptedContent: text,
-                status: 'sent',
-                createdAt: DateTime.now(),
-                isSending: true,
-                error: null,
-                decryptionError: null,
-                senderUsername: senderName,
-              );
-
-              // Add to local optimistic list immediately
-              _sendOptimisticMessage(optimisticMessage);
-
               try {
-                // Send actual message to server
+                // Send message via provider (handles optimistic update automatically)
                 await ref.read(sendMessageProvider.notifier).sendMessage(
                       chatId: widget.chatId,
                       plaintext: text,
@@ -581,31 +653,9 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                       currentUserId: currentUserId,
                     );
 
-                // Remove optimistic message - server response will be fetched automatically
-                _clearPendingMessage(optimisticId);
                 _scrollToBottom();
-
-                // Refresh messages to show server response with real ID
-                await Future.delayed(const Duration(milliseconds: 100));
-                await ref.refresh(
-                  messagesWithCacheProvider(
-                    (chatId: widget.chatId, token: token),
-                  ),
-                );
               } catch (e) {
                 print('[ChatDetail] Send error: $e');
-
-                // Mark optimistic message as failed
-                setState(() {
-                  final index = _pendingMessages
-                      .indexWhere((m) => m.id == optimisticId);
-                  if (index >= 0) {
-                    _pendingMessages[index] = _pendingMessages[index].copyWith(
-                      isSending: false,
-                      error: e.toString().replaceFirst('Exception: ', ''),
-                    );
-                  }
-                });
 
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -635,6 +685,75 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  /// Build the messages view
+  Widget _buildMessagesView(BuildContext context, List<Message> messages, String token, String currentUserId) {
+    // Combine server messages with local optimistic pending messages (T027)
+    // Sort oldest first (natural order) - ListView shows top to bottom
+    final allMessages = [
+      ...messages,
+      ..._pendingMessages,
+    ]..sort((a, b) => a.createdAt.compareTo(b.createdAt)); // Oldest first
+
+    if (allMessages.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.chat_bubble_outline,
+                size: 64, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            Text('No messages yet',
+                style: Theme.of(context).textTheme.bodyLarge),
+            const SizedBox(height: 8),
+            Text('Start a conversation!',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: Colors.grey[600])),
+          ],
+        ),
+      );
+    }
+
+    // Schedule scroll to bottom after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToBottom();
+    });
+
+    return ListView.builder(
+      controller: _scrollController,
+      itemCount: allMessages.length,
+      itemBuilder: (context, index) {
+        final message = allMessages[index];
+        
+        // Check if this is last message from same sender (show avatar)
+        final isLastFromSender = index == allMessages.length - 1 || 
+            allMessages[index + 1].senderId != message.senderId;
+        
+        // Check if this is first message from same sender (show name)
+        final isFirstFromSender = index == 0 || 
+            allMessages[index - 1].senderId != message.senderId;
+        
+        return MessageBubble(
+          key: ValueKey('${message.id}_${message.status}'),
+          message: message,
+          currentUserId: currentUserId,
+          isFirstFromSender: isFirstFromSender,
+          isLastFromSender: isLastFromSender,
+          onRetry: message.hasError
+              ? () => _handleRetry(message)
+              : null,
+          onLongPress: message.senderId == currentUserId
+              ? () => _showMessageContextMenu(message, token)
+              : null,
+          onEdit: message.senderId == currentUserId
+              ? (newContent) => _handleEditMessage(message, newContent, token)
+              : null,
+        );
+      },
     );
   }
 }

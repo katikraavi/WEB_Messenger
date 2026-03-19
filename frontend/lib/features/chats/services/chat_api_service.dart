@@ -68,6 +68,7 @@ class ChatApiService {
             .map((chat) {
               print('[ChatApiService] 🔍 Processing chat object: $chat');
               try {
+                // Ensure backend includes last_message_preview, last_message_timestamp, last_message_sender_avatar_url
                 return Chat.fromJson(chat as Map<String, dynamic>);
               } catch (e) {
                 print('[ChatApiService] ❌ Failed to parse chat: $e');
@@ -599,3 +600,4 @@ class ChatApiService {
   void dispose() {
     _httpClient.close();
   }
+}

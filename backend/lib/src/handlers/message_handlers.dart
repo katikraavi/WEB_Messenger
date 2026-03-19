@@ -5,6 +5,7 @@ import 'package:postgres/postgres.dart';
 import '../services/message_service.dart';
 import '../services/websocket_service.dart';
 import '../models/message_model.dart';
+import '../models/enums.dart';
 
 typedef Connection = PostgreSQLConnection;
 
@@ -110,17 +111,33 @@ class MessageHandlers {
           encryptedContent: encryptedContent,
         );
 
+        // Fetch sender user info for WebSocket broadcast
+        final userResult = await connection.query(
+          'SELECT username, profile_picture_url FROM users WHERE id = @userId',
+          substitutionValues: {'userId': userId},
+        );
+
+        String? senderUsername;
+        String? senderAvatarUrl;
+        if (userResult.isNotEmpty) {
+          senderUsername = userResult.first[0] as String?;
+          senderAvatarUrl = userResult.first[1] as String?;
+        }
+
         // Broadcast message to other participant via WebSocket (T021)
+        // Include sender user info for real-time display
         _webSocketService.notifyMessageCreated(
           chatId,
           {
             'id': message.id,
-            'chatId': message.chatId,
-            'senderId': message.senderId,
-            'recipientId': message.recipientId,
-            'encryptedContent': message.encryptedContent,
+            'chat_id': message.chatId,
+            'sender_id': message.senderId,
+            'recipient_id': message.recipientId,
+            'encrypted_content': message.encryptedContent,
             'status': message.status,
-            'createdAt': message.createdAt.toIso8601String(),
+            'created_at': message.createdAt.toIso8601String(),
+            'sender_username': senderUsername,
+            'sender_avatar_url': senderAvatarUrl,
           },
         );
 
@@ -160,7 +177,7 @@ class MessageHandlers {
       final decoded = utf8.decode(base64Url.decode(payload));
       final json = jsonDecode(decoded) as Map<String, dynamic>;
 
-      return json['userId'] as String?;
+      return json['user_id'] as String?;
     } catch (e) {
       print('[MessageHandlers] Failed to extract user ID from token: $e');
       return null;
@@ -236,11 +253,11 @@ class MessageHandlers {
       );
 
       // Broadcast message.edited event via WebSocket (T050)
-      _webSocketService.broadcast(
-        eventType: 'message.edited',
-        chatId: chatId,
+      final editedEvent = WebSocketEvent(
+        type: WebSocketEventType.messageEdited,
         data: editedMessage.toJson(),
       );
+      _webSocketService.broadcastToChat(chatId, editedEvent);
 
       print(
           '[MessageHandlers] ✓ Message edited: $messageId by $userId');
@@ -344,11 +361,11 @@ class MessageHandlers {
       }
 
       // Broadcast message.deleted event via WebSocket
-      _webSocketService.broadcast(
-        eventType: 'message.deleted',
-        chatId: chatId,
+      final deletedEvent = WebSocketEvent(
+        type: WebSocketEventType.messageDeleted,
         data: deletedMessage.toJson(),
       );
+      _webSocketService.broadcastToChat(chatId, deletedEvent);
 
       print('[MessageHandlers] ✓ Message deleted: $messageId by $userId');
 
@@ -358,6 +375,113 @@ class MessageHandlers {
       return Response(500,
           body: jsonEncode(
               {'error': 'Failed to delete message: ${e.toString()}'}));
+    }
+  }
+
+  /// Update message status (delivered, read)
+  /// 
+  /// PUT /api/chats/{chatId}/messages/status
+  /// 
+  /// Request body:
+  /// {
+  ///   "message_id": "msg-uuid",
+  ///   "status": "delivered" | "read"
+  /// }
+  /// 
+  /// Response: 200 OK with updated message
+  /// Broadcasts messageStatusChanged WebSocket event to all chat participants
+  /// 
+  /// Errors:
+  /// - 400: Invalid status or missing message_id
+  /// - 401: No auth token
+  /// - 403: Not a  participant in this chat
+  /// - 404: Message not found
+  /// - 500: Server error
+  static Future<Response> updateMessageStatus(
+    Request request,
+    String chatId,
+    Connection connection,
+  ) async {
+    try {
+      // Get JWT token
+      final authHeader = request.headers['Authorization'];
+      final token = authHeader?.replaceFirst('Bearer ', '');
+      if (token == null || token.isEmpty) {
+        return Response(401, body: jsonEncode({'error': 'Missing token'}));
+      }
+
+      // Extract user ID from token
+      final userId = _extractUserIdFromToken(token);
+      if (userId == null) {
+        return Response(401, body: jsonEncode({'error': 'Invalid token'}));
+      }
+
+      // Check user is in chat
+      final isParticipant =
+          await _isUserChatParticipant(connection, chatId, userId);
+      if (!isParticipant) {
+        return Response(403,
+            body: jsonEncode({'error': 'Not a participant in this chat'}));
+      }
+
+      // Parse request body
+      final bodyString = await request.readAsString();
+      final bodyJson = jsonDecode(bodyString) as Map<String, dynamic>;
+      final messageId = bodyJson['message_id'] as String?;
+      final newStatus = bodyJson['status'] as String?;
+
+      if (messageId == null || messageId.isEmpty) {
+        return Response(400,
+            body: jsonEncode({'error': 'Missing or empty message_id'}));
+      }
+
+      if (newStatus == null || newStatus.isEmpty) {
+        return Response(400,
+            body: jsonEncode({'error': 'Missing or empty status'}));
+      }
+
+      if (!['sent', 'delivered', 'read'].contains(newStatus)) {
+        return Response(400,
+            body: jsonEncode({'error': 'Invalid status value'}));
+      }
+
+      // Create messageservice
+      final messageService = MessageService(connection);
+
+      // Update the status in database
+      await messageService.updateMessageStatus(
+        messageId,
+        userId, // Current user viewing/receiving the message
+        newStatus,
+      );
+
+      // Broadcast status change via WebSocket so other user sees it immediately
+      final statusEvent = WebSocketEvent(
+        type: WebSocketEventType.messageStatusChanged,
+        data: {
+          'messageId': messageId,
+          'newStatus': newStatus,
+          'updatedBy': userId,
+          'timestamp': DateTime.now().toIso8601String(),
+        },
+      );
+      print('[MessageHandlers] 🔊 Broadcasting status change: messageId=$messageId, newStatus=$newStatus, updatedBy=$userId');
+      _webSocketService.broadcastToChat(chatId, statusEvent);
+
+      print('[MessageHandlers] ✓ Message status updated: $messageId → $newStatus by $userId');
+
+      return Response(200,
+          body: jsonEncode({
+            'messageId': messageId,
+            'status': newStatus,
+            'timestamp': DateTime.now().toIso8601String(),
+          }),
+          headers: {'Content-Type': 'application/json'});
+    } catch (e) {
+      print('[MessageHandlers] ❌ Update message status error: $e');
+      return Response(500,
+          body: jsonEncode(
+              {'error': 'Failed to update message status: ${e.toString()}'}));
     }
   }
 }

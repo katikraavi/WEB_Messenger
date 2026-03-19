@@ -11,12 +11,14 @@ class VerificationPendingScreen extends ConsumerStatefulWidget {
   final String email;
   final String? authToken;
   final VoidCallback? onAlternateEmail;
+  final VoidCallback? onBack;
 
   const VerificationPendingScreen({
     Key? key,
     required this.email,
     this.authToken,
     this.onAlternateEmail,
+    this.onBack,
   }) : super(key: key);
 
   @override
@@ -89,7 +91,7 @@ class _VerificationPendingScreenState
           authToken: widget.authToken,
         )
         .then((_) {
-      _startResendCountdown();
+      if (mounted) _startResendCountdown();
     });
   }
 
@@ -106,7 +108,7 @@ class _VerificationPendingScreenState
         .read(verificationProvider.notifier)
         .verifyEmail(token: token)
         .then((_) {
-      _tokenController.clear();
+      if (mounted) _tokenController.clear();
     });
   }
 
@@ -116,6 +118,12 @@ class _VerificationPendingScreenState
 
     return Scaffold(
       appBar: AppBar(
+        leading: widget.onBack != null
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: widget.onBack,
+              )
+            : null,
         title: const Text('Verify Email'),
         centerTitle: true,
         elevation: 0,

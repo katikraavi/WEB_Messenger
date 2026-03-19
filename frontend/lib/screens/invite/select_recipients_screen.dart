@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'invite_service.dart';
+import '../../features/chats/widgets/user_avatar_widget.dart';
 
 class SelectRecipientsScreen extends StatefulWidget {
   const SelectRecipientsScreen({Key? key}) : super(key: key);
@@ -192,13 +193,10 @@ class _SelectRecipientsScreenState extends State<SelectRecipientsScreen> {
                   return CheckboxListTile(
                     value: isSelected,
                     onChanged: (_) => _toggleUserSelection(user.id),
-                    leading: CircleAvatar(
-                      backgroundImage: user.profilePictureUrl != null
-                          ? NetworkImage(user.profilePictureUrl!)
-                          : null,
-                      child: user.profilePictureUrl == null
-                          ? const Icon(Icons.person)
-                          : null,
+                    leading: UserAvatarWidget(
+                      imageUrl: user.profilePictureUrl,
+                      radius: 20,
+                      username: user.username,
                     ),
                     title: Text(user.username),
                     subtitle: Text(user.email),

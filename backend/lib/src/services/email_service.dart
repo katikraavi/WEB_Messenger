@@ -1,23 +1,32 @@
 import 'dart:async';
+import 'package:mailer/mailer.dart';
+import 'package:mailer/smtp_server.dart';
 
-/// EmailService handles sending transactional emails
-/// 
-/// Responsibilities:
-/// - Build email templates (verification, password reset)
-/// - Send emails via configured provider
-/// - Handle email failures gracefully
+/// EmailService handles sending transactional emails.
+///
+/// Configuration comes from environment variables (see docker-compose.yml):
+///   SMTP_HOST, SMTP_PORT, SMTP_FROM_EMAIL, SMTP_FROM_NAME,
+///   SMTP_USER, SMTP_PASSWORD, SMTP_SECURE
+///
+/// Dev: point at Mailhog (mailhog:1025) — web UI at http://localhost:8025
+/// Prod: point at any real SMTP provider (SendGrid, Mailgun, Gmail, etc.)
 class EmailService {
-  // Email configuration (would come from environment in production)
   final String? smtpHost;
   final int? smtpPort;
   final String? senderEmail;
   final String? senderName;
+  final String? smtpUser;
+  final String? smtpPassword;
+  final bool smtpSecure;
 
   EmailService({
     this.smtpHost,
     this.smtpPort,
     this.senderEmail,
     this.senderName,
+    this.smtpUser,
+    this.smtpPassword,
+    this.smtpSecure = false,
   });
 
   /// Build a verification email
@@ -34,8 +43,14 @@ class EmailService {
     required String recipientName,
     required String verificationLink,
     required String expiresIn,
+    String? registeredAt,
   }) {
-    final subject = 'Verify Your Email Address';
+    // Extract token from verification link (format: ?token=TOKEN)
+    final tokenMatch = RegExp(r'token=([^&]+)').firstMatch(verificationLink);
+    final token = tokenMatch?.group(1) ?? '';
+    final registrationTime = registeredAt ?? DateTime.now().toUtc().toString().substring(0, 19).replaceAll('T', ' ') + ' UTC';
+    
+    final subject = '🔐 Your Email Verification Code: $token';
     
     final htmlBody = '''
 <!DOCTYPE html>
@@ -43,39 +58,118 @@ class EmailService {
 <head>
   <meta charset="UTF-8">
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { text-align: center; margin-bottom: 30px; }
-    .content { background: #f7f7f7; padding: 20px; border-radius: 5px; margin-bottom: 20px; }
-    .button { display: inline-block; background: #007bff; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-    .footer { font-size: 12px; color: #999; text-align: center; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
+    .container { max-width: 500px; margin: 20px auto; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; }
+    .header { background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); color: white; padding: 30px 20px; text-align: center; }
+    .header h1 { font-size: 24px; margin-bottom: 5px; }
+    .header p { font-size: 14px; opacity: 0.9; }
+    .content { padding: 30px 20px; }
+    .greeting { font-size: 16px; margin-bottom: 20px; }
+    .code-section { background: #f8f9fa; border-left: 4px solid #007bff; padding: 20px; border-radius: 8px; margin: 25px 0; text-align: center; }
+    .code-label { font-size: 12px; color: #666; margin-bottom: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+    .code-box { background: white; border: 2px solid #e9ecef; border-radius: 8px; padding: 20px; margin: 10px 0; }
+    .code-value { font-family: 'Courier New', 'Monaco', monospace; font-size: 32px; font-weight: bold; color: #007bff; letter-spacing: 4px; word-break: break-all; line-height: 1.4; }
+    .copy-hint { font-size: 12px; color: #999; margin-top: 12px; }
+    .account-info { background: #f0f4ff; border: 1px solid #d0deff; border-radius: 8px; padding: 16px; margin: 20px 0; }
+    .account-info-title { font-size: 12px; font-weight: 700; color: #0056b3; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+    .account-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #e0e8ff; font-size: 13px; }
+    .account-row:last-child { border-bottom: none; }
+    .account-key { color: #666; font-weight: 500; }
+    .account-val { color: #222; font-weight: 600; font-family: 'Courier New', monospace; word-break: break-all; max-width: 60%; text-align: right; }
+    .instructions { background: #e7f3ff; border-left: 4px solid #0056b3; padding: 15px; border-radius: 6px; margin: 20px 0; font-size: 14px; }
+    .instructions-title { font-weight: 600; color: #0056b3; margin-bottom: 8px; }
+    .instructions p { margin: 6px 0; color: #333; }
+    .step { display: flex; align-items: flex-start; margin: 10px 0; }
+    .step-number { background: #0056b3; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px; flex-shrink: 0; margin-right: 10px; margin-top: 2px; }
+    .button { display: inline-block; background: #007bff; color: white; padding: 14px 40px; text-decoration: none; border-radius: 6px; font-weight: 600; margin: 20px 0; }
+    .divider { border: 0; border-top: 1px solid #e9ecef; margin: 25px 0; }
+    .expires { font-size: 12px; color: #999; text-align: center; margin: 15px 0; }
+    .footer { background: #f8f9fa; padding: 20px; text-align: center; font-size: 11px; color: #999; border-top: 1px solid #e9ecef; }
+    .warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 12px; border-radius: 4px; font-size: 12px; color: #856404; margin-top: 15px; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <h1>Verify Your Email</h1>
+      <h1>Email Verification</h1>
+      <p>Mobile Messenger</p>
     </div>
     
     <div class="content">
-      <p>Hi $recipientName,</p>
+      <p class="greeting">Hi $recipientName! 👋</p>
+      <p>Welcome to Mobile Messenger! To complete your account setup, please verify your email address.</p>
+
+      <div class="account-info">
+        <div class="account-info-title">📋 Your Account Details</div>
+        <div class="account-row">
+          <span class="account-key">Username</span>
+          <span class="account-val">$recipientName</span>
+        </div>
+        <div class="account-row">
+          <span class="account-key">Email</span>
+          <span class="account-val">$recipientEmail</span>
+        </div>
+        <div class="account-row">
+          <span class="account-key">Registered</span>
+          <span class="account-val">$registrationTime</span>
+        </div>
+        <div class="account-row">
+          <span class="account-key">Status</span>
+          <span class="account-val" style="color:#e67e00;">⏳ Pending Verification</span>
+        </div>
+      </div>
       
-      <p>Welcome! Please verify your email address to complete your account setup.</p>
+      <div class="code-section">
+        <div class="code-label">Your Verification Code</div>
+        <div class="code-box">
+          <div class="code-value">$token</div>
+        </div>
+        <div class="copy-hint">📋 Click to select and copy this code</div>
+      </div>
       
-      <p>
-        <a href="$verificationLink" class="button">Verify Email</a>
+      <div class="instructions">
+        <div class="instructions-title">📱 How to verify:</div>
+        <div class="step">
+          <div class="step-number">1</div>
+          <div>Open the Mobile Messenger app</div>
+        </div>
+        <div class="step">
+          <div class="step-number">2</div>
+          <div>Go to the verification screen</div>
+        </div>
+        <div class="step">
+          <div class="step-number">3</div>
+          <div>Paste the code above into the input field</div>
+        </div>
+        <div class="step">
+          <div class="step-number">4</div>
+          <div>Tap <strong>Verify</strong></div>
+        </div>
+      </div>
+      
+      <center>
+        <a href="$verificationLink" class="button">Or Click Here to Verify</a>
+      </center>
+      
+      <div class="divider"></div>
+      
+      <p style="font-size: 13px; line-height: 1.6;">
+        <strong>Can't see the input field?</strong> Make sure you're logged out first. This verification link is only for web browsers.
       </p>
       
-      <p>Or copy and paste this link in your browser:</p>
-      <p style="word-break: break-all; color: #666;">$verificationLink</p>
+      <div class="expires">
+        ⏰ This code expires in <strong>$expiresIn</strong>
+      </div>
       
-      <p style="color: #999; font-size: 12px;">
-        This link expires in $expiresIn. If you didn't create this account, please ignore this email.
-      </p>
+      <div class="warning">
+        ⚠️ Never share this code with anyone. Mobile Messenger staff will never ask for it.
+      </div>
     </div>
     
     <div class="footer">
       <p>© ${DateTime.now().year} Mobile Messenger. All rights reserved.</p>
+      <p style="margin-top: 8px;">If you didn't create this account, you can safely ignore this email.</p>
     </div>
   </div>
 </body>
@@ -83,16 +177,47 @@ class EmailService {
 ''';
 
     final plainTextBody = '''
-Verify Your Email
+╔═══════════════════════════════════════════╗
+║     EMAIL VERIFICATION - MOBILE MESSENGER   ║
+╚═══════════════════════════════════════════╝
 
-Hi $recipientName,
+Hi $recipientName!
 
-Welcome! Please verify your email address to complete your account setup.
+Welcome to Mobile Messenger! To complete your account setup, 
+please verify your email address.
 
-Verification Link:
+┌─────────────────────────────────────┐
+│        YOUR ACCOUNT DETAILS         │
+├─────────────────────────────────────┤
+│ Username  : $recipientName
+│ Email     : $recipientEmail
+│ Registered: $registrationTime
+│ Status    : Pending Verification
+└─────────────────────────────────────┘
+
+YOUR VERIFICATION CODE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+$token
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📱 HOW TO VERIFY:
+  1. Open the Mobile Messenger app
+  2. Go to the verification screen
+  3. Paste the code above into the input field
+  4. Tap Verify
+
+VERIFICATION LINK (for web):
 $verificationLink
 
-This link expires in $expiresIn. If you didn't create this account, please ignore this email.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⏰ This code expires in $expiresIn
+
+⚠️ SECURITY WARNING:
+   Never share this code with anyone.
+   Mobile Messenger staff will never ask for it.
+
+If you didn't create this account, you can safely ignore this email.
 
 © ${DateTime.now().year} Mobile Messenger
 ''';
@@ -206,61 +331,59 @@ This link expires in $expiresIn. For security reasons, you can only use this lin
   /// 
   /// Returns: True if email was sent successfully
   Future<bool> sendEmail(EmailMessage message) async {
-    // Allow sending in development mode even if SMTP not configured
-    // In production, require proper configuration
-    bool isProduction = bool.fromEnvironment('dart.vm.product');
-    if (isProduction && _isNotConfigured()) {
-      throw EmailSendException('Email service not configured');
+    if (_isNotConfigured()) {
+      // No SMTP configured — log and skip.
+      // In dev mode the verification handler returns the token directly
+      // in the API response, so testing still works without a mail server.
+      print('[EMAIL] No SMTP configured — email NOT sent to ${message.to}');
+      print('[EMAIL] Set SMTP_HOST env var (or use Mailhog in docker-compose) to send real emails.');
+      if (bool.fromEnvironment('dart.vm.product')) {
+        throw EmailSendException('Email service not configured for production');
+      }
+      return true;
     }
 
     try {
-      // Development mode: Log email to console
-      if (_isNotConfigured()) {
-        print('═══════════════════════════════════════════════════════════');
-        print('[EMAIL] Development Mode - Email would be sent:');
-        print('[EMAIL] To: ${message.to}');
-        print('[EMAIL] Subject: ${message.subject}');
-        print('[EMAIL] ═══════════════════════════════════════════════════════════');
-        return true;
-      }
+      final smtpServer = SmtpServer(
+        smtpHost!,
+        port: smtpPort!,
+        username: (smtpUser?.isNotEmpty == true) ? smtpUser : null,
+        password: (smtpPassword?.isNotEmpty == true) ? smtpPassword : null,
+        ssl: smtpSecure,
+        ignoreBadCertificate: !smtpSecure,
+        allowInsecure: !smtpSecure,
+      );
 
-      // Production: Send via SMTP
-      // For simplified implementation, we simulate SMTP send
-      // In real production, integrate with mailer package:
-      // import 'package:mailer/mailer.dart';
-      // import 'package:mailer/smtp_server.dart';
-      
-      // final smtpServer = SmtpServer(
-      //   smtpHost!,
-      //   port: smtpPort!,
-      //   username: senderEmail,
-      //   password: String.fromEnvironment('SMTP_PASSWORD'),
-      // );
-      
-      // final email = Message()
-      //   ..from = Address(senderEmail!, senderName)
-      //   ..recipients.add(message.to)
-      //   ..ccRecipients.addAll(message.cc)
-      //   ..bccRecipients.addAll(message.bcc)
-      //   ..subject = message.subject
-      //   ..html = message.htmlBody
-      //   ..text = message.plainTextBody;
-      
-      // await send(email, smtpServer);
-      
+      final msg = Message()
+        ..from = Address(senderEmail!, senderName ?? 'Mobile Messenger')
+        ..recipients.add(message.to)
+        ..subject = message.subject
+        ..html = message.htmlBody
+        ..text = message.plainTextBody;
+
+      for (final cc in message.cc) msg.ccRecipients.add(cc);
+      for (final bcc in message.bcc) msg.bccRecipients.add(bcc);
+
+      await send(msg, smtpServer).timeout(
+        const Duration(seconds: 45),
+        onTimeout: () => throw TimeoutException(
+          'SMTP send timed out after 45 seconds',
+        ),
+      );
       print('[✓] Email sent to ${message.to}: ${message.subject}');
       return true;
+    } on TimeoutException catch (e) {
+      throw EmailSendException('SMTP timeout: ${e.message}');
+    } on MailerException catch (e) {
+      throw EmailSendException(
+          'SMTP error: ${e.message} — ${e.problems.map((p) => p.msg).join(', ')}');
     } on Exception catch (e) {
-      throw EmailSendException('Failed to send email: ${e.toString()}');
+      throw EmailSendException('Failed to send email: $e');
     }
   }
 
-  /// Check if email service is properly configured
-  bool _isNotConfigured() {
-    return smtpHost == null || 
-           smtpPort == null || 
-           senderEmail == null;
-  }
+  bool _isNotConfigured() =>
+      smtpHost == null || smtpPort == null || senderEmail == null;
 }
 
 /// Represents an email message to send

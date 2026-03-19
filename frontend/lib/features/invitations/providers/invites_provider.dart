@@ -6,6 +6,7 @@ import '../../../core/services/api_client.dart';
 import '../../chats/providers/chats_provider.dart';
 import '../../chats/providers/active_chats_provider.dart';
 import '../../search/providers/search_results_provider.dart';
+import './invitation_websocket_provider.dart';
 
 // API Service Provider
 final inviteApiServiceProvider = Provider<InviteApiService>((ref) {
@@ -25,11 +26,12 @@ final invitesCacheInvalidatorProvider = StateProvider<int>((ref) {
 // Query Providers
 
 /// Provides list of pending invitations for current user
-final pendingInvitesProvider =
-    FutureProvider<List<ChatInviteModel>>((ref) async {
+final pendingInvitesProvider = FutureProvider<List<ChatInviteModel>>((
+  ref,
+) async {
   // Watch the cache invalidator to refresh when user changes
   ref.watch(invitesCacheInvalidatorProvider);
-  
+
   print('[Invites] Fetching pending invitations...');
   final apiService = ref.watch(inviteApiServiceProvider);
   try {
@@ -44,11 +46,10 @@ final pendingInvitesProvider =
 });
 
 /// Provides list of sent invitations for current user
-final sentInvitesProvider =
-    FutureProvider<List<ChatInviteModel>>((ref) async {
+final sentInvitesProvider = FutureProvider<List<ChatInviteModel>>((ref) async {
   // Watch the cache invalidator to refresh when user changes
   ref.watch(invitesCacheInvalidatorProvider);
-  
+
   print('[Invites] Fetching sent invitations...');
   final apiService = ref.watch(inviteApiServiceProvider);
   try {
@@ -80,33 +81,36 @@ final pendingInviteCountProvider = FutureProvider<int>((ref) async {
 /// Provider for send invite mutation state and operations
 final sendInviteMutationProvider =
     StateNotifierProvider<SendInviteMutationNotifier, SendInviteState>((ref) {
-  final apiService = ref.watch(inviteApiServiceProvider);
-  return SendInviteMutationNotifier(apiService, ref);
-});
+      final apiService = ref.watch(inviteApiServiceProvider);
+      return SendInviteMutationNotifier(apiService, ref);
+    });
 
 /// Provider for accept invite mutation state and operations
 final acceptInviteMutationProvider =
-    StateNotifierProvider<AcceptInviteMutationNotifier, AcceptInviteState>(
-        (ref) {
-  final apiService = ref.watch(inviteApiServiceProvider);
-  return AcceptInviteMutationNotifier(apiService, ref);
-});
+    StateNotifierProvider<AcceptInviteMutationNotifier, AcceptInviteState>((
+      ref,
+    ) {
+      final apiService = ref.watch(inviteApiServiceProvider);
+      return AcceptInviteMutationNotifier(apiService, ref);
+    });
 
 /// Provider for decline invite mutation state and operations
 final declineInviteMutationProvider =
-    StateNotifierProvider<DeclineInviteMutationNotifier, DeclineInviteState>(
-        (ref) {
-  final apiService = ref.watch(inviteApiServiceProvider);
-  return DeclineInviteMutationNotifier(apiService, ref);
-});
+    StateNotifierProvider<DeclineInviteMutationNotifier, DeclineInviteState>((
+      ref,
+    ) {
+      final apiService = ref.watch(inviteApiServiceProvider);
+      return DeclineInviteMutationNotifier(apiService, ref);
+    });
 
 /// Provider for cancel invite mutation state and operations
 final cancelInviteMutationProvider =
-    StateNotifierProvider<CancelInviteMutationNotifier, CancelInviteState>(
-        (ref) {
-  final apiService = ref.watch(inviteApiServiceProvider);
-  return CancelInviteMutationNotifier(apiService, ref);
-});
+    StateNotifierProvider<CancelInviteMutationNotifier, CancelInviteState>((
+      ref,
+    ) {
+      final apiService = ref.watch(inviteApiServiceProvider);
+      return CancelInviteMutationNotifier(apiService, ref);
+    });
 
 // State classes for mutations
 
@@ -115,11 +119,7 @@ class SendInviteState {
   final ChatInviteModel? data;
   final String? error;
 
-  SendInviteState({
-    this.isLoading = false,
-    this.data,
-    this.error,
-  });
+  SendInviteState({this.isLoading = false, this.data, this.error});
 
   SendInviteState copyWith({
     bool? isLoading,
@@ -139,11 +139,7 @@ class AcceptInviteState {
   final ChatInviteModel? data;
   final String? error;
 
-  AcceptInviteState({
-    this.isLoading = false,
-    this.data,
-    this.error,
-  });
+  AcceptInviteState({this.isLoading = false, this.data, this.error});
 
   AcceptInviteState copyWith({
     bool? isLoading,
@@ -163,11 +159,7 @@ class DeclineInviteState {
   final ChatInviteModel? data;
   final String? error;
 
-  DeclineInviteState({
-    this.isLoading = false,
-    this.data,
-    this.error,
-  });
+  DeclineInviteState({this.isLoading = false, this.data, this.error});
 
   DeclineInviteState copyWith({
     bool? isLoading,
@@ -187,11 +179,7 @@ class CancelInviteState {
   final ChatInviteModel? data;
   final String? error;
 
-  CancelInviteState({
-    this.isLoading = false,
-    this.data,
-    this.error,
-  });
+  CancelInviteState({this.isLoading = false, this.data, this.error});
 
   CancelInviteState copyWith({
     bool? isLoading,
@@ -213,7 +201,7 @@ class SendInviteMutationNotifier extends StateNotifier<SendInviteState> {
   final Ref _ref;
 
   SendInviteMutationNotifier(this._apiService, this._ref)
-      : super(SendInviteState());
+    : super(SendInviteState());
 
   /// Send invitation and invalidate queries on success
   Future<void> sendInvite(String recipientId) async {
@@ -221,7 +209,7 @@ class SendInviteMutationNotifier extends StateNotifier<SendInviteState> {
     try {
       final result = await _apiService.sendInvite(recipientId);
       state = state.copyWith(isLoading: false, data: result);
-      
+
       // Refresh both pending and sent invites immediately
       _ref.invalidate(sentInvitesProvider);
       _ref.invalidate(pendingInvitesProvider);
@@ -243,7 +231,7 @@ class AcceptInviteMutationNotifier extends StateNotifier<AcceptInviteState> {
   final Ref _ref;
 
   AcceptInviteMutationNotifier(this._apiService, this._ref)
-      : super(AcceptInviteState());
+    : super(AcceptInviteState());
 
   /// Accept invitation and invalidate queries on success
   Future<void> acceptInvite(String inviteId) async {
@@ -251,11 +239,11 @@ class AcceptInviteMutationNotifier extends StateNotifier<AcceptInviteState> {
     try {
       final result = await _apiService.acceptInvite(inviteId);
       state = state.copyWith(isLoading: false, data: result);
-      
+
       // Invalidate invitation queries to refresh lists
       _ref.invalidate(pendingInvitesProvider);
       _ref.invalidate(pendingInviteCountProvider);
-      
+
       // Also invalidate chat list - when invitation is accepted, a chat is created on backend
       try {
         final token = await _ref.read(authTokenProvider.future);
@@ -278,13 +266,12 @@ class AcceptInviteMutationNotifier extends StateNotifier<AcceptInviteState> {
   }
 }
 
-class DeclineInviteMutationNotifier
-    extends StateNotifier<DeclineInviteState> {
+class DeclineInviteMutationNotifier extends StateNotifier<DeclineInviteState> {
   final InviteApiService _apiService;
   final Ref _ref;
 
   DeclineInviteMutationNotifier(this._apiService, this._ref)
-      : super(DeclineInviteState());
+    : super(DeclineInviteState());
 
   /// Decline invitation and invalidate queries on success
   Future<void> declineInvite(String inviteId) async {
@@ -292,7 +279,7 @@ class DeclineInviteMutationNotifier
     try {
       final result = await _apiService.declineInvite(inviteId);
       state = state.copyWith(isLoading: false, data: result);
-      
+
       // Invalidate both queries to refresh lists
       _ref.invalidate(pendingInvitesProvider);
       _ref.invalidate(pendingInviteCountProvider);
@@ -313,7 +300,7 @@ class CancelInviteMutationNotifier extends StateNotifier<CancelInviteState> {
   final Ref _ref;
 
   CancelInviteMutationNotifier(this._apiService, this._ref)
-      : super(CancelInviteState());
+    : super(CancelInviteState());
 
   /// Cancel invitation and invalidate queries on success
   Future<void> cancelInvite(String inviteId) async {
@@ -321,7 +308,7 @@ class CancelInviteMutationNotifier extends StateNotifier<CancelInviteState> {
     try {
       final result = await _apiService.cancelInvite(inviteId);
       state = state.copyWith(isLoading: false, data: result);
-      
+
       // Invalidate both queries to refresh lists
       _ref.invalidate(sentInvitesProvider);
     } catch (e) {
@@ -335,3 +322,67 @@ class CancelInviteMutationNotifier extends StateNotifier<CancelInviteState> {
     state = CancelInviteState();
   }
 }
+
+// Real-time Updates from WebSocket
+
+/// Provider that watches invitation events from WebSocket and invalidates caches
+/// This enables real-time updates without requiring manual refresh
+final invitationRealtimeUpdatesProvider = FutureProvider.autoDispose<void>((
+  ref,
+) async {
+  // Watch the WebSocket invitation event stream
+  ref.watch(invitationEventStreamProvider).whenData((event) {
+    if (event == null) return;
+
+    final (:eventType, :invite) = event;
+
+    print(
+      '[InvitationsRealtime] 📡 Received invitation event: $eventType (inviteId: ${invite.id})',
+    );
+
+    // Invalidate appropriate caches based on event type
+    switch (eventType) {
+      case 'sent':
+        // When we send an invitation, refresh sent invitations list
+        print(
+          '[InvitationsRealtime] 📤 Sent invitation - refreshing sent list',
+        );
+        ref.invalidate(sentInvitesProvider);
+        break;
+
+      case 'accepted':
+        // When an invitation is accepted (either by current user or sender sees acceptance)
+        print(
+          '[InvitationsRealtime] ✅ Invitation accepted - refreshing both lists',
+        );
+        ref.invalidate(pendingInvitesProvider);
+        ref.invalidate(sentInvitesProvider);
+        ref.invalidate(pendingInviteCountProvider);
+
+        // Also refresh chat lists since a new chat was created
+        // Note: Chat providers are invalidated through their own WebSocket message handlers
+        break;
+
+      case 'declined':
+        // When an invitation is declined, refresh both lists
+        print(
+          '[InvitationsRealtime] ❌ Invitation declined - refreshing both lists',
+        );
+        ref.invalidate(pendingInvitesProvider);
+        ref.invalidate(sentInvitesProvider);
+        ref.invalidate(pendingInviteCountProvider);
+        break;
+
+      case 'cancelled':
+        // When an invitation is cancelled, refresh sent invitations
+        print(
+          '[InvitationsRealtime] 🚫 Invitation cancelled - refreshing sent list',
+        );
+        ref.invalidate(sentInvitesProvider);
+        break;
+
+      default:
+        print('[InvitationsRealtime] ⚠️  Unknown event type: $eventType');
+    }
+  });
+});

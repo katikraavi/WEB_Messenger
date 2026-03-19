@@ -5,6 +5,7 @@ import '../../../features/search/providers/search_results_provider.dart';
 import '../../../features/search/services/search_service.dart';
 import '../providers/invites_provider.dart';
 import '../services/invite_error_handler.dart';
+import '../../../features/chats/widgets/user_avatar_widget.dart';
 
 /// Screen for selecting a user to send an invitation to
 class SendInvitePickerScreen extends ConsumerStatefulWidget {
@@ -197,13 +198,10 @@ class _SendInvitePickerScreenState extends ConsumerState<SendInvitePickerScreen>
                           final isSending = sendMutation.isLoading;
 
                           return ListTile(
-                            leading: CircleAvatar(
-                              backgroundImage: user.profilePictureUrl != null
-                                  ? NetworkImage(user.profilePictureUrl!)
-                                  : null,
-                              child: user.profilePictureUrl == null
-                                  ? Text(user.username.substring(0, 1).toUpperCase())
-                                  : null,
+                            leading: UserAvatarWidget(
+                              imageUrl: user.profilePictureUrl,
+                              radius: 20,
+                              username: user.username,
                             ),
                             title: Text(user.username),
                             subtitle: Text(user.email),

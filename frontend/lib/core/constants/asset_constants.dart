@@ -3,5 +3,5 @@
 /// Centralized location for all asset path definitions
 class AssetConstants {
   // Profile assets
-  static const String defaultProfilePicture = 'assets/images/profile/defailtProfilePic.jpg';
+  static const String defaultProfilePicture = 'assets/images/profile/defaultProfilePic.jpg';
 }

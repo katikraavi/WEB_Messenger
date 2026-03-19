@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:provider/provider.dart';
 import '../models/auth_models.dart';
+import '../providers/auth_provider.dart';
 import '../../email_verification/providers/verification_provider.dart';
 import '../../email_verification/pages/verification_pending_screen.dart';
 import '../../email_verification/pages/verification_success_screen.dart';
@@ -13,12 +15,20 @@ class EmailVerificationFlowScreen extends ConsumerStatefulWidget {
   final User user;
   final String email;
   final VoidCallback onVerificationComplete;
+  final VoidCallback? onBack;
+  final String? devToken;
+  final LoginRequest? autoLoginRequest;
+  final VoidCallback? onAutoLoginFailed;
 
   const EmailVerificationFlowScreen({
     Key? key,
     required this.user,
     required this.email,
     required this.onVerificationComplete,
+    this.onBack,
+    this.devToken,
+    this.autoLoginRequest,
+    this.onAutoLoginFailed,
   }) : super(key: key);
 
   @override
@@ -28,42 +38,89 @@ class EmailVerificationFlowScreen extends ConsumerStatefulWidget {
 
 class _EmailVerificationFlowScreenState
     extends ConsumerState<EmailVerificationFlowScreen> {
+  bool _autoLoginStarted = false;
+  String? _autoLoginError;
+
   @override
   void initState() {
     super.initState();
-    // Initialize verification and send email
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initializeVerification();
-    });
+    // Seed state from registration response (email was already sent by backend)
+    if (widget.devToken != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(verificationProvider.notifier).seedFromRegistration(
+          email: widget.email,
+          devToken: widget.devToken!,
+        );
+      });
+    }
   }
 
-  Future<void> _initializeVerification() async {
-    // Send verification email via notifier
-    await ref.read(verificationProvider.notifier).sendVerificationEmail(
-      email: widget.email,
-      userId: widget.user.userId,
-    );
+  Future<void> _attemptAutoLogin() async {
+    final loginRequest = widget.autoLoginRequest;
+    if (loginRequest == null) {
+      widget.onVerificationComplete();
+      return;
+    }
+
+    try {
+      await context.read<AuthProvider>().login(loginRequest);
+      if (!mounted) return;
+      widget.onVerificationComplete();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _autoLoginError = 'Email verified, but automatic sign-in failed.';
+      });
+      widget.onAutoLoginFailed?.call();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Consumer(
-      builder: (context, ref, child) {
-        final verificationState = ref.watch(verificationProvider);
+    final verificationState = ref.watch(verificationProvider);
 
-        // Show success if verified
-        if (verificationState.phase == VerificationPhase.verified) {
-          return VerificationSuccessScreen(
-            onContinue: widget.onVerificationComplete,
-          );
+    // Show success if verified
+    if (verificationState.phase == VerificationPhase.verified) {
+      if (widget.autoLoginRequest != null && _autoLoginError == null) {
+        if (!_autoLoginStarted) {
+          _autoLoginStarted = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _attemptAutoLogin();
+          });
         }
 
-        // Show pending/loading/error
-        return VerificationPendingScreen(
-          email: widget.email,
-          onAlternateEmail: null,
+        return const Scaffold(
+          body: SafeArea(
+            child: Center(
+              child: Padding(
+                padding: EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 24),
+                    Text(
+                      'Email verified. Signing you in...',
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         );
-      },
+      }
+
+      return VerificationSuccessScreen(
+        onContinue: widget.onVerificationComplete,
+      );
+    }
+
+    // Show pending/loading/error
+    return VerificationPendingScreen(
+      email: widget.email,
+      onBack: widget.onBack,
+      onAlternateEmail: null,
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart' as riverpod;
+import 'package:firebase_core/firebase_core.dart';
 import 'package:frontend/core/services/api_client.dart';
 import 'package:frontend/core/push_notifications/push_notification_handler.dart';
 import 'package:frontend/features/auth/models/auth_models.dart';
@@ -12,6 +13,14 @@ import 'package:frontend/features/invitations/screens/invitations_screen.dart';
 import 'package:frontend/features/invitations/providers/invites_provider.dart';
 import 'package:frontend/features/chats/screens/chat_list_screen.dart';
 import 'package:frontend/features/chats/providers/chat_cache_invalidator.dart';
+
+String _displayName(String? value) {
+  if (value == null || value.isEmpty) {
+    return '';
+  }
+
+  return value[0].toUpperCase() + value.substring(1);
+}
 
 /// Root widget for Mobile Messenger application
 /// 
@@ -45,6 +54,12 @@ class _MessengerAppState extends State<MessengerApp> {
   /// Sets up Firebase Cloud Messaging to receive and handle push notifications
   Future<void> _initializePushNotifications() async {
     try {
+      // Skip push setup when Firebase is not initialized in local/dev runs.
+      if (Firebase.apps.isEmpty) {
+        print('[App] Firebase is not initialized - skipping push notifications');
+        return;
+      }
+
       await PushNotificationHandler().initialize(navigatorKey: _navigatorKey);
       print('[App] Push notifications initialized');
     } catch (e) {
@@ -233,7 +248,7 @@ class _AuthenticatedHomeScreen extends riverpod.ConsumerStatefulWidget {
 }
 
 class _AuthenticatedHomeScreenState extends riverpod.ConsumerState<_AuthenticatedHomeScreen> {
-  int _selectedIndex = 0;
+  int _selectedIndex = 1; // Start at Chats tab, skip Search page
 
   @override
   Widget build(BuildContext context) {
@@ -246,13 +261,28 @@ class _AuthenticatedHomeScreenState extends riverpod.ConsumerState<_Authenticate
 
     return Scaffold(
       appBar: AppBar(
-        title: _selectedIndex == 0 
-          ? const Text('Search Users')
-          : _selectedIndex == 1
-          ? const Text('Chats')
-          : _selectedIndex == 2
-          ? const Text('Invitations')
-          : const Text('My Profile'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _selectedIndex == 1
+                ? 'Chats'
+                : _selectedIndex == 2
+                ? 'Invitations'
+                : _selectedIndex == 3
+                ? 'My Profile'
+                : 'Search Users', // Fallback for index 0
+            ),
+            Text(
+              'Signed in as: ${_displayName(widget.user.username)}',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Colors.blue[900],
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
         elevation: 0,
         actions: [
           IconButton(
@@ -266,33 +296,11 @@ class _AuthenticatedHomeScreenState extends riverpod.ConsumerState<_Authenticate
           ),
         ],
       ),
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: [
-          // Search Tab
-          _SearchTab(user: widget.user),
-          
-          // Chat List Tab (T024)
-          const ChatListScreen(),
-          
-          // Invitations Tab
-          const InvitationsScreen(),
-          
-          // Profile Tab - Show user's own profile with pre-loaded data
-          ProfileViewScreen(
-            userId: widget.user.userId,
-            isOwnProfile: true,
-          ),
-        ],
-      ),
+      body: _buildBody(),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
+        currentIndex: _selectedIndex - 1, // Adjust index since we start at 1
         type: BottomNavigationBarType.fixed,
         items: <BottomNavigationBarItem>[
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.search),
-            label: 'Search',
-          ),
           const BottomNavigationBarItem(
             icon: Icon(Icons.chat),
             label: 'Chats',
@@ -312,10 +320,39 @@ class _AuthenticatedHomeScreenState extends riverpod.ConsumerState<_Authenticate
         ],
         onTap: (index) {
           setState(() {
-            _selectedIndex = index;
+            _selectedIndex = index + 1; // Adjust index since we start at 1
           });
+          
+          // Refresh chat list when switching to Chats tab (index 0 in BottomNavigationBar)
+          if (index == 0) {
+            print('[App] Switching to Chats tab - refreshing chat list');
+            ref.read(chatsCacheInvalidatorProvider.notifier).state++;
+          }
         },
       ),
+    );
+  }
+
+  /// Build body based on selected tab
+  Widget _buildBody() {
+    return IndexedStack(
+      index: _selectedIndex,
+      children: [
+        // Index 0: Search Tab (now unused, kept for app stability)
+        _SearchTab(user: widget.user),
+        
+        // Index 1: Chat List Tab (T024) - Now the default
+        const ChatListScreen(),
+        
+        // Index 2: Invitations Tab
+        const InvitationsScreen(),
+        
+        // Index 3: Profile Tab - Show user's own profile with pre-loaded data
+        ProfileViewScreen(
+          userId: widget.user.userId,
+          isOwnProfile: true,
+        ),
+      ],
     );
   }
 }
@@ -338,7 +375,7 @@ class _SearchTab extends StatelessWidget {
               const Icon(Icons.check_circle, size: 64, color: Colors.green),
               const SizedBox(height: 16),
               Text(
-                'Welcome, ${user.username}!',
+                'Welcome, ${_displayName(user.username)}!',
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: 8),
