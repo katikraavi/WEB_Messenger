@@ -51,21 +51,21 @@ class PushNotificationHandler {
       sound: true,
     );
 
-    print('[Push] Notification permission status: ${settings.authorizationStatus}');
+    debugPrint('[Push] Notification permission status: ${settings.authorizationStatus}');
 
     // Get FCM token for this device
     final token = await _firebaseMessaging.getToken();
-    print('[Push] Device FCM token: $token');
+    debugPrint('[Push] Device FCM token: $token');
 
     // Handle foreground notifications (app is open)
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print('[Push] Foreground notification received: ${message.notification?.title}');
+      debugPrint('[Push] Foreground notification received: ${message.notification?.title}');
       _handleNotification(message);
     });
 
     // Handle notification tap when app is in background (not killed)
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      print('[Push] Notification tapped (background): ${message.data}');
+      debugPrint('[Push] Notification tapped (background): ${message.data}');
       _handleNotificationTap(message);
     });
 
@@ -87,10 +87,10 @@ class PushNotificationHandler {
     final notification = message.notification;
     final data = message.data;
 
-    print('[Push] Handling notification:');
-    print('[Push]   Title: ${notification?.title}');
-    print('[Push]   Body: ${notification?.body}');
-    print('[Push]   Data: $data');
+    debugPrint('[Push] Handling notification:');
+    debugPrint('[Push]   Title: ${notification?.title}');
+    debugPrint('[Push]   Body: ${notification?.body}');
+    debugPrint('[Push]   Data: $data');
 
     // Show notification in foreground with top-level widget overlay
     if (notification != null) {
@@ -126,7 +126,7 @@ class PushNotificationHandler {
     final deepLink = data['deepLink'] as String?;
     final type = data['type'] as String?;
 
-    print('[Push] Handling data payload: type=$type, deepLink=$deepLink');
+    debugPrint('[Push] Handling data payload: type=$type, deepLink=$deepLink');
 
     if (deepLink != null) {
       _navigateViaDeepLink(deepLink);
@@ -152,10 +152,10 @@ class PushNotificationHandler {
         final tab = uri.queryParameters['tab'] ?? 'pending';
         _navigateToInvitations(tab: tab);
       } else {
-        print('[Push] Unknown deep link format: $deepLink');
+        debugPrint('[Push] Unknown deep link format: $deepLink');
       }
     } catch (e) {
-      print('[Push Error] Failed to parse deep link: $e');
+      debugPrint('[Push Error] Failed to parse deep link: $e');
       _navigateToInvitations();
     }
   }
@@ -167,11 +167,11 @@ class PushNotificationHandler {
   void _navigateToInvitations({String tab = 'pending'}) {
     final navigator = _navigatorKey?.currentState;
     if (navigator == null) {
-      print('[Push Error] Navigator not available for navigation');
+      debugPrint('[Push Error] Navigator not available for navigation');
       return;
     }
 
-    print('[Push] Navigating to Invitations screen, tab=$tab');
+    debugPrint('[Push] Navigating to Invitations screen, tab=$tab');
 
     // Push to invitations screen with tab parameter
     navigator.pushNamedAndRemoveUntil(
@@ -198,7 +198,7 @@ class PushNotificationHandler {
     // Find the context from navigator
     final context = _navigatorKey?.currentContext;
     if (context == null) {
-      print('[Push] Context not available for overlay');
+      debugPrint('[Push] Context not available for overlay');
       return;
     }
 
@@ -252,7 +252,7 @@ class PushNotificationHandler {
   /// - topic: Topic name (e.g., 'chat-invitations')
   Future<void> subscribeToTopic(String topic) async {
     await _firebaseMessaging.subscribeToTopic(topic);
-    print('[Push] Subscribed to topic: $topic');
+    debugPrint('[Push] Subscribed to topic: $topic');
   }
 
   /// Unsubscribe from topic
@@ -261,7 +261,7 @@ class PushNotificationHandler {
   /// - topic: Topic name
   Future<void> unsubscribeFromTopic(String topic) async {
     await _firebaseMessaging.unsubscribeFromTopic(topic);
-    print('[Push] Unsubscribed from topic: $topic');
+    debugPrint('[Push] Unsubscribed from topic: $topic');
   }
 }
 
@@ -273,11 +273,11 @@ class PushNotificationHandler {
 /// 
 /// Called from main.dart as top-level handler
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  print('[Push] Background message received: ${message.notification?.title}');
+  debugPrint('[Push] Background message received: ${message.notification?.title}');
   
   // Parse and store deep link for when app launches
   final data = message.data;
   if (data['deepLink'] != null) {
-    print('[Push] Background deep link stored: ${data['deepLink']}');
+    debugPrint('[Push] Background deep link stored: ${data['deepLink']}');
   }
 }

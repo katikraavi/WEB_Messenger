@@ -11,16 +11,17 @@ import '../services/auth_exception.dart';
 typedef Connection = PostgreSQLConnection;
 
 /// WebSocket handler for real-time message delivery
-/// 
+///
 /// Simplified approach: Let shelf_web_socket handle the upgrade,
 /// validate token AFTER upgrade, then handle messages
 class WebSocketHandler {
   static final _webSocketService = WebSocketService();
 
   /// Create WebSocket handler with proper upgrade handling
-  /// 
+  ///
   /// URL: GET /ws/messages?token=<jwt_token>
-  static Handler createWebSocketHandler(Connection connection, {Request? request}) {
+  static Handler createWebSocketHandler(Connection connection,
+      {Request? request}) {
     return webSocketHandler((webSocket, protocol) {
       _handleWebSocketConnection(webSocket, connection, request);
     });
@@ -35,14 +36,13 @@ class WebSocketHandler {
     // Extract token from request URL (if available)
     String? token;
     String? userId;
-    
+
     try {
       if (request != null) {
         token = request.url.queryParameters['token'];
       }
 
       if (token == null) {
-        print('[WebSocket] ❌ No token provided');
         webSocket.sink.close(1008, 'Token required');
         return;
       }
@@ -51,14 +51,12 @@ class WebSocketHandler {
       try {
         final payload = JwtService.validateToken(token);
         userId = payload.userId;
-        print('[WebSocket] ✓ Authenticated user: $userId');
       } on AuthException catch (e) {
         print('[WebSocket] ❌ Token validation failed: $e');
         webSocket.sink.close(1008, 'Invalid token');
         return;
       }
 
-      print('[WebSocket] ✓ WebSocket connected for user: $userId');
       _webSocketService.addUserConnection(userId, webSocket);
 
       // Handle incoming messages in background
@@ -68,7 +66,6 @@ class WebSocketHandler {
           print('[WebSocket] ❌ Connection error: $error');
         },
         onDone: () {
-          print('[WebSocket] ✓ Connection closed for user: $userId');
           if (userId != null) {
             _webSocketService.removeUserConnection(userId, webSocket);
           }
@@ -96,31 +93,25 @@ class WebSocketHandler {
       final type = json['type'] as String?;
 
       if (type == null) {
-        print('[WebSocket] ⚠️  Missing type in message: $message');
         return;
       }
 
       // Special handling for ping (doesn't need chatId)
       if (type == 'ping') {
         webSocket.sink.add(jsonEncode({'type': 'pong'}));
-        print('[WebSocket] 💙 Ping/pong');
         return;
       }
 
       // All other message types require chatId
       final chatId = json['chatId'] as String?;
       if (chatId == null) {
-        print('[WebSocket] ⚠️  Invalid message format: $message');
         return;
       }
-
-      print('[WebSocket] 📨 Message type=$type, chatId=$chatId, from=$userId');
 
       // Route by message type
       switch (type) {
         case 'subscribe':
           _webSocketService.addConnection(chatId, webSocket);
-          print('[WebSocket] 📦 $userId subscribed to chat $chatId');
           break;
 
         case 'message.sent':
@@ -129,7 +120,6 @@ class WebSocketHandler {
             data: {'userId': userId, ...json['data'] ?? {}},
           );
           _webSocketService.broadcastToChat(chatId, event);
-          print('[WebSocket] 💬 Broadcast message in chat $chatId');
           break;
 
         case 'typing.start':
@@ -161,7 +151,8 @@ class WebSocketHandler {
           break;
 
         default:
-          print('[WebSocket] ⚠️  Unknown message type: $type');
+          // Ignore unknown message types to keep logs clean.
+          break;
       }
     } catch (e) {
       print('[WebSocket] ❌ Error processing message: $e');

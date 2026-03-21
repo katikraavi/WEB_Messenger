@@ -76,13 +76,19 @@ class VerificationNotifier extends StateNotifier<VerificationState> {
       : super(VerificationState());
 
   /// Seed state from a registration response (email already sent by backend)
-  void seedFromRegistration({required String email, required String devToken}) {
+  ///
+  /// This always resets phase to pending to avoid leaking stale verification
+  /// state from previous auth attempts.
+  void seedFromRegistration({required String email, String? devToken}) {
     state = state.copyWith(
       phase: VerificationPhase.pending,
       userEmail: email,
       isLoading: false,
       successMessage: 'Verification email sent to $email',
       devToken: devToken,
+      verificationToken: null,
+      errorMessage: null,
+      retryAfterSeconds: null,
     );
   }
 

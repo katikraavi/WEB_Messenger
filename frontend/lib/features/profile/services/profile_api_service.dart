@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:frontend/features/profile/models/user_profile.dart';
@@ -57,7 +59,7 @@ class ProfileApiService {
       final cleanBaseUrl = baseUrl.replaceAll(RegExp(r'/api$'), '');
       final absoluteUrl = cleanBaseUrl + imageUrl;
       if (debugLogging) {
-        print('[ProfileApiService] Image URL converted: $imageUrl → $absoluteUrl');
+        debugPrint('[ProfileApiService] Image URL converted: $imageUrl → $absoluteUrl');
       }
       return profile.copyWith(profilePictureUrl: absoluteUrl);
     }
@@ -103,7 +105,7 @@ class ProfileApiService {
           final jsonBody = jsonDecode(response.body) as Map<String, dynamic>;
           final profile = UserProfile.fromJson(jsonBody);
           if (debugLogging) {
-            print('[ProfileApiService] Profile fetched - image URL: ${profile.profilePictureUrl}');
+            debugPrint('[ProfileApiService] Profile fetched - image URL: ${profile.profilePictureUrl}');
           }
           return _ensureAbsoluteImageUrl(profile);
         } catch (e) {
@@ -117,7 +119,7 @@ class ProfileApiService {
         throw HttpException('Failed to fetch profile: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
-      print('[ProfileApiService] Error fetching profile: $e');
+      debugPrint('[ProfileApiService] Error fetching profile: $e');
       rethrow;
     }
   }
@@ -161,8 +163,8 @@ class ProfileApiService {
       });
 
       if (debugLogging) {
-        print('[ProfileApiService] PATCH $url');
-        print('[ProfileApiService] Request body: $body');
+        debugPrint('[ProfileApiService] PATCH $url');
+        debugPrint('[ProfileApiService] Request body: $body');
       }
       
       final response = await http.patch(
@@ -175,8 +177,8 @@ class ProfileApiService {
       );
 
       if (debugLogging) {
-        print('[ProfileApiService] Response status: ${response.statusCode}');
-        print('[ProfileApiService] Response body: ${response.body}');
+        debugPrint('[ProfileApiService] Response status: ${response.statusCode}');
+        debugPrint('[ProfileApiService] Response body: ${response.body}');
       }
 
       if (response.statusCode == 200) {
@@ -196,7 +198,7 @@ class ProfileApiService {
         throw HttpException('Failed to update profile: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
-      print('[ProfileApiService] Error updating profile: $e');
+      debugPrint('[ProfileApiService] Error updating profile: $e');
       rethrow;
     }
   }
@@ -281,8 +283,8 @@ class ProfileApiService {
           final profileData = jsonBody['profile'] ?? jsonBody['data'] ?? jsonBody;
           return _ensureAbsoluteImageUrl(UserProfile.fromJson(profileData as Map<String, dynamic>));
         } catch (e) {
-          print('[ProfileApiService] Error parsing profile response: $e');
-          print('[ProfileApiService] Response body: $responseBody');
+          debugPrint('[ProfileApiService] Error parsing profile response: $e');
+          debugPrint('[ProfileApiService] Response body: $responseBody');
           throw FormatException(
             'Failed to parse profile response: $e',
             responseBody,
@@ -307,7 +309,7 @@ class ProfileApiService {
         );
       }
     } catch (e) {
-      print('[ProfileApiService] Error uploading image: $e');
+      debugPrint('[ProfileApiService] Error uploading image: $e');
       rethrow;
     }
   }
@@ -369,7 +371,7 @@ class ProfileApiService {
         );
       }
     } catch (e) {
-      print('[ProfileApiService] Error deleting image: $e');
+      debugPrint('[ProfileApiService] Error deleting image: $e');
       rethrow;
     }
   }

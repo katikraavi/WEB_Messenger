@@ -8,7 +8,7 @@ import '../../email_verification/pages/verification_pending_screen.dart';
 import '../../email_verification/pages/verification_success_screen.dart';
 
 /// Email verification flow screen
-/// 
+///
 /// Shown after successful registration
 /// Guides user through email verification process
 class EmailVerificationFlowScreen extends ConsumerStatefulWidget {
@@ -38,21 +38,28 @@ class EmailVerificationFlowScreen extends ConsumerStatefulWidget {
 
 class _EmailVerificationFlowScreenState
     extends ConsumerState<EmailVerificationFlowScreen> {
+  late final VerificationNotifier _verificationNotifier;
   bool _autoLoginStarted = false;
   String? _autoLoginError;
 
   @override
   void initState() {
     super.initState();
-    // Seed state from registration response (email was already sent by backend)
-    if (widget.devToken != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(verificationProvider.notifier).seedFromRegistration(
-          email: widget.email,
-          devToken: widget.devToken!,
-        );
-      });
-    }
+    _verificationNotifier = ref.read(verificationProvider.notifier);
+    // Always reset to pending for each registration flow.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _verificationNotifier.seedFromRegistration(
+        email: widget.email,
+        devToken: widget.devToken,
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    // Don't reset provider in dispose - it causes Riverpod errors during widget tree finalization
+    // The provider will be cleaned up automatically when the widget is disposed
+    super.dispose();
   }
 
   Future<void> _attemptAutoLogin() async {
@@ -64,15 +71,17 @@ class _EmailVerificationFlowScreenState
 
     try {
       await context.read<AuthProvider>().login(loginRequest);
-      if (!mounted) return;
-      widget.onVerificationComplete();
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _autoLoginError = 'Email verified, but automatic sign-in failed.';
       });
       widget.onAutoLoginFailed?.call();
+      return;
     }
+
+    if (!mounted) return;
+    widget.onVerificationComplete();
   }
 
   @override

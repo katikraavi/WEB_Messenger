@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'dart:convert';
@@ -39,7 +41,7 @@ class WebSocketService {
     String url = 'ws://localhost:8081/ws/messages',
   }) async {
     if (_isConnecting || _isConnected) {
-      print('[WebSocketService] Already connected or connecting');
+      debugPrint('[WebSocketService] Already connected or connecting');
       return;
     }
 
@@ -47,7 +49,7 @@ class WebSocketService {
     _userId = userId;
 
     try {
-      print('[WebSocketService] Connecting to $url');
+      debugPrint('[WebSocketService] Connecting to $url');
 
       _channel = WebSocketChannel.connect(
         Uri.parse('$url?token=$token'),
@@ -63,12 +65,12 @@ class WebSocketService {
       _isConnected = true;
       _isConnecting = false;
 
-      print('[WebSocketService] ✓ Connected');
+      debugPrint('[WebSocketService] ✓ Connected');
 
       // Send initial handshake/ping
       _sendPing();
     } catch (e) {
-      print('[WebSocketService] ❌ Connection failed: $e');
+      debugPrint('[WebSocketService] ❌ Connection failed: $e');
       _isConnecting = false;
       _isConnected = false;
       rethrow;
@@ -77,7 +79,7 @@ class WebSocketService {
 
   /// Disconnect from WebSocket
   Future<void> disconnect() async {
-    print('[WebSocketService] Disconnecting');
+    debugPrint('[WebSocketService] Disconnecting');
     _isConnected = false;
     await _channel?.sink.close();
     _channel = null;
@@ -95,7 +97,7 @@ class WebSocketService {
     required Map<String, dynamic> data,
   }) {
     if (!_isConnected) {
-      print('[WebSocketService] Not connected, cannot send event');
+      debugPrint('[WebSocketService] Not connected, cannot send event');
       return;
     }
 
@@ -107,9 +109,9 @@ class WebSocketService {
       };
 
       _channel!.sink.add(jsonEncode(message));
-      print('[WebSocketService] Event sent: $eventType in $chatId');
+      debugPrint('[WebSocketService] Event sent: $eventType in $chatId');
     } catch (e) {
-      print('[WebSocketService] ❌ Error sending event: $e');
+      debugPrint('[WebSocketService] ❌ Error sending event: $e');
     }
   }
 
@@ -119,37 +121,37 @@ class WebSocketService {
       if (message is String) {
         // Check for ping/pong
         if (message == 'ping') {
-          print('[WebSocketService] Ping received, sending pong');
+          debugPrint('[WebSocketService] Ping received, sending pong');
           _sendPong();
           return;
         }
 
         if (message == 'pong') {
-          print('[WebSocketService] Pong received');
+          debugPrint('[WebSocketService] Pong received');
           return;
         }
 
         // Parse JSON event
         final event = jsonDecode(message) as Map<String, dynamic>;
-        print('[WebSocketService] Event received: ${event['type']}');
+        debugPrint('[WebSocketService] Event received: ${event['type']}');
 
         // Broadcast event to listeners
         _eventController.add(event);
       }
     } catch (e) {
-      print('[WebSocketService] ❌ Error handling message: $e');
+      debugPrint('[WebSocketService] ❌ Error handling message: $e');
     }
   }
 
   /// Handle WebSocket error
   void _handleError(error) {
-    print('[WebSocketService] ❌ Error: $error');
+    debugPrint('[WebSocketService] ❌ Error: $error');
     _isConnected = false;
   }
 
   /// Handle WebSocket done
   void _handleDone() {
-    print('[WebSocketService] ✓ Connection closed');
+    debugPrint('[WebSocketService] ✓ Connection closed');
     _isConnected = false;
   }
 
@@ -158,7 +160,7 @@ class WebSocketService {
     try {
       _channel?.sink.add('ping');
     } catch (e) {
-      print('[WebSocketService] ❌ Error sending ping: $e');
+      debugPrint('[WebSocketService] ❌ Error sending ping: $e');
     }
   }
 
@@ -167,7 +169,7 @@ class WebSocketService {
     try {
       _channel?.sink.add('pong');
     } catch (e) {
-      print('[WebSocketService] ❌ Error sending pong: $e');
+      debugPrint('[WebSocketService] ❌ Error sending pong: $e');
     }
   }
 
@@ -214,7 +216,7 @@ final webSocketServiceProvider = Provider<WebSocketService>((ref) {
 /// final messageStream = ref.watch(messageStreamProvider);
 /// messageStream.whenData((event) {
 ///   if (event['type'] == 'message_received') {
-///     print('New message: ${event['data']}');
+///     debugPrint('New message: ${event['data']}');
 ///   }
 /// });
 /// ```

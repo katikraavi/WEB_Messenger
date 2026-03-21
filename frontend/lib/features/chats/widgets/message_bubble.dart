@@ -1,6 +1,8 @@
+import 'dart:async';
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
+import 'package:fvp/mdk.dart' as fvp_mdk;
 import 'package:media_kit/media_kit.dart';
-import 'package:media_kit_video/media_kit_video.dart';
 import '../models/message_model.dart';
 import './message_status_indicator.dart';
 import './user_avatar_widget.dart';
@@ -309,7 +311,8 @@ class MessageBubble extends StatelessWidget {
         ),
       );
     } else if (mimeType.startsWith('video/')) {
-      return _InlineVideoPlayer(url: resolvedMediaUrl);
+      // Wrap video player in error boundary to prevent platform crashes
+      return _VideoPlayerErrorBoundary(url: resolvedMediaUrl);
     } else if (mimeType.startsWith('audio/')) {
       return _InlineAudioPlayer(url: resolvedMediaUrl);
     } else {
@@ -522,88 +525,38 @@ class _InlineAudioPlayerState extends State<_InlineAudioPlayer> {
   }
 }
 
-class _InlineVideoPlayer extends StatefulWidget {
+/// Error boundary widget for video player to catch platform crashes
+class _VideoPlayerErrorBoundary extends StatefulWidget {
   final String url;
 
-  const _InlineVideoPlayer({required this.url});
+  const _VideoPlayerErrorBoundary({required this.url});
 
   @override
-  State<_InlineVideoPlayer> createState() => _InlineVideoPlayerState();
+  State<_VideoPlayerErrorBoundary> createState() => _VideoPlayerErrorBoundaryState();
 }
 
-class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
-  late final Player _player;
-  late final VideoController _controller;
-  bool _showControls = true;
-  bool _isMuted = false;
-  bool _initialized = false;
+class _VideoPlayerErrorBoundaryState extends State<_VideoPlayerErrorBoundary> {
   bool _hasError = false;
 
   @override
-  void initState() {
-    super.initState();
-    _player = Player();
-    _controller = VideoController(_player);
-    _initialize();
-  }
-
-  @override
-  void dispose() {
-    _player.dispose();
-    super.dispose();
-  }
-
-  Future<void> _initialize() async {
-    try {
-      await _player.open(Media(widget.url));
-      await _player.setPlaylistMode(PlaylistMode.none);
-      await _player.setVolume(100);
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _initialized = true;
-      });
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _hasError = true;
-      });
-    }
-  }
-
-  Future<void> _togglePlayback() async {
-    if (_player.state.playing) {
-      await _player.pause();
-      setState(() {
-        _showControls = true;
-      });
-      return;
-    }
-
-    await _player.play();
-    setState(() {
-      _showControls = false;
-    });
-  }
-
-  Future<void> _toggleMute() async {
-    _isMuted = !_isMuted;
-    await _player.setVolume(_isMuted ? 0 : 100);
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  Future<void> _seekTo(double value, Duration duration) async {
-    final milliseconds = (duration.inMilliseconds * value).round();
-    await _player.seek(Duration(milliseconds: milliseconds));
-  }
-
-  @override
   Widget build(BuildContext context) {
+    if (_hasError) {
+      return _buildFallbackUI();
+    }
+
+    return _InlineVideoPlayer(
+      url: widget.url,
+      onError: () {
+        if (mounted) {
+          setState(() {
+            _hasError = true;
+          });
+        }
+      },
+    );
+  }
+
+  Widget _buildFallbackUI() {
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
       child: Container(
@@ -611,111 +564,336 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
           maxWidth: 250,
           maxHeight: 300,
         ),
+        color: Colors.black12,
+        child: AspectRatio(
+          aspectRatio: 16 / 9,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.video_file, color: Colors.grey.shade400, size: 40),
+              const SizedBox(height: 8),
+              Text(
+                'Video unavailable',
+                style: TextStyle(
+                  color: Colors.grey.shade400,
+                  fontSize: 12,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                widget.url.split('/').last,
+                style: TextStyle(
+                  color: Colors.grey.shade500,
+                  fontSize: 10,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InlineVideoPlayer extends StatefulWidget {
+  final String url;
+  final VoidCallback onError;
+
+  const _InlineVideoPlayer({required this.url, required this.onError});
+
+  @override
+  State<_InlineVideoPlayer> createState() => _InlineVideoPlayerState();
+}
+
+class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
+  fvp_mdk.Player? _player;
+  Timer? _progressTimer;
+  bool _showControls = true;
+  bool _isMuted = Platform.isLinux;
+  bool _initialized = false;
+  bool _hasError = false;
+  bool _playerCreated = false;
+  double _aspectRatio = 16 / 9;
+  int _durationMs = 0;
+  double _progress = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    debugPrint('[InlineVideoPlayer] Video widget created (tap to play)');
+  }
+
+  @override
+  void dispose() {
+    _progressTimer?.cancel();
+    _player?.dispose();
+    super.dispose();
+  }
+
+  bool get _isPlaying => _player?.state == fvp_mdk.PlaybackState.playing;
+
+  void _startProgressTimer() {
+    _progressTimer?.cancel();
+    _progressTimer = Timer.periodic(const Duration(milliseconds: 250), (_) {
+      if (!mounted || !_initialized || _player == null) {
+        return;
+      }
+      final durationMs = _durationMs;
+      final positionMs = _player!.position;
+      setState(() {
+        _progress = durationMs <= 0
+            ? 0.0
+            : (positionMs / durationMs).clamp(0.0, 1.0);
+      });
+    });
+  }
+
+  Future<void> _ensureInitialized() async {
+    if (_playerCreated || _hasError) return;
+    try {
+      debugPrint('[InlineVideoPlayer] Initializing: ${widget.url}');
+      final player = fvp_mdk.Player();
+      _player = player;
+      _playerCreated = true;
+
+      // WSLg/Linux desktop is crashing in native audio initialization. Force a
+      // safer backend and disable embedded audio tracks for inline playback.
+      if (Platform.isLinux) {
+        player.audioBackends = const ['ALSA'];
+        player.setActiveTracks(fvp_mdk.MediaType.audio, const []);
+      }
+
+      player.loop = 0;
+      player.media = widget.url;
+
+      final prepared = await player.prepare().timeout(
+        const Duration(seconds: 15),
+        onTimeout: () => throw Exception('Video loading timeout'),
+      );
+      if (prepared < 0) {
+        throw Exception('Video prepare failed: $prepared');
+      }
+
+      final textureId = await player.updateTexture().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => throw Exception('Video texture initialization timeout'),
+      );
+      if (textureId < 0) {
+        throw Exception('Video texture creation failed: $textureId');
+      }
+
+      final mediaInfo = player.mediaInfo;
+      final videoInfo = mediaInfo.video;
+      if (videoInfo != null && videoInfo.isNotEmpty) {
+        final width = videoInfo.first.codec.width;
+        final height = videoInfo.first.codec.height;
+        if (width > 0 && height > 0) {
+          _aspectRatio = width / height;
+        }
+      }
+      _durationMs = mediaInfo.duration;
+
+      player.onStateChanged((_, _) {
+        if (mounted) {
+          setState(() {});
+        }
+      });
+      _startProgressTimer();
+
+      if (!mounted) return;
+      setState(() {
+        _initialized = true;
+      });
+    } catch (e) {
+      debugPrint('[InlineVideoPlayer] Init error: $e');
+      widget.onError();
+      if (!mounted) return;
+      setState(() { _hasError = true; });
+    }
+  }
+
+  Future<void> _togglePlayback() async {
+    if (!_playerCreated) {
+      await _ensureInitialized();
+      if (_hasError || !_initialized) return;
+    }
+    final player = _player!;
+    if (_isPlaying) {
+      player.state = fvp_mdk.PlaybackState.paused;
+      setState(() {
+        _showControls = true;
+      });
+    } else {
+      player.state = fvp_mdk.PlaybackState.playing;
+      setState(() {
+        _showControls = false;
+      });
+    }
+  }
+
+  Future<void> _toggleMute() async {
+    if (_player == null || Platform.isLinux) return;
+    _isMuted = !_isMuted;
+    _player!.mute = _isMuted;
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _seekTo(double fraction) async {
+    if (_player == null || _durationMs <= 0) return;
+    final ms = (_durationMs * fraction).round();
+    await _player!.seek(position: ms);
+    if (mounted) {
+      setState(() {
+        _progress = fraction.clamp(0.0, 1.0);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Error state
+    if (_hasError) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 250),
+          color: Colors.black,
+          child: AspectRatio(
+            aspectRatio: 16 / 9,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.video_file, color: Colors.grey.shade400, size: 40),
+                const SizedBox(height: 8),
+                Text('Video unavailable',
+                    style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
+                const SizedBox(height: 4),
+                Text(widget.url.split('/').last,
+                    style: TextStyle(color: Colors.grey.shade500, fontSize: 10),
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Tap-to-play placeholder (before first tap)
+    if (!_playerCreated) {
+      return GestureDetector(
+        onTap: _togglePlayback,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 250),
+            color: Colors.black,
+            child: AspectRatio(
+              aspectRatio: 16 / 9,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.play_circle_fill,
+                      color: Colors.white.withValues(alpha: 0.85), size: 52),
+                  const SizedBox(height: 8),
+                  Text('Tap to play',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.7),
+                        fontSize: 12,
+                      )),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Loading spinner while initializing
+    if (!_initialized) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 250),
+          color: Colors.black,
+          child: const AspectRatio(
+            aspectRatio: 16 / 9,
+            child: Center(child: CircularProgressIndicator(color: Colors.white)),
+          ),
+        ),
+      );
+    }
+
+    // Initialized: render player
+    final player = _player!;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 250, maxHeight: 300),
         color: Colors.black,
-        child: Builder(
-          builder: (context) {
-            if (_hasError) {
+        child: ValueListenableBuilder<int?>(
+          valueListenable: player.textureId,
+          builder: (context, textureId, _) {
+            if (textureId == null) {
               return const AspectRatio(
                 aspectRatio: 16 / 9,
-                child: Center(child: Icon(Icons.error_outline, color: Colors.redAccent, size: 40)),
+                child: Center(child: CircularProgressIndicator(color: Colors.white)),
               );
             }
 
-            if (!_initialized) {
-              return AspectRatio(
-                aspectRatio: 16 / 9,
-                child: const Center(child: CircularProgressIndicator()),
-              );
-            }
-
-            return StreamBuilder<bool>(
-              stream: _player.stream.playing,
-              initialData: _player.state.playing,
-              builder: (context, playingSnapshot) {
-                final isPlaying = playingSnapshot.data ?? false;
-                return StreamBuilder<Duration>(
-                  stream: _player.stream.position,
-                  initialData: _player.state.position,
-                  builder: (context, positionSnapshot) {
-                    final position = positionSnapshot.data ?? Duration.zero;
-                    return StreamBuilder<Duration>(
-                      stream: _player.stream.duration,
-                      initialData: _player.state.duration,
-                      builder: (context, durationSnapshot) {
-                        final duration = durationSnapshot.data ?? Duration.zero;
-                        final progress = duration.inMilliseconds <= 0
-                            ? 0.0
-                            : (position.inMilliseconds / duration.inMilliseconds)
-                                .clamp(0.0, 1.0);
-
-                        return GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _showControls = !_showControls;
-                            });
-                          },
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              const AspectRatio(
-                                aspectRatio: 16 / 9,
-                                child: SizedBox.expand(),
-                              ),
-                              Positioned.fill(
-                                child: Video(controller: _controller),
-                              ),
-                              if (_showControls || !isPlaying)
-                                Container(
-                                  color: Colors.black.withValues(alpha: 0.28),
-                                ),
-                              if (_showControls || !isPlaying)
-                                IconButton(
-                                  onPressed: _togglePlayback,
-                                  iconSize: 48,
-                                  color: Colors.white,
-                                  icon: Icon(
-                                    isPlaying
-                                        ? Icons.pause_circle_filled
-                                        : Icons.play_circle_fill,
-                                  ),
-                                ),
-                              Positioned(
-                                right: 8,
-                                top: 8,
-                                child: IconButton(
-                                  onPressed: _toggleMute,
-                                  color: Colors.white,
-                                  icon: Icon(
-                                    _isMuted ? Icons.volume_off : Icons.volume_up,
-                                  ),
-                                ),
-                              ),
-                              Positioned(
-                                left: 8,
-                                right: 8,
-                                bottom: 8,
-                                child: SliderTheme(
-                                  data: SliderTheme.of(context).copyWith(
-                                    trackHeight: 3,
-                                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
-                                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
-                                  ),
-                                  child: Slider(
-                                    value: progress,
-                                    onChanged: duration.inMilliseconds <= 0
-                                        ? null
-                                        : (value) => _seekTo(value, duration),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    );
-                  },
-                );
-              },
+            return AspectRatio(
+              aspectRatio: _aspectRatio,
+              child: GestureDetector(
+                onTap: () => setState(() { _showControls = !_showControls; }),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Positioned.fill(child: Texture(textureId: textureId)),
+                    if (_showControls || !_isPlaying)
+                      Container(color: Colors.black.withValues(alpha: 0.28)),
+                    if (_showControls || !_isPlaying)
+                      IconButton(
+                        onPressed: _togglePlayback,
+                        iconSize: 48,
+                        color: Colors.white,
+                        icon: Icon(
+                          _isPlaying
+                              ? Icons.pause_circle_filled
+                              : Icons.play_circle_fill,
+                        ),
+                      ),
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: IconButton(
+                        onPressed: Platform.isLinux ? null : _toggleMute,
+                        color: Colors.white,
+                        icon: Icon(_isMuted ? Icons.volume_off : Icons.volume_up),
+                      ),
+                    ),
+                    Positioned(
+                      left: 8,
+                      right: 8,
+                      bottom: 8,
+                      child: SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          trackHeight: 3,
+                          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+                          overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
+                        ),
+                        child: Slider(
+                          value: _progress,
+                          onChanged: _durationMs <= 0 ? null : _seekTo,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             );
           },
         ),

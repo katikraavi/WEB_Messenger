@@ -49,29 +49,30 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyDummyKeyForWebPlatform',
-    appId: '1:000:web:000000000000',
-    messagingSenderId: '000000000000',
-    projectId: 'messenger-dev',
-    authDomain: 'messenger-dev.firebaseapp.com',
-    storageBucket: 'messenger-dev.appspot.com',
+    apiKey: 'AIzaSyDOUL3UrQVIvWNxQpuJRo5RWnqGF7haDyc',
+    appId: '1:6754233751:web:3417896a6dc738eca768d2',
+    messagingSenderId: '6754233751',
+    projectId: 'mobile-messenger-a8e3f',
+    authDomain: 'mobile-messenger-a8e3f.firebaseapp.com',
+    storageBucket: 'mobile-messenger-a8e3f.firebasestorage.app',
+    measurementId: 'G-W3NVPNPC08',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDummyKeyForAndroid',
-    appId: '1:000:android:0000000000',
-    messagingSenderId: '000000000000',
-    projectId: 'messenger-dev',
-    storageBucket: 'messenger-dev.appspot.com',
+    apiKey: 'AIzaSyDCiyvtBh6zgOUUW6JQXnQbIPflzldMhhQ',
+    appId: '1:6754233751:android:fea52e5e42b7698fa768d2',
+    messagingSenderId: '6754233751',
+    projectId: 'mobile-messenger-a8e3f',
+    storageBucket: 'mobile-messenger-a8e3f.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyDummyKeyForiOS',
-    appId: '1:000:ios:0000000000',
-    messagingSenderId: '000000000000',
-    projectId: 'messenger-dev',
-    storageBucket: 'messenger-dev.appspot.com',
-    iosBundleId: 'com.example.frontend',
+    apiKey: 'AIzaSyCw96BPF6ZmsKeZPa0H2Ru8cOgS6auPj0w',
+    appId: '1:6754233751:ios:bbab246861ec5360a768d2',
+    messagingSenderId: '6754233751',
+    projectId: 'mobile-messenger-a8e3f',
+    storageBucket: 'mobile-messenger-a8e3f.firebasestorage.app',
+    iosBundleId: 'com.messenger.frontend',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
@@ -83,11 +84,13 @@ class DefaultFirebaseOptions {
     iosBundleId: 'com.example.frontend',
   );
 
+  // Linux uses web credentials — Firebase does not have a native Linux SDK.
   static const FirebaseOptions linux = FirebaseOptions(
-    apiKey: 'AIzaSyDummyKeyForLinux',
-    appId: '1:000:linux:0000000000',
-    messagingSenderId: '000000000000',
-    projectId: 'messenger-dev',
-    storageBucket: 'messenger-dev.appspot.com',
+    apiKey: 'AIzaSyDOUL3UrQVIvWNxQpuJRo5RWnqGF7haDyc',
+    appId: '1:6754233751:web:3417896a6dc738eca768d2',
+    messagingSenderId: '6754233751',
+    projectId: 'mobile-messenger-a8e3f',
+    authDomain: 'mobile-messenger-a8e3f.firebaseapp.com',
+    storageBucket: 'mobile-messenger-a8e3f.firebasestorage.app',
   );
 }

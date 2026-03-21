@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:frontend/core/services/app_exception_logger.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -24,7 +25,7 @@ enum WebSocketEventType {
     try {
       return WebSocketEventType.values.firstWhere((e) => e.name == value);
     } catch (e) {
-      print('[WebSocketEventType] ⚠️  Unknown event type: $value');
+      debugPrint('[WebSocketEventType] ⚠️  Unknown event type: $value');
       return unknown;
     }
   }
@@ -111,7 +112,7 @@ class MessageWebSocketService {
     String baseUrl = 'ws://localhost:8081',
   }) async {
     if (_isConnected) {
-      print('[MessageWebSocket] Already connected');
+      debugPrint('[MessageWebSocket] Already connected');
       return;
     }
 
@@ -119,30 +120,34 @@ class MessageWebSocketService {
       _currentUserId = userId;
       final wsUrl = Uri.parse('$baseUrl/ws/messages?token=$token');
 
-      print('[MessageWebSocket] 🔗 Attempting to connect to $wsUrl');
+      debugPrint('[MessageWebSocket] 🔗 Attempting to connect to $wsUrl');
       _webSocket = WebSocketChannel.connect(wsUrl);
 
-      print('[MessageWebSocket] 🔗 WebSocket channel created, setting up listeners...');
+      debugPrint(
+        '[MessageWebSocket] 🔗 WebSocket channel created, setting up listeners...',
+      );
 
       // Listen for incoming messages
       _webSocket!.stream.listen(
         (message) {
-          print('[MessageWebSocket] 📩 RAW DATA RECEIVED: $message');
+          debugPrint('[MessageWebSocket] 📩 RAW DATA RECEIVED: $message');
           _handleMessage(message);
         },
         onError: (error) {
-          print('[MessageWebSocket] ❌ Stream Error: $error');
+          debugPrint('[MessageWebSocket] ❌ Stream Error: $error');
           _isConnected = false;
         },
         onDone: () {
-          print('[MessageWebSocket] ⚠️  Connection closed by server');
+          debugPrint('[MessageWebSocket] ⚠️  Connection closed by server');
           _isConnected = false;
           _cleanup();
         },
       );
 
       _isConnected = true;
-      print('[MessageWebSocket] ✓ Connected successfully and listening for messages');
+      debugPrint(
+        '[MessageWebSocket] ✓ Connected successfully and listening for messages',
+      );
 
       // Start heartbeat
       _startHeartbeat();
@@ -160,28 +165,29 @@ class MessageWebSocketService {
   /// Subscribe to a specific chat
   void subscribeToChat(String chatId) {
     _currentChatId = chatId;
-    print('[MessageWebSocket] 📦 Subscribing to chat: $chatId');
-    
+    debugPrint('[MessageWebSocket] 📦 Subscribing to chat: $chatId');
+
     if (!_isConnected || _webSocket == null) {
-      print('[MessageWebSocket] ⚠️  Not connected, cannot subscribe to chat');
+      debugPrint(
+        '[MessageWebSocket] ⚠️  Not connected, cannot subscribe to chat',
+      );
       return;
     }
-    
+
     try {
-      _webSocket!.sink.add(jsonEncode({
-        'type': 'subscribe',
-        'chatId': chatId,
-      }));
-      print('[MessageWebSocket] ✓ Sent subscribe message for chat: $chatId');
+      _webSocket!.sink.add(jsonEncode({'type': 'subscribe', 'chatId': chatId}));
+      debugPrint(
+        '[MessageWebSocket] ✓ Sent subscribe message for chat: $chatId',
+      );
     } catch (e) {
-      print('[MessageWebSocket] ❌ Failed to send subscribe message: $e');
+      debugPrint('[MessageWebSocket] ❌ Failed to send subscribe message: $e');
     }
   }
 
   /// Unsubscribe from current chat
   void unsubscribeFromChat() {
     _currentChatId = null;
-    print('[MessageWebSocket] 📦 Unsubscribed from chat');
+    debugPrint('[MessageWebSocket] 📦 Unsubscribed from chat');
   }
 
   /// Send a typing indicator
@@ -200,7 +206,7 @@ class MessageWebSocketService {
         'data': {'userId': _currentUserId},
       };
       _webSocket!.sink.add(jsonEncode(event));
-      print('[MessageWebSocket] 📤 Sent typing indicator');
+      debugPrint('[MessageWebSocket] 📤 Sent typing indicator');
 
       // Debounce: cancel previous timer and set new one
       _typingDebounceTimer?.cancel();
@@ -208,7 +214,7 @@ class MessageWebSocketService {
         sendStoppedTyping(chatId: chatId);
       });
     } catch (e) {
-      print('[MessageWebSocket] ❌ Failed to send typing indicator: $e');
+      debugPrint('[MessageWebSocket] ❌ Failed to send typing indicator: $e');
     }
   }
 
@@ -223,9 +229,9 @@ class MessageWebSocketService {
         'data': {'userId': _currentUserId},
       };
       _webSocket!.sink.add(jsonEncode(event));
-      print('[MessageWebSocket] 📤 Sent stopped typing indicator');
+      debugPrint('[MessageWebSocket] 📤 Sent stopped typing indicator');
     } catch (e) {
-      print('[MessageWebSocket] ❌ Failed to send stopped typing: $e');
+      debugPrint('[MessageWebSocket] ❌ Failed to send stopped typing: $e');
     }
   }
 
@@ -243,7 +249,7 @@ class MessageWebSocketService {
       _currentUserId = null;
       _currentChatId = null;
 
-      print('[MessageWebSocket] 🔌 Disconnected');
+      debugPrint('[MessageWebSocket] 🔌 Disconnected');
     } catch (e, st) {
       AppExceptionLogger.log(
         e,
@@ -256,16 +262,22 @@ class MessageWebSocketService {
   /// Handle incoming WebSocket message
   void _handleMessage(dynamic message) {
     try {
-      print('[MessageWebSocket] 🔍 Processing message type: ${message.runtimeType}');
-      
+      debugPrint(
+        '[MessageWebSocket] 🔍 Processing message type: ${message.runtimeType}',
+      );
+
       if (message is String) {
         final previewLength = message.length > 100 ? 100 : message.length;
-        print('[MessageWebSocket] 🔍 Parsing JSON: ${message.substring(0, previewLength)}...');
+        debugPrint(
+          '[MessageWebSocket] 🔍 Parsing JSON: ${message.substring(0, previewLength)}...',
+        );
         final json = jsonDecode(message) as Map<String, dynamic>;
-        print('[MessageWebSocket] ✓ JSON decoded: $json');
-        
+        debugPrint('[MessageWebSocket] ✓ JSON decoded: $json');
+
         var event = WebSocketEvent.fromJson(json);
-        print('[MessageWebSocket] ✓ Event parsed: type=${event.type.name}, chatId=${event.chatId}');
+        debugPrint(
+          '[MessageWebSocket] ✓ Event parsed: type=${event.type.name}, chatId=${event.chatId}',
+        );
 
         // Use current chat ID if not in event
         if (event.chatId.isEmpty && _currentChatId != null) {
@@ -274,34 +286,46 @@ class MessageWebSocketService {
             chatId: _currentChatId!,
             data: event.data,
           );
-          print('[MessageWebSocket] ✓ Updated event chatId to $_currentChatId');
+          debugPrint(
+            '[MessageWebSocket] ✓ Updated event chatId to $_currentChatId',
+          );
         }
 
-        print('[MessageWebSocket] 📨 Received ${event.type.name} for chat ${event.chatId}');
+        debugPrint(
+          '[MessageWebSocket] 📨 Received ${event.type.name} for chat ${event.chatId}',
+        );
 
         // Check if this is a typing indicator wrapped in messageCreated
         if (event.type == WebSocketEventType.messageCreated &&
             event.data['type'] == 'typing_indicator') {
           final isTyping = event.data['isTyping'] as bool? ?? true;
-          print('[MessageWebSocket] 🎹 TYPING_INDICATOR: userId=${event.data['userId']}, isTyping=$isTyping');
+          debugPrint(
+            '[MessageWebSocket] 🎹 TYPING_INDICATOR: userId=${event.data['userId']}, isTyping=$isTyping',
+          );
           _typingIndicatorsController.add((
             userId: event.data['userId'] as String? ?? '',
             chatId: event.chatId,
             isTyping: isTyping,
           ));
-          print('[MessageWebSocket] ✓ Added to typing indicators stream');
+          debugPrint('[MessageWebSocket] ✓ Added to typing indicators stream');
         } else if (event.type != WebSocketEventType.unknown &&
             event.type != WebSocketEventType.ping &&
             event.type != WebSocketEventType.pong) {
           // Emit real message events to stream (skip ping/pong and unknown)
-          print('[MessageWebSocket] 💬 Adding event to eventStream: ${event.type.name}');
+          debugPrint(
+            '[MessageWebSocket] 💬 Adding event to eventStream: ${event.type.name}',
+          );
           _eventStreamController.add(event);
-          print('[MessageWebSocket] ✓ Event added to stream');
+          debugPrint('[MessageWebSocket] ✓ Event added to stream');
         } else {
-          print('[MessageWebSocket] ⏭️  Skipping event: ${event.type.name}');
+          debugPrint(
+            '[MessageWebSocket] ⏭️  Skipping event: ${event.type.name}',
+          );
         }
       } else {
-        print('[MessageWebSocket] ⚠️  Received non-string message: $message');
+        debugPrint(
+          '[MessageWebSocket] ⚠️  Received non-string message: $message',
+        );
       }
     } catch (e, st) {
       AppExceptionLogger.log(

@@ -23,7 +23,7 @@ Future<Response> sendVerificationEmail(
     final body = await request.readAsString();
     final data = jsonDecode(body) as Map<String, dynamic>;
     final email = data['email'] as String?;
-    final userId = data['userId'] as String?;
+    String? userId = data['userId'] as String?;
 
     if (email == null || email.isEmpty) {
       return Response.badRequest(
@@ -32,9 +32,29 @@ Future<Response> sendVerificationEmail(
     }
 
     if (userId == null || userId.isEmpty) {
-      return Response.badRequest(
-        body: jsonEncode({'error': 'UserId is required'}),
+      // Allow resend by email when frontend does not have userId in state.
+      final lookup = await verificationService.connection.query(
+        'SELECT id, email_verified FROM "users" WHERE LOWER(email) = LOWER(@email) LIMIT 1',
+        substitutionValues: {'email': email},
       );
+
+      if (lookup.isEmpty) {
+        return Response(404,
+          body: jsonEncode({'error': 'Account not found for this email'}),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
+
+      final row = lookup.first.toColumnMap();
+      final alreadyVerified = row['email_verified'] as bool? ?? false;
+      if (alreadyVerified) {
+        return Response(409,
+          body: jsonEncode({'error': 'Email is already verified'}),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
+
+      userId = row['id'] as String;
     }
 
     // Validate email format (basic)
@@ -132,13 +152,18 @@ Future<Response> verifyEmailToken(
     }
 
     // Verify token using verification service
-    final verifiedUserId = await verificationService.verifyAndConsumeToken(token);
-    
+    final verified = await verificationService.verifyAndConsumeToken(token);
+    if (!verified) {
+      return Response.badRequest(
+        body: jsonEncode({'error': 'Invalid or expired token'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+
     return Response.ok(
       jsonEncode({
         'success': true,
         'message': 'Email verified successfully!',
-        'user_id': verifiedUserId,
       }),
       headers: {'Content-Type': 'application/json'},
     );

@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/profile_form_state.dart';
 import '../models/user_profile.dart';
@@ -234,7 +236,7 @@ class ProfileFormStateNotifier extends StateNotifier<ProfileFormState> {
       );
       return true;
     } catch (e) {
-      print('[ProfileFormStateNotifier] Error setting image: $e');
+      debugPrint('[ProfileFormStateNotifier] Error setting image: $e');
       state = state.copyWith(error: ValidationError.imageFormatInvalid);
       return false;
     }

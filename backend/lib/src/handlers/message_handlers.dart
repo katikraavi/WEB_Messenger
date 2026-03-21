@@ -11,26 +11,27 @@ import '../models/enums.dart';
 typedef Connection = PostgreSQLConnection;
 
 /// Message handlers for message-related HTTP endpoints
-/// 
+///
 /// Handles:
 /// - POST /api/chats/{chatId}/messages - Send new message (T028-T029)
 /// - Error handling: 401 (auth), 403 (not participant), 404 (not found), 5xx (server)
 class MessageHandlers {
   /// Singleton WebSocket service for broadcasting messages (T021)
   static final _webSocketService = WebSocketService();
+
   /// POST /api/chats/{chatId}/messages
-  /// 
+  ///
   /// Send a message in a chat
-  /// 
+  ///
   /// Required headers:
   /// - Authorization: Bearer <jwt_token>
-  /// 
+  ///
   /// Request body:
   /// {
   ///   "encrypted_content": "aGVsbG8gd29ybGQtZW5jcnlwdGVkYmFzZTY0", // Base64 encrypted
   ///   "idempotency_key": "msg-uuid-or-request-id" // Optional, prevents duplicates
   /// }
-  /// 
+  ///
   /// Response: 201 Created
   /// {
   ///   "id": "msg-uuid",
@@ -39,7 +40,7 @@ class MessageHandlers {
   ///   "encrypted_content": "...",
   ///   "created_at": "2026-03-15T10:30:00Z"
   /// }
-  /// 
+  ///
   /// Errors:
   /// - 400: Missing encrypted_content, content too large, invalid format
   /// - 401: No authorization token or invalid JWT
@@ -56,17 +57,15 @@ class MessageHandlers {
       // Extract JWT token from Authorization header
       final authHeader = request.headers['authorization'];
       if (authHeader == null || !authHeader.startsWith('Bearer ')) {
-        return Response.unauthorized(jsonEncode({
-          'error': 'Missing or invalid authorization header'
-        }));
+        return Response.unauthorized(
+            jsonEncode({'error': 'Missing or invalid authorization header'}));
       }
 
       final token = authHeader.substring(7);
       final userId = _extractUserIdFromToken(token);
       if (userId == null) {
-        return Response.unauthorized(jsonEncode({
-          'error': 'Invalid authorization token'
-        }));
+        return Response.unauthorized(
+            jsonEncode({'error': 'Invalid authorization token'}));
       }
 
       // Parse request body
@@ -84,8 +83,10 @@ class MessageHandlers {
 
       if ((mediaUrl == null) != (mediaType == null)) {
         return Response(400,
-        body: jsonEncode({'error': 'media_url and media_type must be provided together'}),
-        headers: {'Content-Type': 'application/json'});
+            body: jsonEncode({
+              'error': 'media_url and media_type must be provided together'
+            }),
+            headers: {'Content-Type': 'application/json'});
       }
 
       // Check if user is a participant
@@ -105,9 +106,8 @@ class MessageHandlers {
       const maxEncryptedSize = 20000; // 20KB max for encrypted content
       if (encryptedContent.length > maxEncryptedSize) {
         return Response(400,
-            body: jsonEncode({
-              'error': 'Message content is too large (max 10KB plaintext)'
-            }),
+            body: jsonEncode(
+                {'error': 'Message content is too large (max 10KB plaintext)'}),
             headers: {'Content-Type': 'application/json'});
       }
 
@@ -186,7 +186,7 @@ class MessageHandlers {
             headers: {'Content-Type': 'application/json'});
       }
     } catch (e) {
-      print('[MessageHandlers.sendMessage] Error: $e');
+//       print('[MessageHandlers.sendMessage] Error: $e');
       return Response.internalServerError(
           body: jsonEncode({'error': 'Internal server error: $e'}),
           headers: {'Content-Type': 'application/json'});
@@ -217,7 +217,7 @@ class MessageHandlers {
   }
 
   /// Helper: Extract user ID from JWT token (MVP implementation)
-  /// 
+  ///
   /// In production, verify JWT signature and extract claims
   /// For MVP, we decode the token ignoring signature
   static String? _extractUserIdFromToken(String token) {
@@ -236,25 +236,25 @@ class MessageHandlers {
 
       return json['user_id'] as String?;
     } catch (e) {
-      print('[MessageHandlers] Failed to extract user ID from token: $e');
+//       print('[MessageHandlers] Failed to extract user ID from token: $e');
       return null;
     }
   }
-  
+
   /// PUT /api/chats/{chatId}/messages/{messageId} (T049)
-  /// 
+  ///
   /// Edit an existing message
-  /// 
+  ///
   /// Required headers:
   /// - Authorization: Bearer <jwt_token>
-  /// 
+  ///
   /// Request body:
   /// {
   ///   "encrypted_content": "new-encrypted-base64"
   /// }
-  /// 
+  ///
   /// Response: 200 OK with updated Message object
-  /// 
+  ///
   /// Errors:
   /// - 400: Invalid content, not different from original
   /// - 401: No auth token
@@ -316,17 +316,14 @@ class MessageHandlers {
       );
       _webSocketService.broadcastToChat(chatId, editedEvent);
 
-      print(
-          '[MessageHandlers] ✓ Message edited: $messageId by $userId');
-
       return Response(200,
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode(editedMessage.toJson()));
     } catch (e) {
       print('[MessageHandlers] ❌ Edit message error: $e');
       return Response(500,
-          body: jsonEncode(
-              {'error': 'Failed to edit message: ${e.toString()}'}));
+          body:
+              jsonEncode({'error': 'Failed to edit message: ${e.toString()}'}));
     }
   }
 
@@ -352,20 +349,20 @@ class MessageHandlers {
       final row = result.first.toColumnMap();
       return row['is_participant'] as bool? ?? false;
     } catch (e) {
-      print('[MessageHandlers] Error checking participant: $e');
+//       print('[MessageHandlers] Error checking participant: $e');
       return false;
     }
   }
 
   /// Delete a message (soft-delete via is_deleted flag)
-  /// 
+  ///
   /// Validates:
   /// - Message exists
   /// - User is the message sender
   /// - Chat participant status
-  /// 
+  ///
   /// Broadcasts message.deleted WebSocket event with updated message state
-  /// 
+  ///
   /// Responses:
   /// - 204: Message deleted successfully
   /// - 400: Invalid message state
@@ -413,8 +410,7 @@ class MessageHandlers {
       // Fetch updated message to broadcast
       final deletedMessage = await messageService.getMessageById(messageId);
       if (deletedMessage == null) {
-        return Response(404,
-            body: jsonEncode({'error': 'Message not found'}));
+        return Response(404, body: jsonEncode({'error': 'Message not found'}));
       }
 
       // Broadcast message.deleted event via WebSocket
@@ -423,8 +419,6 @@ class MessageHandlers {
         data: deletedMessage.toJson(),
       );
       _webSocketService.broadcastToChat(chatId, deletedEvent);
-
-      print('[MessageHandlers] ✓ Message deleted: $messageId by $userId');
 
       return Response(204);
     } catch (e) {
@@ -436,18 +430,18 @@ class MessageHandlers {
   }
 
   /// Update message status (delivered, read)
-  /// 
+  ///
   /// PUT /api/chats/{chatId}/messages/status
-  /// 
+  ///
   /// Request body:
   /// {
   ///   "message_id": "msg-uuid",
   ///   "status": "delivered" | "read"
   /// }
-  /// 
+  ///
   /// Response: 200 OK with updated message
   /// Broadcasts messageStatusChanged WebSocket event to all chat participants
-  /// 
+  ///
   /// Errors:
   /// - 400: Invalid status or missing message_id
   /// - 401: No auth token
@@ -522,10 +516,7 @@ class MessageHandlers {
           'timestamp': DateTime.now().toIso8601String(),
         },
       );
-      print('[MessageHandlers] 🔊 Broadcasting status change: messageId=$messageId, newStatus=$newStatus, updatedBy=$userId');
       _webSocketService.broadcastToChat(chatId, statusEvent);
-
-      print('[MessageHandlers] ✓ Message status updated: $messageId → $newStatus by $userId');
 
       return Response(200,
           body: jsonEncode({

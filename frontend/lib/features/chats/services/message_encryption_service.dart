@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import '../models/message_model.dart';
 
 /// Service for message encryption/decryption
@@ -23,7 +25,7 @@ class MessageEncryptionService {
       final decrypted = utf8.decode(base64Decode(message.encryptedContent));
       return message.copyWith(decryptedContent: decrypted);
     } catch (e) {
-      print('[MessageEncryptionService] Failed to decrypt message ${message.id}: $e');
+      debugPrint('[MessageEncryptionService] Failed to decrypt message ${message.id}: $e');
       // If decryption fails, return the encrypted content as-is
       return message.copyWith(decryptedContent: 'Could not decrypt message');
     }

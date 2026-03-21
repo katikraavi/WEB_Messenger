@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart' as img;
 
@@ -5,14 +6,14 @@ import 'package:image_picker/image_picker.dart' as img;
 class PickedMediaFile {
   final String name;
   final String path;
-  final Uint8List bytes;
+  final Uint8List? bytes; // Optional for videos (streaming instead)
   final String mimeType;
   final int sizeBytes;
 
   PickedMediaFile({
     required this.name,
     required this.path,
-    required this.bytes,
+    this.bytes,
     required this.mimeType,
     required this.sizeBytes,
   });
@@ -24,7 +25,7 @@ class PickedMediaFile {
 }
 
 /// Media Picker Service (T073)
-/// 
+///
 /// Handles selecting images and videos from device
 class MediaPickerService {
   static const int maxFileSize = 52428800; // 50MB in bytes
@@ -47,7 +48,7 @@ class MediaPickerService {
   static final _picker = img.ImagePicker();
 
   /// Pick an image from device
-  /// 
+  ///
   /// Returns: PickedMediaFile or null if cancelled
   static Future<PickedMediaFile?> pickImage() async {
     try {
@@ -84,14 +85,15 @@ class MediaPickerService {
   }
 
   /// Pick a video from device
-  /// 
+  ///
   /// Returns: PickedMediaFile or null if cancelled
+  /// Note: Video bytes are NOT loaded into memory. Only path and size are stored.
+  /// Video upload uses streaming to handle large files efficiently.
   static Future<PickedMediaFile?> pickVideo() async {
     try {
       final video = await _picker.pickVideo(source: img.ImageSource.gallery);
       if (video == null) return null;
 
-      final bytes = await video.readAsBytes();
       final fileName = video.name;
 
       // Determine MIME type from extension
@@ -101,18 +103,27 @@ class MediaPickerService {
         throw Exception('Video type not supported: $mimeType');
       }
 
-      if (bytes.length > maxFileSize) {
+      // Get file size without loading into memory
+      final file = File(video.path);
+      final fileSizeBytes = await file.length();
+
+      if (fileSizeBytes > maxFileSize) {
         throw Exception(
-          'Video too large: ${bytes.length ~/ 1048576}MB (max 50MB)',
+          'Video too large: ${fileSizeBytes ~/ 1048576}MB (max 50MB)',
         );
       }
 
+      debugPrint(
+        '[MediaPickerService] Picked video: $fileName (${fileSizeBytes ~/ 1048576}MB)',
+      );
+
+      // For videos, bytes is null - we'll stream during upload
       return PickedMediaFile(
         name: fileName,
         path: video.path,
-        bytes: bytes,
+        bytes: null,
         mimeType: mimeType,
-        sizeBytes: bytes.length,
+        sizeBytes: fileSizeBytes,
       );
     } catch (e) {
       debugPrint('[MediaPickerService] Error picking video: $e');

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:provider/provider.dart' as provider_pkg;
 import 'dart:async';
@@ -33,7 +34,7 @@ String _displayName(String? value) {
 }
 
 /// Screen for displaying a single chat conversation (T042-T043, T025-T027)
-/// 
+///
 /// Features:
 /// - Displays message history for a specific chat
 /// - Real-time message sending with encryption
@@ -71,7 +72,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   late ScrollController _scrollController;
   late final WebSocketNotifier _webSocketNotifier;
   LocalMessagesNotifier? _localMessagesNotifier;
-  
+
   // Track whether we've enabled viewer active mode
   bool _viewerActiveEnabled = false;
   bool _isRecordingAudio = false;
@@ -86,13 +87,13 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     super.initState();
     _scrollController = ScrollController();
     _webSocketNotifier = ref.read(messageWebSocketProvider.notifier);
-    
+
     // Connect to WebSocket for real-time messaging after frame is built
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       _connectWebSocket();
     });
   }
-  
+
   /// Connect to WebSocket and subscribe to chat
   Future<void> _connectWebSocket() async {
     try {
@@ -100,32 +101,33 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         context,
         listen: false,
       );
-      
+
       final token = authProvider.token;
       final userId = authProvider.user?.userId;
-      
+
       if (token == null || userId == null) {
-        print('[ChatDetail] Cannot connect to WebSocket - not authenticated');
+        debugPrint(
+          '[ChatDetail] Cannot connect to WebSocket - not authenticated',
+        );
         return;
       }
-      
+
       // Get the websocket service from riverpod
       // Connect if not already connected
       if (!ref.read(messageWebSocketProvider).isConnected) {
         await _webSocketNotifier.connect(token: token, userId: userId);
       }
-      
+
       // Subscribe to this chat
       _webSocketNotifier.subscribeToChat(widget.chatId);
       await _reloadMessagesAfterReconnect();
       _clearHeaderError();
-      
-      print('[ChatDetail] ✓ Connected to WebSocket for chat ${widget.chatId}');
-    } catch (e) {
-      AppExceptionLogger.log(
-        e,
-        context: 'ChatDetailScreen._connectWebSocket',
+
+      debugPrint(
+        '[ChatDetail] ✓ Connected to WebSocket for chat ${widget.chatId}',
       );
+    } catch (e) {
+      AppExceptionLogger.log(e, context: 'ChatDetailScreen._connectWebSocket');
       _showHeaderError(
         'Realtime connection lost. Showing the last synced messages.',
         canRetry: true,
@@ -150,9 +152,11 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
 
     await ref
         .read(
-          localMessagesProvider(
-            (chatId: widget.chatId, token: token, currentUserId: userId),
-          ).notifier,
+          localMessagesProvider((
+            chatId: widget.chatId,
+            token: token,
+            currentUserId: userId,
+          )).notifier,
         )
         .loadMessagesFromServer();
   }
@@ -230,11 +234,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Row(
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 18,
-              color: Colors.orange.shade900,
-            ),
+            Icon(Icons.error_outline, size: 18, color: Colors.orange.shade900),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -272,21 +272,18 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   void dispose() {
     // Note: We disable viewer in deactivate() before dispose() since that's safer
     _scrollController.dispose();
-    
+
     // Unsubscribe from chat and optionally disconnect
     try {
       _webSocketNotifier.unsubscribeFromChat();
-      
+
       // Optionally disconnect if leaving the app entirely
       // For now, keep connection alive for other chats
       // wsNotifier.disconnect();
     } catch (e) {
-      AppExceptionLogger.log(
-        e,
-        context: 'ChatDetailScreen.dispose',
-      );
+      AppExceptionLogger.log(e, context: 'ChatDetailScreen.dispose');
     }
-    
+
     super.dispose();
   }
 
@@ -294,31 +291,30 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   /// This is where we safely disable viewer mode
   @override
   void deactivate() {
-    print('[ChatDetail] 🚪 deactivate() called - disabling viewer mode for chat ${widget.chatId}');
-    
+    debugPrint(
+      '[ChatDetail] 🚪 deactivate() called - disabling viewer mode for chat ${widget.chatId}',
+    );
+
     if (_viewerActiveEnabled) {
       try {
         if (_localMessagesNotifier != null) {
           // Disable viewer mode - new messages should NOT auto-read
           _localMessagesNotifier!.setChatBeingViewed(false);
           _viewerActiveEnabled = false;
-          print('[ChatDetail] ✓ Viewer mode disabled');
+          debugPrint('[ChatDetail] ✓ Viewer mode disabled');
         }
       } catch (e) {
-        AppExceptionLogger.log(
-          e,
-          context: 'ChatDetailScreen.deactivate',
-        );
+        AppExceptionLogger.log(e, context: 'ChatDetailScreen.deactivate');
       }
     }
-    
+
     super.deactivate();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    
+
     // Trigger auto-mark-as-read when entering chat (T020)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -326,21 +322,25 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           context,
           listen: false,
         );
-        
+
         if (authProvider.token != null) {
           // Trigger auto-read provider to mark unread messages as read
           // This will cause the recipient to show "read" status (blue checkmarks) to the sender
-          print('[ChatDetail] 🔔 Triggering auto-mark-as-read for chat ${widget.chatId}');
-          ref.read(autoMarkAsReadProvider((
-            chatId: widget.chatId,
-            token: authProvider.token!,
-            currentUserId: authProvider.user!.userId,
-          )));
+          debugPrint(
+            '[ChatDetail] 🔔 Triggering auto-mark-as-read for chat ${widget.chatId}',
+          );
+          ref.read(
+            autoMarkAsReadProvider((
+              chatId: widget.chatId,
+              token: authProvider.token!,
+              currentUserId: authProvider.user!.userId,
+            )),
+          );
         }
       }
     });
   }
-  
+
   /// Send typing start/stop event via WebSocket (T044)
   void _sendTypingEvent(String eventType) {
     try {
@@ -349,13 +349,10 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       } else if (eventType == 'typing.stop') {
         _webSocketNotifier.stopTyping(widget.chatId);
       }
-      
-      print('[ChatDetail] Sent typing event: $eventType');
+
+      debugPrint('[ChatDetail] Sent typing event: $eventType');
     } catch (e) {
-      AppExceptionLogger.log(
-        e,
-        context: 'ChatDetailScreen._sendTypingEvent',
-      );
+      AppExceptionLogger.log(e, context: 'ChatDetailScreen._sendTypingEvent');
     }
   }
 
@@ -374,17 +371,23 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   }
 
   /// Handle message retry (T025 error state)
-  Future<void> _handleRetry(Message failedMessage, String token, String currentUserId) async {
+  Future<void> _handleRetry(
+    Message failedMessage,
+    String token,
+    String currentUserId,
+  ) async {
     // Only allow retry for messages with errors
     if (failedMessage.error == null) {
       return;
     }
 
-    await ref.read(sendMessageProvider.notifier).retryMessage(
-      failedMessage: failedMessage,
-      token: token,
-      currentUserId: currentUserId,
-    );
+    await ref
+        .read(sendMessageProvider.notifier)
+        .retryMessage(
+          failedMessage: failedMessage,
+          token: token,
+          currentUserId: currentUserId,
+        );
     _scrollToBottom();
   }
 
@@ -423,7 +426,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       ),
     );
   }
-  
+
   /// Show edit message dialog (T052, T053)
   void _showEditMessageDialog(Message message, String token) {
     showDialog(
@@ -461,9 +464,13 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       ),
     );
   }
-  
+
   /// Handle message edit (T055)
-  Future<void> _handleEditMessage(Message message, String newContent, String token) async {
+  Future<void> _handleEditMessage(
+    Message message,
+    String newContent,
+    String token,
+  ) async {
     try {
       // For now, we'll just show a snackbar since backend isn't deployed yet
       ScaffoldMessenger.of(context).showSnackBar(
@@ -472,7 +479,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           action: SnackBarAction(label: 'OK', onPressed: () {}),
         ),
       );
-      
+
       // TODO: Uncomment when backend is ready
       /*
       final editedMessage = await ref.read(editMessageProvider(
@@ -484,7 +491,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         ),
       ).future);
       
-      print('[ChatDetail] ✅ Message edited: ${message.id}');
+      debugPrint('[ChatDetail] ✅ Message edited: ${message.id}');
       
       // Refresh message list to show updated content
       await ref.refresh(
@@ -498,10 +505,10 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       );
       */
     } catch (e) {
-      print('[ChatDetail] ❌ Error editing message: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to edit: $e')),
-      );
+      debugPrint('[ChatDetail] ❌ Error editing message: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to edit: $e')));
     }
   }
 
@@ -521,7 +528,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         (widget.chatId, message.id, token),
       ).future);
 
-      print('[ChatDetail] ✅ Message deleted: ${message.id}');
+      debugPrint('[ChatDetail] ✅ Message deleted: ${message.id}');
 
       // Refresh message list to reflect deletion
       await ref.refresh(
@@ -535,22 +542,22 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       );
       */
     } catch (e) {
-      print('[ChatDetail] ❌ Error deleting message: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to delete: $e')),
-      );
+      debugPrint('[ChatDetail] ❌ Error deleting message: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to delete: $e')));
     }
   }
 
   /// Handle image attachment (T079)
   Future<void> _handleImageAttachment(String token) async {
     try {
-      print('[ChatDetail] 📸 Image attachment started');
+      debugPrint('[ChatDetail] 📸 Image attachment started');
 
       // Pick image from device
       final pickedMedia = await MediaPickerService.pickImage();
       if (pickedMedia == null) {
-        print('[ChatDetail] ℹ️ Image selection cancelled');
+        debugPrint('[ChatDetail] ℹ️ Image selection cancelled');
         return;
       }
 
@@ -569,7 +576,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         token: token,
       );
 
-      print('[ChatDetail] ✅ Image uploaded: ${uploadedMedia.id}');
+      debugPrint('[ChatDetail] ✅ Image uploaded: ${uploadedMedia.id}');
 
       final chatApiService = ChatApiService(baseUrl: 'http://localhost:8081');
       final mediaPath = '/uploads/media/${uploadedMedia.fileName}';
@@ -580,38 +587,46 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         mediaUrl: mediaPath,
         mediaType: uploadedMedia.mimeType,
       );
-      final decryptedMessage = await MessageEncryptionService.decryptMessage(sentMessage);
+      final decryptedMessage = await MessageEncryptionService.decryptMessage(
+        sentMessage,
+      );
 
-      ref.read(
-        localMessagesProvider(
-          (chatId: widget.chatId, token: token, currentUserId: currentUserIdFromContext()),
-        ).notifier,
-      ).upsertMessage(decryptedMessage);
-      
+      ref
+          .read(
+            localMessagesProvider((
+              chatId: widget.chatId,
+              token: token,
+              currentUserId: currentUserIdFromContext(),
+            )).notifier,
+          )
+          .upsertMessage(decryptedMessage);
+
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Image sent: ${uploadedMedia.originalName ?? uploadedMedia.fileName}'),
+          content: Text(
+            'Image sent: ${uploadedMedia.originalName ?? uploadedMedia.fileName}',
+          ),
           duration: Duration(seconds: 2),
         ),
       );
     } catch (e) {
-      print('[ChatDetail] ❌ Image upload error: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to upload image: $e')),
-      );
+      debugPrint('[ChatDetail] ❌ Image upload error: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to upload image: $e')));
     }
   }
 
   /// Handle video attachment (T080)
   Future<void> _handleVideoAttachment(String token) async {
     try {
-      print('[ChatDetail] 🎬 Video attachment started');
+      debugPrint('[ChatDetail] 🎬 Video attachment started');
 
       // Pick video from device
       final pickedMedia = await MediaPickerService.pickVideo();
       if (pickedMedia == null) {
-        print('[ChatDetail] ℹ️ Video selection cancelled');
+        debugPrint('[ChatDetail] ℹ️ Video selection cancelled');
         return;
       }
 
@@ -630,7 +645,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         token: token,
       );
 
-      print('[ChatDetail] ✅ Video uploaded: ${uploadedMedia.id}');
+      debugPrint('[ChatDetail] ✅ Video uploaded: ${uploadedMedia.id}');
 
       final chatApiService = ChatApiService(baseUrl: 'http://localhost:8081');
       final mediaPath = '/uploads/media/${uploadedMedia.fileName}';
@@ -641,26 +656,34 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         mediaUrl: mediaPath,
         mediaType: uploadedMedia.mimeType,
       );
-      final decryptedMessage = await MessageEncryptionService.decryptMessage(sentMessage);
+      final decryptedMessage = await MessageEncryptionService.decryptMessage(
+        sentMessage,
+      );
 
-      ref.read(
-        localMessagesProvider(
-          (chatId: widget.chatId, token: token, currentUserId: currentUserIdFromContext()),
-        ).notifier,
-      ).upsertMessage(decryptedMessage);
-      
+      ref
+          .read(
+            localMessagesProvider((
+              chatId: widget.chatId,
+              token: token,
+              currentUserId: currentUserIdFromContext(),
+            )).notifier,
+          )
+          .upsertMessage(decryptedMessage);
+
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Video sent: ${uploadedMedia.originalName ?? uploadedMedia.fileName}'),
+          content: Text(
+            'Video sent: ${uploadedMedia.originalName ?? uploadedMedia.fileName}',
+          ),
           duration: Duration(seconds: 2),
         ),
       );
     } catch (e) {
-      print('[ChatDetail] ❌ Video upload error: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to upload video: $e')),
-      );
+      debugPrint('[ChatDetail] ❌ Video upload error: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to upload video: $e')));
     }
   }
 
@@ -677,7 +700,9 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           _isRecordingAudio = true;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Recording audio... tap the mic again to send')),
+          const SnackBar(
+            content: Text('Recording audio... tap the mic again to send'),
+          ),
         );
         return;
       }
@@ -710,40 +735,44 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         mediaUrl: mediaPath,
         mediaType: uploadedMedia.mimeType,
       );
-      final decryptedMessage = await MessageEncryptionService.decryptMessage(sentMessage);
+      final decryptedMessage = await MessageEncryptionService.decryptMessage(
+        sentMessage,
+      );
 
-      ref.read(
-        localMessagesProvider(
-          (chatId: widget.chatId, token: token, currentUserId: currentUserIdFromContext()),
-        ).notifier,
-      ).upsertMessage(decryptedMessage);
+      ref
+          .read(
+            localMessagesProvider((
+              chatId: widget.chatId,
+              token: token,
+              currentUserId: currentUserIdFromContext(),
+            )).notifier,
+          )
+          .upsertMessage(decryptedMessage);
 
       if (!mounted) {
         return;
       }
 
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Audio message sent')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Audio message sent')));
     } catch (e) {
       if (mounted) {
         setState(() {
           _isRecordingAudio = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to record audio: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to record audio: $e')));
       }
     }
   }
 
   Future<void> _loadNotificationSettings(String token) async {
     try {
-      final isMuted = await ChatNotificationSettingsService.instance.fetchMuteStatus(
-        token: token,
-        chatId: widget.chatId,
-      );
+      final isMuted = await ChatNotificationSettingsService.instance
+          .fetchMuteStatus(token: token, chatId: widget.chatId);
       if (!mounted) {
         return;
       }
@@ -777,7 +806,11 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(nextValue ? 'Chat notifications muted' : 'Chat notifications unmuted'),
+          content: Text(
+            nextValue
+                ? 'Chat notifications muted'
+                : 'Chat notifications unmuted',
+          ),
         ),
       );
     } catch (e) {
@@ -824,22 +857,30 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       token: token,
       currentUserId: currentUserId,
     );
-    _localMessagesNotifier = ref.read(localMessagesProvider(localMessagesKey).notifier);
+    _localMessagesNotifier = ref.read(
+      localMessagesProvider(localMessagesKey).notifier,
+    );
     final messages = ref.watch(localMessagesProvider(localMessagesKey));
 
     // Notify the notifier that this chat is now being viewed - new messages should be auto-read
-    ref.read(
-      localMessagesProvider(
-        (chatId: widget.chatId, token: token, currentUserId: currentUserId),
-      ).notifier,
-    ).setChatBeingViewed(true);
+    ref
+        .read(
+          localMessagesProvider((
+            chatId: widget.chatId,
+            token: token,
+            currentUserId: currentUserId,
+          )).notifier,
+        )
+        .setChatBeingViewed(true);
     _viewerActiveEnabled = true;
 
     // Auto-scroll to bottom when new messages arrive
     ref.listen(
-      localMessagesProvider(
-        (chatId: widget.chatId, token: token, currentUserId: currentUserId),
-      ),
+      localMessagesProvider((
+        chatId: widget.chatId,
+        token: token,
+        currentUserId: currentUserId,
+      )),
       (previous, next) {
         // Only scroll if we actually have new messages
         if (previous != null && next.length > previous.length) {
@@ -863,12 +904,18 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     ref.watch(messageStatusUpdateProvider).whenData((statusUpdate) {
       if (statusUpdate != null) {
         final (:messageId, :newStatus, :chatId) = statusUpdate;
-        print('[ChatDetail] 📡 Status update: $messageId -> $newStatus');
-        
+        debugPrint('[ChatDetail] 📡 Status update: $messageId -> $newStatus');
+
         // Handle status change via notifier
         if (authProvider.token != null) {
-          ref.read(messageStatusNotifierProvider.notifier)
-              .handleStatusChange(messageId, newStatus, chatId: chatId, token: authProvider.token!);
+          ref
+              .read(messageStatusNotifierProvider.notifier)
+              .handleStatusChange(
+                messageId,
+                newStatus,
+                chatId: chatId,
+                token: authProvider.token!,
+              );
         }
       }
     });
@@ -918,9 +965,17 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                 value: 'toggle_mute',
                 child: Row(
                   children: [
-                    Icon(_isChatMuted ? Icons.notifications_active : Icons.notifications_off),
+                    Icon(
+                      _isChatMuted
+                          ? Icons.notifications_active
+                          : Icons.notifications_off,
+                    ),
                     const SizedBox(width: 8),
-                    Text(_isChatMuted ? 'Unmute notifications' : 'Mute notifications'),
+                    Text(
+                      _isChatMuted
+                          ? 'Unmute notifications'
+                          : 'Mute notifications',
+                    ),
                   ],
                 ),
               ),
@@ -941,12 +996,12 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
             builder: (context, ref, child) {
               // Get current user ID
               final currentUserId = authProvider.user?.userId;
-              
+
               // Watch typing users for this chat
               final typingUsers = ref.watch(
                 typingUsersForChatProvider(widget.chatId),
               );
-              
+
               // Filter out current user and map to usernames
               final typingUsernames = typingUsers
                   .where((user) => user.userId != currentUserId)
@@ -964,11 +1019,15 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           MessageInputBox(
             onSend: (text) async {
               // Stop typing indicator when sending
-              ref.read(messageWebSocketProvider.notifier).stopTyping(widget.chatId);
+              ref
+                  .read(messageWebSocketProvider.notifier)
+                  .stopTyping(widget.chatId);
 
               try {
                 // Send message via provider (handles optimistic update automatically)
-                await ref.read(sendMessageProvider.notifier).sendMessage(
+                await ref
+                    .read(sendMessageProvider.notifier)
+                    .sendMessage(
                       chatId: widget.chatId,
                       plaintext: text,
                       token: token,
@@ -977,7 +1036,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
 
                 _scrollToBottom();
               } catch (e) {
-                print('[ChatDetail] Send error: $e');
+                debugPrint('[ChatDetail] Send error: $e');
 
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -995,7 +1054,9 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
               _sendTypingEvent('typing.stop');
             },
             onTypingRefresh: () {
-              _sendTypingEvent('typing.start'); // Refresh by sending start again
+              _sendTypingEvent(
+                'typing.start',
+              ); // Refresh by sending start again
             },
             // Media attachment handlers (T078)
             onImageTap: () {
@@ -1015,7 +1076,12 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   }
 
   /// Build the messages view
-  Widget _buildMessagesView(BuildContext context, List<Message> messages, String token, String currentUserId) {
+  Widget _buildMessagesView(
+    BuildContext context,
+    List<Message> messages,
+    String token,
+    String currentUserId,
+  ) {
     // Combine server messages with local optimistic pending messages (T027)
     // Sort oldest first (natural order) - ListView shows top to bottom
     final allMessages = [...messages]
@@ -1026,17 +1092,19 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.chat_bubble_outline,
-                size: 64, color: Colors.grey[400]),
+            Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey[400]),
             const SizedBox(height: 16),
-            Text('No messages yet',
-                style: Theme.of(context).textTheme.bodyLarge),
+            Text(
+              'No messages yet',
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
             const SizedBox(height: 8),
-            Text('Start a conversation!',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(color: Colors.grey[600])),
+            Text(
+              'Start a conversation!',
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+            ),
           ],
         ),
       );
@@ -1052,15 +1120,16 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       itemCount: allMessages.length,
       itemBuilder: (context, index) {
         final message = allMessages[index];
-        
+
         // Check if this is last message from same sender (show avatar)
-        final isLastFromSender = index == allMessages.length - 1 || 
+        final isLastFromSender =
+            index == allMessages.length - 1 ||
             allMessages[index + 1].senderId != message.senderId;
-        
+
         // Check if this is first message from same sender (show name)
-        final isFirstFromSender = index == 0 || 
-            allMessages[index - 1].senderId != message.senderId;
-        
+        final isFirstFromSender =
+            index == 0 || allMessages[index - 1].senderId != message.senderId;
+
         return MessageBubble(
           key: ValueKey('${message.id}_${message.status}'),
           message: message,

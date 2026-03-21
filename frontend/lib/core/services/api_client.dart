@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -51,22 +53,22 @@ class ApiClient {
       try {
         final isServerHealthy = await isHealthy();
         if (isServerHealthy) {
-          print('[API Client] Backend connected successfully on attempt ${attempt + 1}');
+          debugPrint('[API Client] Backend connected successfully on attempt ${attempt + 1}');
           return true;
         }
       } catch (e) {
-        print('[API Client] Connection attempt ${attempt + 1} failed: $e');
+        debugPrint('[API Client] Connection attempt ${attempt + 1} failed: $e');
       }
 
       // Wait before next retry (except after last attempt)
       if (attempt < maxRetries - 1) {
         final delay = delays[attempt];
-        print('[API Client] Retrying in ${delay}ms...');
+        debugPrint('[API Client] Retrying in ${delay}ms...');
         await Future.delayed(Duration(milliseconds: delay));
       }
     }
 
-    print('[API Client] Failed to connect to backend after $maxRetries attempts');
+    debugPrint('[API Client] Failed to connect to backend after $maxRetries attempts');
     return false;
   }
 
@@ -86,14 +88,14 @@ class ApiClient {
       if (response.statusCode == 200) {
         // Parse JSON response
         // Expected: {"status": "ok", "timestamp": "<ISO8601>", "uptime_ms": <number>}
-        print('[API Client] Backend health check passed');
+        debugPrint('[API Client] Backend health check passed');
         return true;
       } else {
-        print('[API Client] Health check failed with status ${response.statusCode}');
+        debugPrint('[API Client] Health check failed with status ${response.statusCode}');
         return false;
       }
     } catch (e) {
-      print('[API Client] Health check error: $e');
+      debugPrint('[API Client] Health check error: $e');
       return false;
     }
   }

@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/foundation.dart';
 import '../models/chat_model.dart';
 import 'chats_provider.dart';
 import '../services/message_websocket_service.dart';
@@ -56,41 +57,46 @@ final activeChatListProvider = StreamProvider.family<List<Chat>, String>((ref, t
   await for (final event in wsEventStream) {
     if (event.type == WebSocketEventType.messageCreated || event.type == WebSocketEventType.messageStatusChanged) {
       final chatId = event.chatId;
-      // Always fetch the latest message for the affected chat
-      final messages = await apiService.fetchMessages(token: token, chatId: chatId, limit: 1);
-      if (messages.isNotEmpty) {
-        final msg = messages.first;
-        String preview = '';
-        try {
-          preview = utf8.decode(base64Decode(msg.encryptedContent));
-        } catch (_) {
-          preview = '[Encrypted]';
-        }
-        enrichedChats = enrichedChats.map((chat) {
-          if (chat.id == chatId) {
-            return Chat(
-              id: chat.id,
-              participant1Id: chat.participant1Id,
-              participant2Id: chat.participant2Id,
-              isParticipant1Archived: chat.isParticipant1Archived,
-              isParticipant2Archived: chat.isParticipant2Archived,
-              createdAt: chat.createdAt,
-              updatedAt: chat.updatedAt,
-              lastMessagePreview: preview,
-              lastMessageTimestamp: msg.createdAt,
-              lastMessageSenderAvatarUrl: msg.senderId,
-              lastMessageStatus: msg.status,
-            );
+      try {
+        // Always fetch the latest message for the affected chat
+        final messages = await apiService.fetchMessages(token: token, chatId: chatId, limit: 1);
+        if (messages.isNotEmpty) {
+          final msg = messages.first;
+          String preview = '';
+          try {
+            preview = utf8.decode(base64Decode(msg.encryptedContent));
+          } catch (_) {
+            preview = '[Encrypted]';
           }
-          return chat;
-        }).toList();
-        // Re-sort
-        enrichedChats.sort((a, b) {
-          final aTime = a.lastMessageTimestamp ?? a.updatedAt;
-          final bTime = b.lastMessageTimestamp ?? b.updatedAt;
-          return bTime.compareTo(aTime);
-        });
-        yield enrichedChats;
+          enrichedChats = enrichedChats.map((chat) {
+            if (chat.id == chatId) {
+              return Chat(
+                id: chat.id,
+                participant1Id: chat.participant1Id,
+                participant2Id: chat.participant2Id,
+                isParticipant1Archived: chat.isParticipant1Archived,
+                isParticipant2Archived: chat.isParticipant2Archived,
+                createdAt: chat.createdAt,
+                updatedAt: chat.updatedAt,
+                lastMessagePreview: preview,
+                lastMessageTimestamp: msg.createdAt,
+                lastMessageSenderAvatarUrl: msg.senderId,
+                lastMessageStatus: msg.status,
+              );
+            }
+            return chat;
+          }).toList();
+          // Re-sort
+          enrichedChats.sort((a, b) {
+            final aTime = a.lastMessageTimestamp ?? a.updatedAt;
+            final bTime = b.lastMessageTimestamp ?? b.updatedAt;
+            return bTime.compareTo(aTime);
+          });
+          yield enrichedChats;
+        }
+      } catch (e) {
+        // Skip errors (e.g., 403 if user is not a participant in this chat)
+        debugPrint('[ActiveChatListProvider] Error fetching messages for chat $chatId: $e');
       }
     }
   }

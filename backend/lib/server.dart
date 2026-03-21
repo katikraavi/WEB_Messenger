@@ -31,6 +31,12 @@ import 'src/services/websocket_service.dart';
 // Alias for cleaner code
 typedef Connection = PostgreSQLConnection;
 
+bool get _verboseBackendLogs {
+  final value = Platform.environment['VERBOSE_BACKEND_LOGS'];
+  if (value == null) return false;
+  return value.toLowerCase() == '1' || value.toLowerCase() == 'true';
+}
+
 void main() async {
   final port = int.parse(Platform.environment['SERVERPOD_PORT'] ?? '8081');
   final env = Platform.environment['SERVERPOD_ENV'] ?? 'development';
@@ -46,7 +52,8 @@ void main() async {
       int.parse(Platform.environment['DATABASE_PORT'] ?? '5432'),
       Platform.environment['DATABASE_NAME'] ?? 'messenger_db',
       username: Platform.environment['DATABASE_USER'] ?? 'messenger_user',
-      password: Platform.environment['DATABASE_PASSWORD'] ?? 'messenger_password',
+      password:
+          Platform.environment['DATABASE_PASSWORD'] ?? 'messenger_password',
     );
     await dbConnection.open();
     print('[✓] Connected to database successfully');
@@ -82,12 +89,15 @@ void main() async {
     smtpUser: Platform.environment['SMTP_USER'],
     smtpPassword: Platform.environment['SMTP_PASSWORD'],
     smtpSecure:
-        (Platform.environment['SMTP_SECURE'] ?? 'false').toLowerCase() == 'true',
+        (Platform.environment['SMTP_SECURE'] ?? 'false').toLowerCase() ==
+            'true',
   );
   if (Platform.environment['SMTP_HOST'] != null) {
-    print('[✓] Email: SMTP → ${Platform.environment['SMTP_HOST']}:${Platform.environment['SMTP_PORT'] ?? '?'}');
+    print(
+        '[✓] Email: SMTP → ${Platform.environment['SMTP_HOST']}:${Platform.environment['SMTP_PORT'] ?? '?'}');
   } else {
-    print('[INFO] Email: No SMTP configured — tokens returned in API response (dev mode)');
+    print(
+        '[INFO] Email: No SMTP configured — tokens returned in API response (dev mode)');
   }
   for (final warning in emailService.getConfigurationWarnings()) {
     print('[WARNING] Email configuration: $warning');
@@ -108,14 +118,17 @@ void main() async {
   // Initialize encryption service with master key from environment
   final encryptionMasterKey = Platform.environment['ENCRYPTION_MASTER_KEY'];
   late EncryptionService encryptionService;
-  
+
   if (encryptionMasterKey != null && encryptionMasterKey.isNotEmpty) {
-    encryptionService = EncryptionService(masterEncryptionKey: encryptionMasterKey);
+    encryptionService =
+        EncryptionService(masterEncryptionKey: encryptionMasterKey);
     print('[✓] Encryption service initialized with master key');
   } else {
-    print('[WARNING] ENCRYPTION_MASTER_KEY not set - encryption disabled. Set this in production!');
+    print(
+        '[WARNING] ENCRYPTION_MASTER_KEY not set - encryption disabled. Set this in production!');
     // Create dummy service that returns plaintext
-    encryptionService = EncryptionService(masterEncryptionKey: 'default-insecure-key-development-only');
+    encryptionService = EncryptionService(
+        masterEncryptionKey: 'default-insecure-key-development-only');
   }
 
   // Initialize service config for handlers to access services
@@ -130,7 +143,7 @@ void main() async {
 
   // Setup middleware pipeline
   final handler = Pipeline()
-      .addMiddleware(logRequests())
+      .addMiddleware(_logRequestsExceptHealth())
       .addMiddleware(_corsMiddleware())
       .addHandler(_createHandler(
         tokenService,
@@ -143,7 +156,7 @@ void main() async {
       ));
 
   final server = await shelf_io.serve(handler, InternetAddress.anyIPv4, port);
-  
+
   print('╔═══════════════════════════════════════════════════════╗');
   print('║ 🚀 Messenger Backend Started                          ║');
   print('║ Port: ${server.port}                                         ║');
@@ -171,7 +184,7 @@ Handler _createHandler(
     try {
       var path = request.url.path;
       final method = request.method;
-      
+
       // Normalize path - remove leading and trailing slashes
       if (path.startsWith('/')) {
         path = path.substring(1);
@@ -179,12 +192,10 @@ Handler _createHandler(
       if (path.endsWith('/')) {
         path = path.substring(0, path.length - 1);
       }
-      
-      // Debug log
-      print('[DEBUG] Received request: $method /$path (raw: ${request.url.path})');
-      print('[DEBUG] ALL REQUESTS ARE LOGGED HERE! This is the master log!');
-      if (path == 'api/chats/archived') {
-        print('[DEBUG] >>> PATH IS EXACTLY api/chats/archived! <<<');
+
+      if (_verboseBackendLogs) {
+        print(
+            '[DEBUG] Received request: $method /$path (raw: ${request.url.path})');
       }
 
       // Static file serving for /uploads directory
@@ -195,7 +206,10 @@ Handler _createHandler(
       // Health check endpoint (public)
       if (path == 'health' && method == 'GET') {
         return Response.ok(
-          jsonEncode({'status': 'healthy', 'timestamp': DateTime.now().toIso8601String()}),
+          jsonEncode({
+            'status': 'healthy',
+            'timestamp': DateTime.now().toIso8601String()
+          }),
           headers: {'Content-Type': 'application/json'},
         );
       }
@@ -203,7 +217,10 @@ Handler _createHandler(
       // Schema status endpoint (public)
       if (path == 'schema' && method == 'GET') {
         return Response.ok(
-          jsonEncode({'status': 'Schema tables created via migrations: users, chats, chat_members, messages, invites, verification_token, password_reset_token, password_reset_attempt'}),
+          jsonEncode({
+            'status':
+                'Schema tables created via migrations: users, chats, chat_members, messages, invites, verification_token, password_reset_token, password_reset_attempt'
+          }),
           headers: {'Content-Type': 'application/json'},
         );
       }
@@ -306,7 +323,7 @@ Handler _createHandler(
       // Auth endpoints (registration - public)
       if (path == 'auth/register' && method == 'POST') {
         return await _handleRegister(
-          request, database, tokenService, emailService, verificationService);
+            request, database, tokenService, emailService, verificationService);
       }
 
       // Auth endpoints (login - public)
@@ -403,14 +420,18 @@ Handler _createHandler(
 
       // Invite endpoints - simple in-memory implementation for testing
       // GET /api/users/<userId>/invites/pending/count - Get count of pending invites
-      if (path.startsWith('api/users/') && path.contains('/invites/pending/count') && method == 'GET') {
+      if (path.startsWith('api/users/') &&
+          path.contains('/invites/pending/count') &&
+          method == 'GET') {
         print('[InviteHandler] Fetching pending invite count for user');
         try {
           // Verify authorization
           final authHeader = request.headers['authorization'];
           if (authHeader == null || !authHeader.startsWith('Bearer ')) {
-            return Response(401,
-              body: jsonEncode({'error': 'Missing or invalid authorization header'}),
+            return Response(
+              401,
+              body: jsonEncode(
+                  {'error': 'Missing or invalid authorization header'}),
               headers: {'Content-Type': 'application/json'},
             );
           }
@@ -422,10 +443,13 @@ Handler _createHandler(
           // Extract userId from path: api/users/{userId}/invites/pending/count
           final pathParts = path.split('/');
           final userIdIndex = pathParts.indexOf('users') + 1;
-          final userId = userIdIndex > 0 && userIdIndex < pathParts.length ? pathParts[userIdIndex] : null;
-          
+          final userId = userIdIndex > 0 && userIdIndex < pathParts.length
+              ? pathParts[userIdIndex]
+              : null;
+
           if (userId == null) {
-            return Response(400,
+            return Response(
+              400,
               body: jsonEncode({'error': 'User ID not found in path'}),
               headers: {'Content-Type': 'application/json'},
             );
@@ -433,9 +457,13 @@ Handler _createHandler(
 
           // Ensure user can only access their own invite count
           if (authenticatedUserId != userId) {
-            print('[InviteHandler] ⚠️  Unauthorized access attempt: user $authenticatedUserId tried to access count for user $userId');
-            return Response(403,
-              body: jsonEncode({'error': 'Unauthorized - you can only view your own invitations'}),
+            print(
+                '[InviteHandler] ⚠️  Unauthorized access attempt: user $authenticatedUserId tried to access count for user $userId');
+            return Response(
+              403,
+              body: jsonEncode({
+                'error': 'Unauthorized - you can only view your own invitations'
+              }),
               headers: {'Content-Type': 'application/json'},
             );
           }
@@ -448,19 +476,21 @@ Handler _createHandler(
           );
 
           final count = result.isNotEmpty ? result[0][0] as int : 0;
-          
+
           return Response.ok(
             jsonEncode({'count': count}),
             headers: {'Content-Type': 'application/json'},
           );
         } on AuthException catch (e) {
-          return Response(401,
+          return Response(
+            401,
             body: jsonEncode({'error': 'Invalid token'}),
             headers: {'Content-Type': 'application/json'},
           );
         } catch (e) {
           print('[InviteHandler] ❌ Error fetching pending invite count: $e');
-          return Response(400,
+          return Response(
+            400,
             body: jsonEncode({'error': e.toString()}),
             headers: {'Content-Type': 'application/json'},
           );
@@ -468,14 +498,18 @@ Handler _createHandler(
       }
 
       // GET /api/users/<userId>/invites/pending - Get pending invites for user
-      if (path.startsWith('api/users/') && path.contains('/invites/pending') && method == 'GET') {
+      if (path.startsWith('api/users/') &&
+          path.contains('/invites/pending') &&
+          method == 'GET') {
         print('[InviteHandler] Fetching pending invites for user');
         try {
           // Verify authorization
           final authHeader = request.headers['authorization'];
           if (authHeader == null || !authHeader.startsWith('Bearer ')) {
-            return Response(401,
-              body: jsonEncode({'error': 'Missing or invalid authorization header'}),
+            return Response(
+              401,
+              body: jsonEncode(
+                  {'error': 'Missing or invalid authorization header'}),
               headers: {'Content-Type': 'application/json'},
             );
           }
@@ -487,27 +521,35 @@ Handler _createHandler(
           // Extract userId from path: api/users/{userId}/invites/pending
           final pathParts = path.split('/');
           final userIdIndex = pathParts.indexOf('users') + 1;
-          final userId = userIdIndex > 0 && userIdIndex < pathParts.length ? pathParts[userIdIndex] : null;
-          
+          final userId = userIdIndex > 0 && userIdIndex < pathParts.length
+              ? pathParts[userIdIndex]
+              : null;
+
           if (userId == null) {
-            return Response(400,
+            return Response(
+              400,
               body: jsonEncode({'error': 'User ID not found in path'}),
               headers: {'Content-Type': 'application/json'},
             );
           }
 
           // Ensure user can only access their own pending invites
-          print('[InviteHandler] 🔍 DEBUG: authenticatedUserId=$authenticatedUserId, requested userId=$userId');
+          print(
+              '[InviteHandler] 🔍 DEBUG: authenticatedUserId=$authenticatedUserId, requested userId=$userId');
           if (authenticatedUserId != userId) {
-            print('[InviteHandler] ⚠️  Unauthorized access attempt: user $authenticatedUserId tried to access pending invites for user $userId');
-            return Response(403,
-              body: jsonEncode({'error': 'Unauthorized - you can only view your own invitations'}),
+            print(
+                '[InviteHandler] ⚠️  Unauthorized access attempt: user $authenticatedUserId tried to access pending invites for user $userId');
+            return Response(
+              403,
+              body: jsonEncode({
+                'error': 'Unauthorized - you can only view your own invitations'
+              }),
               headers: {'Content-Type': 'application/json'},
             );
           }
 
           print('[InviteHandler] Fetching pending invites for userId: $userId');
-          
+
           // Query pending invites from database (where this user is the receiver)
           // JOIN with both sender AND recipient to get all user info
           final result = await database.query(
@@ -520,49 +562,58 @@ Handler _createHandler(
             substitutionValues: {'userId': userId},
           );
 
-          final invites = result.map((row) => {
-            'id': row[0].toString(),
-            'senderId': row[1].toString(),
-            'senderName': row[2] as String,
-            'senderAvatarUrl': row[3] as String?,
-            'recipientId': row[4].toString(),
-            'recipientName': row[5] as String,
-            'recipientAvatarUrl': row[6] as String?,
-            'status': row[7] as String,
-            'createdAt': (row[8] as DateTime).toIso8601String(),
-            'updatedAt': (row[9] as DateTime?)?.toIso8601String() ?? (row[8] as DateTime).toIso8601String(),
-            'deletedAt': null,
-          }).toList();
+          final invites = result
+              .map((row) => {
+                    'id': row[0].toString(),
+                    'senderId': row[1].toString(),
+                    'senderName': row[2] as String,
+                    'senderAvatarUrl': row[3] as String?,
+                    'recipientId': row[4].toString(),
+                    'recipientName': row[5] as String,
+                    'recipientAvatarUrl': row[6] as String?,
+                    'status': row[7] as String,
+                    'createdAt': (row[8] as DateTime).toIso8601String(),
+                    'updatedAt': (row[9] as DateTime?)?.toIso8601String() ??
+                        (row[8] as DateTime).toIso8601String(),
+                    'deletedAt': null,
+                  })
+              .toList();
 
           print('[InviteHandler] ✅ Fetched ${invites.length} pending invites');
-          
+
           return Response.ok(
             jsonEncode(invites),
             headers: {'Content-Type': 'application/json'},
           );
         } on AuthException catch (e) {
-          return Response(401,
+          return Response(
+            401,
             body: jsonEncode({'error': 'Invalid token'}),
             headers: {'Content-Type': 'application/json'},
           );
         } catch (e) {
           print('[InviteHandler] ❌ Error fetching pending invites: $e');
-          return Response(400,
+          return Response(
+            400,
             body: jsonEncode({'error': e.toString()}),
             headers: {'Content-Type': 'application/json'},
           );
         }
       }
 
-      // GET /api/users/<userId>/invites/sent - Get sent invites for user  
-      if (path.startsWith('api/users/') && path.contains('/invites/sent') && method == 'GET') {
+      // GET /api/users/<userId>/invites/sent - Get sent invites for user
+      if (path.startsWith('api/users/') &&
+          path.contains('/invites/sent') &&
+          method == 'GET') {
         print('[InviteHandler] Fetching sent invites for user');
         try {
           // Verify authorization
           final authHeader = request.headers['authorization'];
           if (authHeader == null || !authHeader.startsWith('Bearer ')) {
-            return Response(401,
-              body: jsonEncode({'error': 'Missing or invalid authorization header'}),
+            return Response(
+              401,
+              body: jsonEncode(
+                  {'error': 'Missing or invalid authorization header'}),
               headers: {'Content-Type': 'application/json'},
             );
           }
@@ -574,10 +625,13 @@ Handler _createHandler(
           // Extract userId from path: api/users/{userId}/invites/sent
           final pathParts = path.split('/');
           final userIdIndex = pathParts.indexOf('users') + 1;
-          final userId = userIdIndex > 0 && userIdIndex < pathParts.length ? pathParts[userIdIndex] : null;
-          
+          final userId = userIdIndex > 0 && userIdIndex < pathParts.length
+              ? pathParts[userIdIndex]
+              : null;
+
           if (userId == null) {
-            return Response(400,
+            return Response(
+              400,
               body: jsonEncode({'error': 'User ID not found in path'}),
               headers: {'Content-Type': 'application/json'},
             );
@@ -585,15 +639,19 @@ Handler _createHandler(
 
           // Ensure user can only access their own sent invites
           if (authenticatedUserId != userId) {
-            print('[InviteHandler] ⚠️  Unauthorized access attempt: user $authenticatedUserId tried to access sent invites for user $userId');
-            return Response(403,
-              body: jsonEncode({'error': 'Unauthorized - you can only view your own invitations'}),
+            print(
+                '[InviteHandler] ⚠️  Unauthorized access attempt: user $authenticatedUserId tried to access sent invites for user $userId');
+            return Response(
+              403,
+              body: jsonEncode({
+                'error': 'Unauthorized - you can only view your own invitations'
+              }),
               headers: {'Content-Type': 'application/json'},
             );
           }
 
           print('[InviteHandler] Fetching sent invites for userId: $userId');
-          
+
           // Query sent invites from database (where this user is the sender)
           // JOIN with sender and recipient user info
           final result = await database.query(
@@ -606,34 +664,39 @@ Handler _createHandler(
             substitutionValues: {'userId': userId},
           );
 
-          final invites = result.map((row) => {
-            'id': row[0].toString(),
-            'senderId': row[1].toString(),
-            'senderName': row[2] as String,
-            'senderAvatarUrl': row[3] as String?,
-            'recipientId': row[4].toString(),
-            'recipientName': row[5] as String,
-            'recipientAvatarUrl': row[6] as String?,
-            'status': row[7] as String,
-            'createdAt': (row[8] as DateTime).toIso8601String(),
-            'updatedAt': (row[9] as DateTime?)?.toIso8601String() ?? (row[8] as DateTime).toIso8601String(),
-            'deletedAt': null,
-          }).toList();
+          final invites = result
+              .map((row) => {
+                    'id': row[0].toString(),
+                    'senderId': row[1].toString(),
+                    'senderName': row[2] as String,
+                    'senderAvatarUrl': row[3] as String?,
+                    'recipientId': row[4].toString(),
+                    'recipientName': row[5] as String,
+                    'recipientAvatarUrl': row[6] as String?,
+                    'status': row[7] as String,
+                    'createdAt': (row[8] as DateTime).toIso8601String(),
+                    'updatedAt': (row[9] as DateTime?)?.toIso8601String() ??
+                        (row[8] as DateTime).toIso8601String(),
+                    'deletedAt': null,
+                  })
+              .toList();
 
           print('[InviteHandler] ✅ Fetched ${invites.length} sent invites');
-          
+
           return Response.ok(
             jsonEncode(invites),
             headers: {'Content-Type': 'application/json'},
           );
         } on AuthException catch (e) {
-          return Response(401,
+          return Response(
+            401,
             body: jsonEncode({'error': 'Invalid token'}),
             headers: {'Content-Type': 'application/json'},
           );
         } catch (e) {
           print('[InviteHandler] ❌ Error fetching sent invites: $e');
-          return Response(400,
+          return Response(
+            400,
             body: jsonEncode({'error': e.toString()}),
             headers: {'Content-Type': 'application/json'},
           );
@@ -646,8 +709,10 @@ Handler _createHandler(
         try {
           final authHeader = request.headers['authorization'];
           if (authHeader == null || !authHeader.startsWith('Bearer ')) {
-            return Response(401,
-              body: jsonEncode({'error': 'Missing or invalid authorization header'}),
+            return Response(
+              401,
+              body: jsonEncode(
+                  {'error': 'Missing or invalid authorization header'}),
               headers: {'Content-Type': 'application/json'},
             );
           }
@@ -657,11 +722,13 @@ Handler _createHandler(
           final payload = JwtService.validateToken(token);
           final senderId = payload.userId;
 
-          final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
+          final body =
+              jsonDecode(await request.readAsString()) as Map<String, dynamic>;
           final recipientId = body['recipientId'] as String?;
-          
+
           if (recipientId == null) {
-            return Response(400,
+            return Response(
+              400,
               body: jsonEncode({'error': 'recipientId is required'}),
               headers: {'Content-Type': 'application/json'},
             );
@@ -674,7 +741,8 @@ Handler _createHandler(
           );
 
           if (senderResult.isEmpty) {
-            return Response(404,
+            return Response(
+              404,
               body: jsonEncode({'error': 'Sender not found'}),
               headers: {'Content-Type': 'application/json'},
             );
@@ -689,7 +757,8 @@ Handler _createHandler(
           );
 
           if (recipientResult.isEmpty) {
-            return Response(404,
+            return Response(
+              404,
               body: jsonEncode({'error': 'Recipient not found'}),
               headers: {'Content-Type': 'application/json'},
             );
@@ -700,12 +769,17 @@ Handler _createHandler(
             '''SELECT id FROM invites 
                WHERE sender_id = @senderId AND receiver_id = @recipientId AND status IN ('pending', 'accepted') 
                LIMIT 1''',
-            substitutionValues: {'senderId': senderId, 'recipientId': recipientId},
+            substitutionValues: {
+              'senderId': senderId,
+              'recipientId': recipientId
+            },
           );
 
           if (pendingInviteCheck.isNotEmpty) {
-            return Response(409,
-              body: jsonEncode({'error': 'Pending invitation already exists to this user'}),
+            return Response(
+              409,
+              body: jsonEncode(
+                  {'error': 'Pending invitation already exists to this user'}),
               headers: {'Content-Type': 'application/json'},
             );
           }
@@ -748,11 +822,16 @@ Handler _createHandler(
             'SELECT username, profile_picture_url FROM users WHERE id = @recipientId',
             substitutionValues: {'recipientId': recipientId},
           );
-          
-          final recipientName = recipientInfoResult.isNotEmpty ? recipientInfoResult[0][0] as String : 'Unknown';
-          final recipientAvatarUrl = recipientInfoResult.isNotEmpty ? recipientInfoResult[0][1] as String? : null;
 
-          return Response(201,
+          final recipientName = recipientInfoResult.isNotEmpty
+              ? recipientInfoResult[0][0] as String
+              : 'Unknown';
+          final recipientAvatarUrl = recipientInfoResult.isNotEmpty
+              ? recipientInfoResult[0][1] as String?
+              : null;
+
+          return Response(
+            201,
             body: jsonEncode({
               'id': inviteId,
               'senderId': senderId,
@@ -769,13 +848,15 @@ Handler _createHandler(
             headers: {'Content-Type': 'application/json'},
           );
         } on AuthException catch (e) {
-          return Response(401,
+          return Response(
+            401,
             body: jsonEncode({'error': 'Invalid token'}),
             headers: {'Content-Type': 'application/json'},
           );
         } catch (e) {
           print('[InviteHandler] ❌ Error sending invite: $e');
-          return Response(400,
+          return Response(
+            400,
             body: jsonEncode({'error': e.toString()}),
             headers: {'Content-Type': 'application/json'},
           );
@@ -783,13 +864,17 @@ Handler _createHandler(
       }
 
       // POST /api/invites/{inviteId}/accept - Accept an invite
-      if (path.contains('api/invites/') && path.endsWith('/accept') && method == 'POST') {
+      if (path.contains('api/invites/') &&
+          path.endsWith('/accept') &&
+          method == 'POST') {
         print('[InviteHandler] Accepting invite');
         try {
           final authHeader = request.headers['authorization'];
           if (authHeader == null || !authHeader.startsWith('Bearer ')) {
-            return Response(401,
-              body: jsonEncode({'error': 'Missing or invalid authorization header'}),
+            return Response(
+              401,
+              body: jsonEncode(
+                  {'error': 'Missing or invalid authorization header'}),
               headers: {'Content-Type': 'application/json'},
             );
           }
@@ -797,8 +882,9 @@ Handler _createHandler(
           final token = authHeader.substring('Bearer '.length);
           final payload = JwtService.validateToken(token);
 
-          final inviteId = path.replaceFirst('api/invites/', '').replaceFirst('/accept', '');
-          
+          final inviteId =
+              path.replaceFirst('api/invites/', '').replaceFirst('/accept', '');
+
           // Fetch full invite record
           final inviteResult = await database.query(
             'SELECT id, sender_id, receiver_id, status, created_at, responded_at FROM invites WHERE id = @inviteId',
@@ -806,7 +892,8 @@ Handler _createHandler(
           );
 
           if (inviteResult.isEmpty) {
-            return Response(404,
+            return Response(
+              404,
               body: jsonEncode({'error': 'Invite not found'}),
               headers: {'Content-Type': 'application/json'},
             );
@@ -814,14 +901,16 @@ Handler _createHandler(
 
           final row = inviteResult[0];
           final senderId = row[1] as String;
-          
+
           // Fetch sender info
           final senderResult = await database.query(
             'SELECT username FROM users WHERE id = @senderId',
             substitutionValues: {'senderId': senderId},
           );
 
-          final senderUsername = senderResult.isNotEmpty ? senderResult[0][0] as String : 'Unknown';
+          final senderUsername = senderResult.isNotEmpty
+              ? senderResult[0][0] as String
+              : 'Unknown';
 
           // Update invite status
           await database.execute(
@@ -834,14 +923,16 @@ Handler _createHandler(
           // Create a chat between the two users
           try {
             final receiverId = row[2] as String;
-            
+
             // Ensure participant_1_id < participant_2_id for consistency
-            final participant1Id = senderId.compareTo(receiverId) < 0 ? senderId : receiverId;
-            final participant2Id = senderId.compareTo(receiverId) < 0 ? receiverId : senderId;
+            final participant1Id =
+                senderId.compareTo(receiverId) < 0 ? senderId : receiverId;
+            final participant2Id =
+                senderId.compareTo(receiverId) < 0 ? receiverId : senderId;
 
             final chatId = const Uuid().v4();
             final now = DateTime.now().toUtc();
-            
+
             // Insert chat or update if already exists
             await database.execute(
               '''INSERT INTO chats 
@@ -859,7 +950,8 @@ Handler _createHandler(
                 'now': now,
               },
             );
-            print('[InviteHandler] ✓ Chat created for accepted invite: $chatId');
+            print(
+                '[InviteHandler] ✓ Chat created for accepted invite: $chatId');
           } catch (e) {
             print('[InviteHandler] ⚠️ Warning: Failed to create chat: $e');
             // Continue - don't fail the whole accept, but log the warning
@@ -880,13 +972,15 @@ Handler _createHandler(
             headers: {'Content-Type': 'application/json'},
           );
         } on AuthException catch (e) {
-          return Response(401,
+          return Response(
+            401,
             body: jsonEncode({'error': 'Invalid token'}),
             headers: {'Content-Type': 'application/json'},
           );
         } catch (e) {
           print('[InviteHandler] ❌ Error accepting invite: $e');
-          return Response(400,
+          return Response(
+            400,
             body: jsonEncode({'error': e.toString()}),
             headers: {'Content-Type': 'application/json'},
           );
@@ -894,13 +988,17 @@ Handler _createHandler(
       }
 
       // POST /api/invites/{inviteId}/decline - Decline an invite
-      if (path.contains('api/invites/') && path.endsWith('/decline') && method == 'POST') {
+      if (path.contains('api/invites/') &&
+          path.endsWith('/decline') &&
+          method == 'POST') {
         print('[InviteHandler] Declining invite');
         try {
           final authHeader = request.headers['authorization'];
           if (authHeader == null || !authHeader.startsWith('Bearer ')) {
-            return Response(401,
-              body: jsonEncode({'error': 'Missing or invalid authorization header'}),
+            return Response(
+              401,
+              body: jsonEncode(
+                  {'error': 'Missing or invalid authorization header'}),
               headers: {'Content-Type': 'application/json'},
             );
           }
@@ -908,8 +1006,10 @@ Handler _createHandler(
           final token = authHeader.substring('Bearer '.length);
           final payload = JwtService.validateToken(token);
 
-          final inviteId = path.replaceFirst('api/invites/', '').replaceFirst('/decline', '');
-          
+          final inviteId = path
+              .replaceFirst('api/invites/', '')
+              .replaceFirst('/decline', '');
+
           // Fetch full invite record
           final inviteResult = await database.query(
             'SELECT id, sender_id, receiver_id, status, created_at, responded_at FROM invites WHERE id = @inviteId',
@@ -917,7 +1017,8 @@ Handler _createHandler(
           );
 
           if (inviteResult.isEmpty) {
-            return Response(404,
+            return Response(
+              404,
               body: jsonEncode({'error': 'Invite not found'}),
               headers: {'Content-Type': 'application/json'},
             );
@@ -925,14 +1026,39 @@ Handler _createHandler(
 
           final row = inviteResult[0];
           final senderId = row[1] as String;
-          
+          final recipientId = row[2] as String;
+          final currentStatus = row[3] as String;
+
+          // Ensure user can only decline their own invites
+          if (payload.userId != recipientId) {
+            return Response(
+              403,
+              body: jsonEncode({
+                'error': 'Unauthorized - you can only decline your own invites'
+              }),
+              headers: {'Content-Type': 'application/json'},
+            );
+          }
+
+          // Can only decline pending invitations
+          if (currentStatus != 'pending') {
+            return Response(
+              400,
+              body:
+                  jsonEncode({'error': 'Can only decline pending invitations'}),
+              headers: {'Content-Type': 'application/json'},
+            );
+          }
+
           // Fetch sender info
           final senderResult = await database.query(
             'SELECT username FROM users WHERE id = @senderId',
             substitutionValues: {'senderId': senderId},
           );
 
-          final senderUsername = senderResult.isNotEmpty ? senderResult[0][0] as String : 'Unknown';
+          final senderUsername = senderResult.isNotEmpty
+              ? senderResult[0][0] as String
+              : 'Unknown';
 
           // Update invite status
           await database.execute(
@@ -948,7 +1074,7 @@ Handler _createHandler(
               'senderId': senderId,
               'senderName': senderUsername,
               'senderAvatarUrl': null,
-              'recipientId': row[2] as String,
+              'recipientId': recipientId,
               'status': 'declined',
               'createdAt': (row[4] as DateTime).toIso8601String(),
               'updatedAt': DateTime.now().toIso8601String(),
@@ -957,13 +1083,15 @@ Handler _createHandler(
             headers: {'Content-Type': 'application/json'},
           );
         } on AuthException catch (e) {
-          return Response(401,
+          return Response(
+            401,
             body: jsonEncode({'error': 'Invalid token'}),
             headers: {'Content-Type': 'application/json'},
           );
         } catch (e) {
           print('[InviteHandler] ❌ Error declining invite: $e');
-          return Response(400,
+          return Response(
+            400,
             body: jsonEncode({'error': e.toString()}),
             headers: {'Content-Type': 'application/json'},
           );
@@ -971,13 +1099,17 @@ Handler _createHandler(
       }
 
       // POST /api/invites/{inviteId}/cancel - Cancel a sent invite
-      if (path.contains('api/invites/') && path.endsWith('/cancel') && method == 'POST') {
+      if (path.contains('api/invites/') &&
+          path.endsWith('/cancel') &&
+          method == 'POST') {
         print('[InviteHandler] Canceling invite');
         try {
           final authHeader = request.headers['authorization'];
           if (authHeader == null || !authHeader.startsWith('Bearer ')) {
-            return Response(401,
-              body: jsonEncode({'error': 'Missing or invalid authorization header'}),
+            return Response(
+              401,
+              body: jsonEncode(
+                  {'error': 'Missing or invalid authorization header'}),
               headers: {'Content-Type': 'application/json'},
             );
           }
@@ -986,8 +1118,9 @@ Handler _createHandler(
           final payload = JwtService.validateToken(token);
           final userId = payload.userId;
 
-          final inviteId = path.replaceFirst('api/invites/', '').replaceFirst('/cancel', '');
-          
+          final inviteId =
+              path.replaceFirst('api/invites/', '').replaceFirst('/cancel', '');
+
           // Fetch full invite record
           final inviteResult = await database.query(
             'SELECT id, sender_id, receiver_id, status, created_at, responded_at, canceled_at FROM invites WHERE id = @inviteId',
@@ -995,7 +1128,8 @@ Handler _createHandler(
           );
 
           if (inviteResult.isEmpty) {
-            return Response(404,
+            return Response(
+              404,
               body: jsonEncode({'error': 'Invite not found'}),
               headers: {'Content-Type': 'application/json'},
             );
@@ -1005,19 +1139,23 @@ Handler _createHandler(
           final senderId = row[1] as String;
           final receiverId = row[2] as String;
           final status = row[3] as String;
-          
+
           // Only sender can cancel
           if (userId != senderId) {
-            return Response(403,
-              body: jsonEncode({'error': 'Only the sender can cancel this invitation'}),
+            return Response(
+              403,
+              body: jsonEncode(
+                  {'error': 'Only the sender can cancel this invitation'}),
               headers: {'Content-Type': 'application/json'},
             );
           }
 
           // Can only cancel pending invitations
           if (status != 'pending') {
-            return Response(400,
-              body: jsonEncode({'error': 'Can only cancel pending invitations'}),
+            return Response(
+              400,
+              body:
+                  jsonEncode({'error': 'Can only cancel pending invitations'}),
               headers: {'Content-Type': 'application/json'},
             );
           }
@@ -1028,7 +1166,9 @@ Handler _createHandler(
             substitutionValues: {'senderId': senderId},
           );
 
-          final senderUsername = senderResult.isNotEmpty ? senderResult[0][0] as String : 'Unknown';
+          final senderUsername = senderResult.isNotEmpty
+              ? senderResult[0][0] as String
+              : 'Unknown';
 
           // Update invite status
           await database.execute(
@@ -1053,14 +1193,96 @@ Handler _createHandler(
             headers: {'Content-Type': 'application/json'},
           );
         } on AuthException catch (e) {
-          return Response(401,
+          return Response(
+            401,
             body: jsonEncode({'error': 'Invalid token'}),
             headers: {'Content-Type': 'application/json'},
           );
         } catch (e) {
           print('[InviteHandler] ❌ Error canceling invite: $e');
-          return Response(400,
+          return Response(
+            400,
             body: jsonEncode({'error': e.toString()}),
+            headers: {'Content-Type': 'application/json'},
+          );
+        }
+      }
+
+      // DELETE /api/chats/{chatId} - Delete a chat (remove connection)
+      if (path.startsWith('api/chats/') &&
+          !path.contains('/messages') &&
+          !path.contains('/notification-settings') &&
+          !path.contains('/archive') &&
+          !path.contains('/unarchive') &&
+          method == 'DELETE') {
+        try {
+          final authHeader = request.headers['authorization'];
+          if (authHeader == null || !authHeader.startsWith('Bearer ')) {
+            return Response(
+              401,
+              body: jsonEncode(
+                  {'error': 'Missing or invalid authorization header'}),
+              headers: {'Content-Type': 'application/json'},
+            );
+          }
+
+          final token = authHeader.substring('Bearer '.length);
+          final payload = JwtService.validateToken(token);
+          final userId = payload.userId;
+
+          // Extract chatId from path: api/chats/{chatId}
+          final chatId = path.replaceFirst('api/chats/', '').split('/').first;
+
+          // Check if user is a participant in the chat
+          final chatResult = await database.query(
+            r'SELECT participant_1_id, participant_2_id FROM chats WHERE id = @chatId',
+            substitutionValues: {'chatId': chatId},
+          );
+
+          if (chatResult.isEmpty) {
+            return Response(
+              404,
+              body: jsonEncode({'error': 'Chat not found'}),
+              headers: {'Content-Type': 'application/json'},
+            );
+          }
+
+          final row = chatResult[0];
+          final participant1 = row[0] as String;
+          final participant2 = row[1] as String;
+
+          if (userId != participant1 && userId != participant2) {
+            return Response(
+              403,
+              body: jsonEncode({
+                'error': 'Unauthorized - you are not a participant in this chat'
+              }),
+              headers: {'Content-Type': 'application/json'},
+            );
+          }
+
+          // Soft-delete: mark chat as archived for this user by setting the appropriate flag
+          // Archive for the user (participant_1 or participant_2)
+          final isParticipant1 = userId == participant1;
+          final archiveColumn = isParticipant1 ? 'is_participant_1_archived' : 'is_participant_2_archived';
+          
+          await database.execute(
+            'UPDATE chats SET $archiveColumn = true WHERE id = @chatId',
+            substitutionValues: {'chatId': chatId},
+          );
+
+          return Response(204);
+        } on AuthException catch (e) {
+          return Response(
+            401,
+            body: jsonEncode({'error': 'Invalid token'}),
+            headers: {'Content-Type': 'application/json'},
+          );
+        } catch (e) {
+          print('[ChatHandler] ❌ Error deleting chat: $e');
+          return Response(
+            500,
+            body: jsonEncode({'error': 'Failed to delete chat: $e'}),
             headers: {'Content-Type': 'application/json'},
           );
         }
@@ -1072,7 +1294,8 @@ Handler _createHandler(
       if (path == 'ws/messages' && method == 'GET') {
         try {
           // Let shelf_web_socket handle the upgrade, pass database for handler to use
-          final wsHandler = WebSocketHandler.createWebSocketHandler(database, request: request);
+          final wsHandler = WebSocketHandler.createWebSocketHandler(database,
+              request: request);
           return await wsHandler(request);
         } catch (e) {
           print('[WebSocket] ❌ Error in WebSocket handler: $e');
@@ -1088,8 +1311,10 @@ Handler _createHandler(
         try {
           final authHeader = request.headers['authorization'];
           if (authHeader == null || !authHeader.startsWith('Bearer ')) {
-            return Response(401,
-              body: jsonEncode({'error': 'Missing or invalid authorization header'}),
+            return Response(
+              401,
+              body: jsonEncode(
+                  {'error': 'Missing or invalid authorization header'}),
               headers: {'Content-Type': 'application/json'},
             );
           }
@@ -1100,7 +1325,7 @@ Handler _createHandler(
 
           // Import ChatHandlers to use
           final chatHandlers = ChatHandlers(database);
-          
+
           // Add userId to request context
           final requestWithContext = request.change(
             context: {...request.context, 'userId': userId},
@@ -1108,13 +1333,15 @@ Handler _createHandler(
 
           return await chatHandlers.getChats(requestWithContext);
         } on AuthException catch (e) {
-          return Response(401,
+          return Response(
+            401,
             body: jsonEncode({'error': 'Invalid token'}),
             headers: {'Content-Type': 'application/json'},
           );
         } catch (e) {
           print('[ChatHandler] ❌ Error fetching chats: $e');
-          return Response(500,
+          return Response(
+            500,
             body: jsonEncode({'error': 'Failed to fetch chats: $e'}),
             headers: {'Content-Type': 'application/json'},
           );
@@ -1122,14 +1349,17 @@ Handler _createHandler(
       }
 
       // GET /api/chats/archived - Fetch archived chats for current user (check BEFORE other /api/chats/* routes)
-      print('[ROUTE CHECK] Testing path for archived: path=$path, method=$method');
       if (path == 'api/chats/archived' && method == 'GET') {
-        print('[ROUTE MATCH] ✅ MATCHED archived chats route!');
+        if (_verboseBackendLogs) {
+          print('[ROUTE MATCH] archived chats route matched');
+        }
         try {
           final authHeader = request.headers['authorization'];
           if (authHeader == null || !authHeader.startsWith('Bearer ')) {
-            return Response(401,
-              body: jsonEncode({'error': 'Missing or invalid authorization header'}),
+            return Response(
+              401,
+              body: jsonEncode(
+                  {'error': 'Missing or invalid authorization header'}),
               headers: {'Content-Type': 'application/json'},
             );
           }
@@ -1149,13 +1379,15 @@ Handler _createHandler(
             headers: {'Content-Type': 'application/json'},
           );
         } on AuthException catch (e) {
-          return Response(401,
+          return Response(
+            401,
             body: jsonEncode({'error': 'Invalid token'}),
             headers: {'Content-Type': 'application/json'},
           );
         } catch (e) {
           print('[ChatHandler] ❌ Error fetching archived chats: $e');
-          return Response(500,
+          return Response(
+            500,
             body: jsonEncode({'error': 'Failed to fetch archived chats: $e'}),
             headers: {'Content-Type': 'application/json'},
           );
@@ -1163,12 +1395,16 @@ Handler _createHandler(
       }
 
       // GET /api/chats/{chatId}/messages - Fetch message history
-      if (path.startsWith('api/chats/') && path.endsWith('/messages') && method == 'GET') {
+      if (path.startsWith('api/chats/') &&
+          path.endsWith('/messages') &&
+          method == 'GET') {
         try {
           final authHeader = request.headers['authorization'];
           if (authHeader == null || !authHeader.startsWith('Bearer ')) {
-            return Response(401,
-              body: jsonEncode({'error': 'Missing or invalid authorization header'}),
+            return Response(
+              401,
+              body: jsonEncode(
+                  {'error': 'Missing or invalid authorization header'}),
               headers: {'Content-Type': 'application/json'},
             );
           }
@@ -1178,11 +1414,12 @@ Handler _createHandler(
           final userId = payload.userId;
 
           // Extract chatId from path: api/chats/{chatId}/messages
-          final chatId = path.replaceFirst('api/chats/', '').replaceFirst('/messages', '');
+          final chatId =
+              path.replaceFirst('api/chats/', '').replaceFirst('/messages', '');
 
           // Import ChatHandlers to use
           final chatHandlers = ChatHandlers(database);
-          
+
           // Add userId to request context
           final requestWithContext = request.change(
             context: {...request.context, 'userId': userId},
@@ -1190,13 +1427,15 @@ Handler _createHandler(
 
           return await chatHandlers.getMessages(requestWithContext, chatId);
         } on AuthException catch (e) {
-          return Response(401,
+          return Response(
+            401,
             body: jsonEncode({'error': 'Invalid token'}),
             headers: {'Content-Type': 'application/json'},
           );
         } catch (e) {
           print('[ChatHandler] ❌ Error fetching messages: $e');
-          return Response(500,
+          return Response(
+            500,
             body: jsonEncode({'error': 'Failed to fetch messages: $e'}),
             headers: {'Content-Type': 'application/json'},
           );
@@ -1204,20 +1443,25 @@ Handler _createHandler(
       }
 
       // POST /api/chats/{chatId}/messages - Send a message (T028-T029)
-      if (path.startsWith('api/chats/') && path.endsWith('/messages') && method == 'POST') {
+      if (path.startsWith('api/chats/') &&
+          path.endsWith('/messages') &&
+          method == 'POST') {
         try {
           // Extract chatId from path: api/chats/{chatId}/messages
-          final chatId = path.replaceFirst('api/chats/', '').replaceFirst('/messages', '');
+          final chatId =
+              path.replaceFirst('api/chats/', '').replaceFirst('/messages', '');
 
           return await MessageHandlers.sendMessage(request, chatId, database);
         } on AuthException catch (e) {
-          return Response(401,
+          return Response(
+            401,
             body: jsonEncode({'error': 'Invalid token'}),
             headers: {'Content-Type': 'application/json'},
           );
         } catch (e) {
           print('[MessageHandler] ❌ Error sending message: $e');
-          return Response(500,
+          return Response(
+            500,
             body: jsonEncode({'error': 'Failed to send message: $e'}),
             headers: {'Content-Type': 'application/json'},
           );
@@ -1225,27 +1469,34 @@ Handler _createHandler(
       }
 
       // PUT /api/chats/{chatId}/messages/{messageId} - Edit a message (T049)
-      if (path.startsWith('api/chats/') && 
-          path.contains('/messages/') && 
+      if (path.startsWith('api/chats/') &&
+          path.contains('/messages/') &&
           !path.endsWith('/status') &&
-          !path.contains('/messages/') && path != path.replaceAll(RegExp(r'/messages/[^/]+$'), '/messages/X') &&
+          !path.contains('/messages/') &&
+          path != path.replaceAll(RegExp(r'/messages/[^/]+$'), '/messages/X') &&
           method == 'PUT') {
         try {
           final parts = path.split('/');
           // Path format: api/chats/{chatId}/messages/{messageId}
-          if (parts.length >= 5 && parts[0] == 'api' && parts[1] == 'chats' && parts[3] == 'messages') {
+          if (parts.length >= 5 &&
+              parts[0] == 'api' &&
+              parts[1] == 'chats' &&
+              parts[3] == 'messages') {
             final chatId = parts[2];
             final messageId = parts[4];
-            return await MessageHandlers.editMessage(request, chatId, messageId, database);
+            return await MessageHandlers.editMessage(
+                request, chatId, messageId, database);
           }
         } on AuthException catch (e) {
-          return Response(401,
+          return Response(
+            401,
             body: jsonEncode({'error': 'Invalid token'}),
             headers: {'Content-Type': 'application/json'},
           );
         } catch (e) {
           print('[MessageHandler] ❌ Error editing message: $e');
-          return Response(500,
+          return Response(
+            500,
             body: jsonEncode({'error': 'Failed to edit message: $e'}),
             headers: {'Content-Type': 'application/json'},
           );
@@ -1253,26 +1504,32 @@ Handler _createHandler(
       }
 
       // DELETE /api/chats/{chatId}/messages/{messageId} - Delete a message (T060)
-      if (path.startsWith('api/chats/') && 
-          path.contains('/messages/') && 
+      if (path.startsWith('api/chats/') &&
+          path.contains('/messages/') &&
           !path.endsWith('/status') &&
           method == 'DELETE') {
         try {
           final parts = path.split('/');
           // Path format: api/chats/{chatId}/messages/{messageId}
-          if (parts.length >= 5 && parts[0] == 'api' && parts[1] == 'chats' && parts[3] == 'messages') {
+          if (parts.length >= 5 &&
+              parts[0] == 'api' &&
+              parts[1] == 'chats' &&
+              parts[3] == 'messages') {
             final chatId = parts[2];
             final messageId = parts[4];
-            return await MessageHandlers.deleteMessage(request, chatId, messageId, database);
+            return await MessageHandlers.deleteMessage(
+                request, chatId, messageId, database);
           }
         } on AuthException catch (e) {
-          return Response(401,
+          return Response(
+            401,
             body: jsonEncode({'error': 'Invalid token'}),
             headers: {'Content-Type': 'application/json'},
           );
         } catch (e) {
           print('[MessageHandler] ❌ Error deleting message: $e');
-          return Response(500,
+          return Response(
+            500,
             body: jsonEncode({'error': 'Failed to delete message: $e'}),
             headers: {'Content-Type': 'application/json'},
           );
@@ -1280,24 +1537,30 @@ Handler _createHandler(
       }
 
       // PUT /api/chats/{chatId}/messages/status - Update message status (T020 - Message Status System)
-      if (path.startsWith('api/chats/') && 
+      if (path.startsWith('api/chats/') &&
           path.endsWith('/messages/status') &&
           method == 'PUT') {
         try {
           final parts = path.split('/');
           // Path format: api/chats/{chatId}/messages/status
-          if (parts.length >= 4 && parts[0] == 'api' && parts[1] == 'chats' && parts[3] == 'messages') {
+          if (parts.length >= 4 &&
+              parts[0] == 'api' &&
+              parts[1] == 'chats' &&
+              parts[3] == 'messages') {
             final chatId = parts[2];
-            return await MessageHandlers.updateMessageStatus(request, chatId, database);
+            return await MessageHandlers.updateMessageStatus(
+                request, chatId, database);
           }
         } on AuthException catch (e) {
-          return Response(401,
+          return Response(
+            401,
             body: jsonEncode({'error': 'Invalid token'}),
             headers: {'Content-Type': 'application/json'},
           );
         } catch (e) {
           print('[MessageHandler] ❌ Error updating message status: $e');
-          return Response(500,
+          return Response(
+            500,
             body: jsonEncode({'error': 'Failed to update message status: $e'}),
             headers: {'Content-Type': 'application/json'},
           );
@@ -1309,13 +1572,15 @@ Handler _createHandler(
         try {
           return await MediaHandlers.uploadMedia(request, database);
         } on AuthException catch (e) {
-          return Response(401,
+          return Response(
+            401,
             body: jsonEncode({'error': 'Invalid token'}),
             headers: {'Content-Type': 'application/json'},
           );
         } catch (e) {
           print('[MediaHandler] ❌ Error uploading media: $e');
-          return Response(500,
+          return Response(
+            500,
             body: jsonEncode({'error': 'Failed to upload media: $e'}),
             headers: {'Content-Type': 'application/json'},
           );
@@ -1323,22 +1588,29 @@ Handler _createHandler(
       }
 
       // GET /api/media/{mediaId}/download - Download a media file (T071)
-      if (path.startsWith('api/media/') && path.contains('/download') && method == 'GET') {
+      if (path.startsWith('api/media/') &&
+          path.contains('/download') &&
+          method == 'GET') {
         try {
           final parts = path.split('/');
           // Path format: api/media/{mediaId}/download
-          if (parts.length >= 4 && parts[0] == 'api' && parts[1] == 'media' && parts[3] == 'download') {
+          if (parts.length >= 4 &&
+              parts[0] == 'api' &&
+              parts[1] == 'media' &&
+              parts[3] == 'download') {
             final mediaId = parts[2];
             return await MediaHandlers.downloadMedia(request, mediaId);
           }
         } on AuthException catch (e) {
-          return Response(401,
+          return Response(
+            401,
             body: jsonEncode({'error': 'Invalid token'}),
             headers: {'Content-Type': 'application/json'},
           );
         } catch (e) {
           print('[MediaHandler] ❌ Error downloading media: $e');
-          return Response(500,
+          return Response(
+            500,
             body: jsonEncode({'error': 'Failed to download media: $e'}),
             headers: {'Content-Type': 'application/json'},
           );
@@ -1346,22 +1618,30 @@ Handler _createHandler(
       }
 
       // PUT /api/messages/{messageId}/attach-media - Attach media to a message (T072)
-      if (path.startsWith('api/messages/') && path.contains('/attach-media') && method == 'PUT') {
+      if (path.startsWith('api/messages/') &&
+          path.contains('/attach-media') &&
+          method == 'PUT') {
         try {
           final parts = path.split('/');
           // Path format: api/messages/{messageId}/attach-media
-          if (parts.length >= 4 && parts[0] == 'api' && parts[1] == 'messages' && parts[3] == 'attach-media') {
+          if (parts.length >= 4 &&
+              parts[0] == 'api' &&
+              parts[1] == 'messages' &&
+              parts[3] == 'attach-media') {
             final messageId = parts[2];
-            return await MediaHandlers.attachMediaToMessage(request, messageId, database);
+            return await MediaHandlers.attachMediaToMessage(
+                request, messageId, database);
           }
         } on AuthException catch (e) {
-          return Response(401,
+          return Response(
+            401,
             body: jsonEncode({'error': 'Invalid token'}),
             headers: {'Content-Type': 'application/json'},
           );
         } catch (e) {
           print('[MediaHandler] ❌ Error attaching media: $e');
-          return Response(500,
+          return Response(
+            500,
             body: jsonEncode({'error': 'Failed to attach media: $e'}),
             headers: {'Content-Type': 'application/json'},
           );
@@ -1373,20 +1653,24 @@ Handler _createHandler(
         try {
           final authHeader = request.headers['authorization'];
           if (authHeader == null || !authHeader.startsWith('Bearer ')) {
-            return Response(401,
-              body: jsonEncode({'error': 'Missing or invalid authorization header'}),
+            return Response(
+              401,
+              body: jsonEncode(
+                  {'error': 'Missing or invalid authorization header'}),
               headers: {'Content-Type': 'application/json'},
             );
           }
 
           final token = authHeader.substring('Bearer '.length);
           final payload = JwtService.validateToken(token);
-          final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
+          final body =
+              jsonDecode(await request.readAsString()) as Map<String, dynamic>;
           final deviceToken = body['token'] as String?;
           final platform = body['platform'] as String?;
 
           if (deviceToken == null || deviceToken.isEmpty) {
-            return Response(400,
+            return Response(
+              400,
               body: jsonEncode({'error': 'token is required'}),
               headers: {'Content-Type': 'application/json'},
             );
@@ -1401,12 +1685,14 @@ Handler _createHandler(
 
           return Response(204);
         } on AuthException {
-          return Response(401,
+          return Response(
+            401,
             body: jsonEncode({'error': 'Invalid token'}),
             headers: {'Content-Type': 'application/json'},
           );
         } catch (e) {
-          return Response(500,
+          return Response(
+            500,
             body: jsonEncode({'error': 'Failed to register device token: $e'}),
             headers: {'Content-Type': 'application/json'},
           );
@@ -1418,8 +1704,10 @@ Handler _createHandler(
         try {
           final authHeader = request.headers['authorization'];
           if (authHeader == null || !authHeader.startsWith('Bearer ')) {
-            return Response(401,
-              body: jsonEncode({'error': 'Missing or invalid authorization header'}),
+            return Response(
+              401,
+              body: jsonEncode(
+                  {'error': 'Missing or invalid authorization header'}),
               headers: {'Content-Type': 'application/json'},
             );
           }
@@ -1427,19 +1715,22 @@ Handler _createHandler(
           final token = authHeader.substring('Bearer '.length);
           final payload = JwtService.validateToken(token);
           final chatService = ChatService(database);
-          final mutedChatIds = await chatService.getMutedChatIds(payload.userId);
+          final mutedChatIds =
+              await chatService.getMutedChatIds(payload.userId);
 
           return Response.ok(
             jsonEncode({'chat_ids': mutedChatIds}),
             headers: {'Content-Type': 'application/json'},
           );
         } on AuthException {
-          return Response(401,
+          return Response(
+            401,
             body: jsonEncode({'error': 'Invalid token'}),
             headers: {'Content-Type': 'application/json'},
           );
         } catch (e) {
-          return Response(500,
+          return Response(
+            500,
             body: jsonEncode({'error': 'Failed to fetch muted chats: $e'}),
             headers: {'Content-Type': 'application/json'},
           );
@@ -1447,19 +1738,25 @@ Handler _createHandler(
       }
 
       // GET /api/chats/{chatId}/notification-settings - Fetch per-chat notification preferences.
-      if (path.startsWith('api/chats/') && path.endsWith('/notification-settings') && method == 'GET') {
+      if (path.startsWith('api/chats/') &&
+          path.endsWith('/notification-settings') &&
+          method == 'GET') {
         try {
           final authHeader = request.headers['authorization'];
           if (authHeader == null || !authHeader.startsWith('Bearer ')) {
-            return Response(401,
-              body: jsonEncode({'error': 'Missing or invalid authorization header'}),
+            return Response(
+              401,
+              body: jsonEncode(
+                  {'error': 'Missing or invalid authorization header'}),
               headers: {'Content-Type': 'application/json'},
             );
           }
 
           final token = authHeader.substring('Bearer '.length);
           final payload = JwtService.validateToken(token);
-          final chatId = path.replaceFirst('api/chats/', '').replaceFirst('/notification-settings', '');
+          final chatId = path
+              .replaceFirst('api/chats/', '')
+              .replaceFirst('/notification-settings', '');
           final chatService = ChatService(database);
           final isMuted = await chatService.isChatMuted(chatId, payload.userId);
 
@@ -1468,68 +1765,87 @@ Handler _createHandler(
             headers: {'Content-Type': 'application/json'},
           );
         } on AuthException {
-          return Response(401,
+          return Response(
+            401,
             body: jsonEncode({'error': 'Invalid token'}),
             headers: {'Content-Type': 'application/json'},
           );
         } catch (e) {
-          return Response(500,
-            body: jsonEncode({'error': 'Failed to fetch notification settings: $e'}),
+          return Response(
+            500,
+            body: jsonEncode(
+                {'error': 'Failed to fetch notification settings: $e'}),
             headers: {'Content-Type': 'application/json'},
           );
         }
       }
 
       // PUT /api/chats/{chatId}/notification-settings - Update per-chat notification preferences.
-      if (path.startsWith('api/chats/') && path.endsWith('/notification-settings') && method == 'PUT') {
+      if (path.startsWith('api/chats/') &&
+          path.endsWith('/notification-settings') &&
+          method == 'PUT') {
         try {
           final authHeader = request.headers['authorization'];
           if (authHeader == null || !authHeader.startsWith('Bearer ')) {
-            return Response(401,
-              body: jsonEncode({'error': 'Missing or invalid authorization header'}),
+            return Response(
+              401,
+              body: jsonEncode(
+                  {'error': 'Missing or invalid authorization header'}),
               headers: {'Content-Type': 'application/json'},
             );
           }
 
           final token = authHeader.substring('Bearer '.length);
           final payload = JwtService.validateToken(token);
-          final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
+          final body =
+              jsonDecode(await request.readAsString()) as Map<String, dynamic>;
           final isMuted = body['is_muted'] as bool?;
           if (isMuted == null) {
-            return Response(400,
+            return Response(
+              400,
               body: jsonEncode({'error': 'is_muted is required'}),
               headers: {'Content-Type': 'application/json'},
             );
           }
 
-          final chatId = path.replaceFirst('api/chats/', '').replaceFirst('/notification-settings', '');
+          final chatId = path
+              .replaceFirst('api/chats/', '')
+              .replaceFirst('/notification-settings', '');
           final chatService = ChatService(database);
-          final updated = await chatService.setChatMuted(chatId, payload.userId, isMuted);
+          final updated =
+              await chatService.setChatMuted(chatId, payload.userId, isMuted);
 
           return Response.ok(
             jsonEncode({'chat_id': chatId, 'is_muted': updated}),
             headers: {'Content-Type': 'application/json'},
           );
         } on AuthException {
-          return Response(401,
+          return Response(
+            401,
             body: jsonEncode({'error': 'Invalid token'}),
             headers: {'Content-Type': 'application/json'},
           );
         } catch (e) {
-          return Response(500,
-            body: jsonEncode({'error': 'Failed to update notification settings: $e'}),
+          return Response(
+            500,
+            body: jsonEncode(
+                {'error': 'Failed to update notification settings: $e'}),
             headers: {'Content-Type': 'application/json'},
           );
         }
       }
 
       // PUT /api/chats/{chatId}/archive - Archive a chat for current user
-      if (path.startsWith('api/chats/') && path.endsWith('/archive') && method == 'PUT') {
+      if (path.startsWith('api/chats/') &&
+          path.endsWith('/archive') &&
+          method == 'PUT') {
         try {
           final authHeader = request.headers['authorization'];
           if (authHeader == null || !authHeader.startsWith('Bearer ')) {
-            return Response(401,
-              body: jsonEncode({'error': 'Missing or invalid authorization header'}),
+            return Response(
+              401,
+              body: jsonEncode(
+                  {'error': 'Missing or invalid authorization header'}),
               headers: {'Content-Type': 'application/json'},
             );
           }
@@ -1539,7 +1855,8 @@ Handler _createHandler(
           final userId = payload.userId;
 
           // Extract chatId from path: api/chats/{chatId}/archive
-          final chatId = path.replaceFirst('api/chats/', '').replaceFirst('/archive', '');
+          final chatId =
+              path.replaceFirst('api/chats/', '').replaceFirst('/archive', '');
 
           final chatService = ChatService(database);
           final updated = await chatService.archiveChat(chatId, userId);
@@ -1549,13 +1866,15 @@ Handler _createHandler(
             headers: {'Content-Type': 'application/json'},
           );
         } on AuthException catch (e) {
-          return Response(401,
+          return Response(
+            401,
             body: jsonEncode({'error': 'Invalid token'}),
             headers: {'Content-Type': 'application/json'},
           );
         } catch (e) {
           print('[ChatHandler] ❌ Error archiving chat: $e');
-          return Response(500,
+          return Response(
+            500,
             body: jsonEncode({'error': 'Failed to archive chat: $e'}),
             headers: {'Content-Type': 'application/json'},
           );
@@ -1563,12 +1882,16 @@ Handler _createHandler(
       }
 
       // PUT /api/chats/{chatId}/unarchive - Unarchive a chat for current user
-      if (path.startsWith('api/chats/') && path.endsWith('/unarchive') && method == 'PUT') {
+      if (path.startsWith('api/chats/') &&
+          path.endsWith('/unarchive') &&
+          method == 'PUT') {
         try {
           final authHeader = request.headers['authorization'];
           if (authHeader == null || !authHeader.startsWith('Bearer ')) {
-            return Response(401,
-              body: jsonEncode({'error': 'Missing or invalid authorization header'}),
+            return Response(
+              401,
+              body: jsonEncode(
+                  {'error': 'Missing or invalid authorization header'}),
               headers: {'Content-Type': 'application/json'},
             );
           }
@@ -1578,7 +1901,9 @@ Handler _createHandler(
           final userId = payload.userId;
 
           // Extract chatId from path: api/chats/{chatId}/unarchive
-          final chatId = path.replaceFirst('api/chats/', '').replaceFirst('/unarchive', '');
+          final chatId = path
+              .replaceFirst('api/chats/', '')
+              .replaceFirst('/unarchive', '');
 
           final chatService = ChatService(database);
           final updated = await chatService.unarchiveChat(chatId, userId);
@@ -1588,13 +1913,15 @@ Handler _createHandler(
             headers: {'Content-Type': 'application/json'},
           );
         } on AuthException catch (e) {
-          return Response(401,
+          return Response(
+            401,
             body: jsonEncode({'error': 'Invalid token'}),
             headers: {'Content-Type': 'application/json'},
           );
         } catch (e) {
           print('[ChatHandler] ❌ Error unarchiving chat: $e');
-          return Response(500,
+          return Response(
+            500,
             body: jsonEncode({'error': 'Failed to unarchive chat: $e'}),
             headers: {'Content-Type': 'application/json'},
           );
@@ -1609,10 +1936,26 @@ Handler _createHandler(
       print('[ERROR] Request handler error: $e');
       print('[ERROR] Stack: $st');
       return Response.internalServerError(
-        body: jsonEncode({'error': 'Internal server error', 'message': e.toString()}),
+        body: jsonEncode(
+            {'error': 'Internal server error', 'message': e.toString()}),
         headers: {'Content-Type': 'application/json'},
       );
     }
+  };
+}
+
+/// Logging middleware that skips health checks to reduce log noise
+Middleware _logRequestsExceptHealth() {
+  return (Handler innerHandler) {
+    return (Request request) async {
+      final path = request.url.path;
+      // Skip logging for health checks
+      if (path == '/health' || path == 'health') {
+        return await innerHandler(request);
+      }
+      // Log other requests
+      return await logRequests()(innerHandler)(request);
+    };
   };
 }
 
@@ -1644,8 +1987,6 @@ Middleware _corsMiddleware() {
   };
 }
 
-
-
 /// Handle POST /auth/register
 Future<Response> _handleRegister(
   Request request,
@@ -1659,26 +2000,39 @@ Future<Response> _handleRegister(
   final email = (body['email'] as String?).toString().toLowerCase();
   final username = body['username'] as String?;
   final password = body['password'] as String?;
-  print('[Register] Incoming registration request: email=$email, username=$username');
+  print(
+      '[Register] Incoming registration request: email=$email, username=$username');
   try {
     // ...existing code...
 
     // Validate required fields
     if (email.isEmpty) {
-      return Response(400,
-        body: jsonEncode({'error': 'Validation failed', 'details': ['Email is required']}),
+      return Response(
+        400,
+        body: jsonEncode({
+          'error': 'Validation failed',
+          'details': ['Email is required']
+        }),
         headers: {'Content-Type': 'application/json'},
       );
     }
     if (username?.isEmpty ?? true) {
-      return Response(400,
-        body: jsonEncode({'error': 'Validation failed', 'details': ['Username is required']}),
+      return Response(
+        400,
+        body: jsonEncode({
+          'error': 'Validation failed',
+          'details': ['Username is required']
+        }),
         headers: {'Content-Type': 'application/json'},
       );
     }
     if (password?.isEmpty ?? true) {
-      return Response(400,
-        body: jsonEncode({'error': 'Validation failed', 'details': ['Password is required']}),
+      return Response(
+        400,
+        body: jsonEncode({
+          'error': 'Validation failed',
+          'details': ['Password is required']
+        }),
         headers: {'Content-Type': 'application/json'},
       );
     }
@@ -1686,8 +2040,10 @@ Future<Response> _handleRegister(
     // Validate password strength
     final passwordErrors = _validatePasswordStrength(password!);
     if (passwordErrors.isNotEmpty) {
-      return Response(400,
-        body: jsonEncode({'error': 'Password validation failed', 'details': passwordErrors}),
+      return Response(
+        400,
+        body: jsonEncode(
+            {'error': 'Password validation failed', 'details': passwordErrors}),
         headers: {'Content-Type': 'application/json'},
       );
     }
@@ -1697,10 +2053,12 @@ Future<Response> _handleRegister(
       'SELECT email FROM "users" WHERE email = @email',
       substitutionValues: {'email': email},
     );
-    print('[Register] Email check results: ${emailCheck.map((row) => row.toColumnMap()).toList()}');
+    print(
+        '[Register] Email check results: ${emailCheck.map((row) => row.toColumnMap()).toList()}');
     if (emailCheck.isNotEmpty) {
       print('[Register] Email already registered: $email');
-      return Response(409,
+      return Response(
+        409,
         body: jsonEncode({'error': 'Email already registered'}),
         headers: {'Content-Type': 'application/json'},
       );
@@ -1710,17 +2068,20 @@ Future<Response> _handleRegister(
       'SELECT username FROM "users" WHERE username = @username',
       substitutionValues: {'username': username},
     );
-    print('[Register] Username check results: ${usernameCheck.map((row) => row.toColumnMap()).toList()}');
+    print(
+        '[Register] Username check results: ${usernameCheck.map((row) => row.toColumnMap()).toList()}');
     if (usernameCheck.isNotEmpty) {
       print('[Register] Username already taken: $username');
-      return Response(409,
+      return Response(
+        409,
         body: jsonEncode({'error': 'Username already taken'}),
         headers: {'Content-Type': 'application/json'},
       );
     }
     final passwordHash = _hashPassword(password!);
     final userId = const Uuid().v4(); // Just UUID, no prefix
-    print('[Register] Creating new user: email=$email, username=$username, userId=$userId');
+    print(
+        '[Register] Creating new user: email=$email, username=$username, userId=$userId');
 
     // Insert user into database
     await database.execute(
@@ -1741,28 +2102,44 @@ Future<Response> _handleRegister(
     // Auto-send verification email
     String? devToken;
     try {
-      final token = await verificationService
-          .createVerificationToken(userId)
-          .timeout(
-            const Duration(seconds: 3),
-            onTimeout: () => throw TimeoutException(
-              'Verification token creation timed out',
-            ),
-          );
-      final appBaseUrl = Platform.environment['APP_BASE_URL'] ?? 'http://localhost:8081';
-      final verificationLink = '$appBaseUrl/auth/verify-email/confirm?token=$token';
+      final token =
+          await verificationService.createVerificationToken(userId).timeout(
+                const Duration(seconds: 3),
+                onTimeout: () => throw TimeoutException(
+                  'Verification token creation timed out',
+                ),
+              );
+      final appBaseUrl =
+          Platform.environment['APP_BASE_URL'] ?? 'http://localhost:8081';
+      final verificationLink =
+          '$appBaseUrl/auth/verify-email/confirm?token=$token';
       final emailMsg = emailService.buildVerificationEmail(
         recipientEmail: email,
         recipientName: username!,
         verificationLink: verificationLink,
         expiresIn: '24 hours',
-        registeredAt: DateTime.now().toUtc().toString().substring(0, 19).replaceAll('T', ' ') + ' UTC',
+        registeredAt: DateTime.now()
+                .toUtc()
+                .toString()
+                .substring(0, 19)
+                .replaceAll('T', ' ') +
+            ' UTC',
       );
       devToken = token; // kept for dev response
       await emailService.sendEmail(emailMsg);
       print('[Register] Verification email dispatched to $email');
     } catch (emailErr) {
       print('[Register][WARNING] Could not send verification email: $emailErr');
+      // Ensure account is not left behind when verification cannot be delivered.
+      try {
+        await database.execute(
+          'DELETE FROM "users" WHERE id = @id',
+          substitutionValues: {'id': userId},
+        );
+      } catch (cleanupErr) {
+        print(
+            '[Register][WARNING] Failed to rollback user after email failure: $cleanupErr');
+      }
       return Response(
         502,
         body: jsonEncode({
@@ -1785,14 +2162,16 @@ Future<Response> _handleRegister(
           'Development mode: use this token with POST /auth/verify-email/confirm {"token":"..."}';
     }
 
-    return Response(201,
+    return Response(
+      201,
       body: jsonEncode(responseBody),
       headers: {'Content-Type': 'application/json'},
     );
   } catch (e, st) {
     print('[ERROR] Registration error: $e');
     print('[ERROR] Stack: $st');
-    return Response(500,
+    return Response(
+      500,
       body: jsonEncode({'error': 'Server error - please try again later'}),
       headers: {'Content-Type': 'application/json'},
     );
@@ -1802,20 +2181,29 @@ Future<Response> _handleRegister(
 /// Handle POST /auth/login
 Future<Response> _handleLogin(Request request, Connection database) async {
   try {
-    final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
+    final body =
+        jsonDecode(await request.readAsString()) as Map<String, dynamic>;
 
     final email = (body['email'] as String?).toString().toLowerCase();
     final password = body['password'] as String?;
 
     if (email.isEmpty) {
-      return Response(400,
-        body: jsonEncode({'error': 'Validation failed', 'details': ['Email is required']}),
+      return Response(
+        400,
+        body: jsonEncode({
+          'error': 'Validation failed',
+          'details': ['Email is required']
+        }),
         headers: {'Content-Type': 'application/json'},
       );
     }
     if (password?.isEmpty ?? true) {
-      return Response(400,
-        body: jsonEncode({'error': 'Validation failed', 'details': ['Password is required']}),
+      return Response(
+        400,
+        body: jsonEncode({
+          'error': 'Validation failed',
+          'details': ['Password is required']
+        }),
         headers: {'Content-Type': 'application/json'},
       );
     }
@@ -1827,7 +2215,8 @@ Future<Response> _handleLogin(Request request, Connection database) async {
     );
 
     if (result.isEmpty) {
-      return Response(401,
+      return Response(
+        401,
         body: jsonEncode({'error': 'Invalid email or password'}),
         headers: {'Content-Type': 'application/json'},
       );
@@ -1835,10 +2224,11 @@ Future<Response> _handleLogin(Request request, Connection database) async {
 
     final user = result.first.toColumnMap();
     final storedHash = user['password_hash'] as String;
-    
+
     // Verify password
     if (!_verifyPassword(password!, storedHash)) {
-      return Response(401,
+      return Response(
+        401,
         body: jsonEncode({'error': 'Invalid email or password'}),
         headers: {'Content-Type': 'application/json'},
       );
@@ -1846,8 +2236,12 @@ Future<Response> _handleLogin(Request request, Connection database) async {
 
     final emailVerified = user['email_verified'] as bool? ?? false;
     if (!emailVerified) {
-      return Response(403,
-        body: jsonEncode({'error': 'Email not verified. Please verify your email before logging in.'}),
+      return Response(
+        403,
+        body: jsonEncode({
+          'error':
+              'Email not verified. Please verify your email before logging in.'
+        }),
         headers: {'Content-Type': 'application/json'},
       );
     }
@@ -1868,7 +2262,8 @@ Future<Response> _handleLogin(Request request, Connection database) async {
   } catch (e, st) {
     print('[ERROR] Login error: $e');
     print('[ERROR] Stack: $st');
-    return Response(500,
+    return Response(
+      500,
       body: jsonEncode({'error': 'Server error - please try again later'}),
       headers: {'Content-Type': 'application/json'},
     );
@@ -1876,11 +2271,13 @@ Future<Response> _handleLogin(Request request, Connection database) async {
 }
 
 /// Handle GET /auth/me (protected)
-Future<Response> _handleValidateSession(Request request, Connection database) async {
+Future<Response> _handleValidateSession(
+    Request request, Connection database) async {
   try {
     final authHeader = request.headers['authorization'];
     if (authHeader == null || !authHeader.startsWith('Bearer ')) {
-      return Response(401,
+      return Response(
+        401,
         body: jsonEncode({'error': 'Missing or invalid authorization header'}),
         headers: {'Content-Type': 'application/json'},
       );
@@ -1897,7 +2294,8 @@ Future<Response> _handleValidateSession(Request request, Connection database) as
       );
 
       if (result.isEmpty) {
-        return Response(401,
+        return Response(
+          401,
           body: jsonEncode({'error': 'Invalid token'}),
           headers: {'Content-Type': 'application/json'},
         );
@@ -1906,7 +2304,8 @@ Future<Response> _handleValidateSession(Request request, Connection database) as
       final userRow = result.first.toColumnMap();
       final emailVerified = userRow['email_verified'] as bool? ?? false;
       if (!emailVerified) {
-        return Response(401,
+        return Response(
+          401,
           body: jsonEncode({'error': 'Email not verified'}),
           headers: {'Content-Type': 'application/json'},
         );
@@ -1921,14 +2320,16 @@ Future<Response> _handleValidateSession(Request request, Connection database) as
         headers: {'Content-Type': 'application/json'},
       );
     } on AuthException catch (e) {
-      return Response(401,
+      return Response(
+        401,
         body: jsonEncode({'error': 'Invalid token'}),
         headers: {'Content-Type': 'application/json'},
       );
     }
   } catch (e) {
     print('[ERROR] Session validation error: $e');
-    return Response(500,
+    return Response(
+      500,
       body: jsonEncode({'error': 'Server error'}),
       headers: {'Content-Type': 'application/json'},
     );
@@ -1940,7 +2341,8 @@ Future<Response> _handleLogout(Request request) async {
   try {
     final authHeader = request.headers['authorization'];
     if (authHeader == null || !authHeader.startsWith('Bearer ')) {
-      return Response(401,
+      return Response(
+        401,
         body: jsonEncode({'error': 'Not authenticated'}),
         headers: {'Content-Type': 'application/json'},
       );
@@ -1951,7 +2353,8 @@ Future<Response> _handleLogout(Request request) async {
       headers: {'Content-Type': 'application/json'},
     );
   } catch (e) {
-    return Response(500,
+    return Response(
+      500,
       body: jsonEncode({'error': 'Server error'}),
       headers: {'Content-Type': 'application/json'},
     );
@@ -1961,21 +2364,24 @@ Future<Response> _handleLogout(Request request) async {
 /// Validate password strength
 List<String> _validatePasswordStrength(String password) {
   final errors = <String>[];
-  
+
   if (password.length < 8) errors.add('Password must be at least 8 characters');
-  if (!password.contains(RegExp(r'[a-z]'))) errors.add('Password must contain a lowercase letter');
-  if (!password.contains(RegExp(r'[A-Z]'))) errors.add('Password must contain an uppercase letter');
-  if (!password.contains(RegExp(r'[0-9]'))) errors.add('Password must contain a digit');
-  if (!password.contains(RegExp(r'[!@#\$%^&*(),.?":{}|<>]'))) errors.add('Password must contain a special character');
-  
+  if (!password.contains(RegExp(r'[a-z]')))
+    errors.add('Password must contain a lowercase letter');
+  if (!password.contains(RegExp(r'[A-Z]')))
+    errors.add('Password must contain an uppercase letter');
+  if (!password.contains(RegExp(r'[0-9]')))
+    errors.add('Password must contain a digit');
+  if (!password.contains(RegExp(r'[!@#\$%^&*(),.?":{}|<>]')))
+    errors.add('Password must contain a special character');
+
   return errors;
 }
 
-
-
 /// Handle search by username (mock implementation)
 /// Handle search by username (real database query)
-Future<Response> _handleSearchByUsername(Request request, Connection database) async {
+Future<Response> _handleSearchByUsername(
+    Request request, Connection database) async {
   try {
     // Check authentication and validate JWT token
     final authHeader = request.headers['authorization'];
@@ -2013,7 +2419,8 @@ Future<Response> _handleSearchByUsername(Request request, Connection database) a
         limit = int.parse(request.url.queryParameters['limit']!);
       } catch (e) {
         return Response.badRequest(
-          body: jsonEncode({'error': 'Invalid limit parameter: must be an integer'}),
+          body: jsonEncode(
+              {'error': 'Invalid limit parameter: must be an integer'}),
           headers: {'Content-Type': 'application/json'},
         );
       }
@@ -2029,7 +2436,8 @@ Future<Response> _handleSearchByUsername(Request request, Connection database) a
     }
     if (trimmed.length > 100) {
       return Response.badRequest(
-        body: jsonEncode({'error': 'Search query cannot exceed 100 characters'}),
+        body:
+            jsonEncode({'error': 'Search query cannot exceed 100 characters'}),
         headers: {'Content-Type': 'application/json'},
       );
     }
@@ -2078,7 +2486,8 @@ Future<Response> _handleSearchByUsername(Request request, Connection database) a
 }
 
 /// Handle search by email (real database query)
-Future<Response> _handleSearchByEmail(Request request, Connection database) async {
+Future<Response> _handleSearchByEmail(
+    Request request, Connection database) async {
   try {
     // Check authentication and validate JWT token
     final authHeader = request.headers['authorization'];
@@ -2116,7 +2525,8 @@ Future<Response> _handleSearchByEmail(Request request, Connection database) asyn
         limit = int.parse(request.url.queryParameters['limit']!);
       } catch (e) {
         return Response.badRequest(
-          body: jsonEncode({'error': 'Invalid limit parameter: must be an integer'}),
+          body: jsonEncode(
+              {'error': 'Invalid limit parameter: must be an integer'}),
           headers: {'Content-Type': 'application/json'},
         );
       }
@@ -2126,20 +2536,24 @@ Future<Response> _handleSearchByEmail(Request request, Connection database) asyn
     final trimmed = query.trim();
     if (trimmed.length < 2) {
       return Response.badRequest(
-        body: jsonEncode({'error': 'Search query must be at least 2 characters'}),
+        body:
+            jsonEncode({'error': 'Search query must be at least 2 characters'}),
         headers: {'Content-Type': 'application/json'},
       );
     }
     // Allow partial email searches - just need @ or . (e.g., "alice.", "alice@", "alice.smith")
     if (!trimmed.contains('@') && !trimmed.contains('.')) {
       return Response.badRequest(
-        body: jsonEncode({'error': 'Email search must contain @ or . for email-like queries'}),
+        body: jsonEncode({
+          'error': 'Email search must contain @ or . for email-like queries'
+        }),
         headers: {'Content-Type': 'application/json'},
       );
     }
     if (trimmed.length > 100) {
       return Response.badRequest(
-        body: jsonEncode({'error': 'Search query cannot exceed 100 characters'}),
+        body:
+            jsonEncode({'error': 'Search query cannot exceed 100 characters'}),
         headers: {'Content-Type': 'application/json'},
       );
     }
@@ -2211,10 +2625,10 @@ Response _serveStaticFile(Request request, String path) {
 
     // Construct file path
     final file = File(path);
-    
+
     print('[StaticFileServer] Attempting to serve: $path');
     print('[StaticFileServer] Absolute path: ${file.absolute.path}');
-    
+
     // Check if file exists
     if (!file.existsSync()) {
       print('[StaticFileServer] ❌ File not found: $path');
@@ -2223,12 +2637,13 @@ Response _serveStaticFile(Request request, String path) {
       if (dir.existsSync()) {
         try {
           final files = dir.listSync();
-          print('[StaticFileServer] Files in uploads/profile_pictures: ${files.map((f) => f.path).toList()}');
+          print(
+              '[StaticFileServer] Files in uploads/profile_pictures: ${files.map((f) => f.path).toList()}');
         } catch (e) {
           print('[StaticFileServer] Error listing directory: $e');
         }
       }
-      
+
       return Response.notFound(
         jsonEncode({'error': 'File not found', 'path': path}),
         headers: {'Content-Type': 'application/json'},
@@ -2245,11 +2660,11 @@ Response _serveStaticFile(Request request, String path) {
 
     final stat = file.statSync();
     final totalLength = stat.size;
-    
+
     // Determine content type based on file extension
     final ext = path.split('.').last.toLowerCase();
     String contentType = 'application/octet-stream';
-    
+
     switch (ext) {
       case 'jpg':
       case 'jpeg':
@@ -2378,9 +2793,9 @@ Response _serveStaticFile(Request request, String path) {
 
     // Read file bytes
     final bytes = file.readAsBytesSync();
-    
+
     print('[✓] Serving: $path (${bytes.length} bytes)');
-    
+
     return Response.ok(
       bytes,
       headers: commonHeaders,
@@ -2406,9 +2821,17 @@ String _generateId() {
 Future<void> _seedTestUsers(PostgreSQLConnection database) async {
   try {
     final testUsers = [
-      {'username': 'alice', 'email': 'alice@example.com', 'password': 'alice123'},
+      {
+        'username': 'alice',
+        'email': 'alice@example.com',
+        'password': 'alice123'
+      },
       {'username': 'bob', 'email': 'bob@example.com', 'password': 'bob123'},
-      {'username': 'charlie', 'email': 'charlie@example.com', 'password': 'charlie123'},
+      {
+        'username': 'charlie',
+        'email': 'charlie@example.com',
+        'password': 'charlie123'
+      },
       {'username': 'diane', 'email': 'diane@test.org', 'password': 'diane123'},
     ];
 
@@ -2497,14 +2920,18 @@ Map<String, dynamic> _invitationRowToJson(List<dynamic> row) {
     'recipientAvatarUrl': row[6], // receiver_avatar
     'status': row[7], // status
     'createdAt': (row[8] as DateTime).toIso8601String(), // created_at
-    'respondedAt': row[9] != null ? (row[9] as DateTime).toIso8601String() : null, // responded_at
-    'canceledAt': row[10] != null ? (row[10] as DateTime).toIso8601String() : null, // canceled_at
+    'respondedAt': row[9] != null
+        ? (row[9] as DateTime).toIso8601String()
+        : null, // responded_at
+    'canceledAt': row[10] != null
+        ? (row[10] as DateTime).toIso8601String()
+        : null, // canceled_at
   };
 }
 
 /// Unused - kept for reference
 /// Each endpoint handles its own JWT validation
-/// Pattern: 
+/// Pattern:
 ///   final token = authHeader.substring('Bearer '.length);
 ///   final payload = JwtService.validateToken(token);
 ///   final userId = payload.userId;

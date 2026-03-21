@@ -1,7 +1,5 @@
-import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
 import '../models/auth_models.dart';
-import '../providers/auth_provider.dart';
 import 'login_screen.dart';
 import 'registration_screen.dart';
 import 'email_verification_flow_screen.dart';
@@ -109,23 +107,9 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
       );
       return;
     }
-
-    setState(() {
-      _registeredUser = null;
-      _registeredEmail = null;
-      _registeredDevToken = null;
-      _pendingLoginRequest = null;
-      _loginPrefillRequest = null;
-    });
-
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Email verified and signed in.'),
-        backgroundColor: Colors.green,
-        duration: Duration(seconds: 3),
-      ),
-    );
+    // In auto-login flow, auth state change already transitions to home screen.
+    // Avoid extra local UI work here to prevent race conditions with disposal.
+    _pendingLoginRequest = null;
     widget.onAuthSuccess?.call();
   }
 

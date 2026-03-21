@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:provider/provider.dart' as provider_pkg;
@@ -74,7 +76,7 @@ class ProfileImageUploadWidget extends ConsumerWidget {
                     imageState.uploadedImageUrl!,
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) {
-                      print('[ProfileImageUploadWidget] ERROR loading uploaded image: $error');
+                      debugPrint('[ProfileImageUploadWidget] ERROR loading uploaded image: $error');
                       return _buildDefaultProfilePicture();
                     },
                   ),
@@ -88,7 +90,7 @@ class ProfileImageUploadWidget extends ConsumerWidget {
                     userProfileAsync!.value!.profilePictureUrl!,
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) {
-                      print('[ProfileImageUploadWidget] ERROR loading refreshed profile image: $error');
+                      debugPrint('[ProfileImageUploadWidget] ERROR loading refreshed profile image: $error');
                       return _buildDefaultProfilePicture();
                     },
                   ),
@@ -99,7 +101,7 @@ class ProfileImageUploadWidget extends ConsumerWidget {
                     currentImageUrl!,
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) {
-                      print('[ProfileImageUploadWidget] ERROR loading current profile picture: $error');
+                      debugPrint('[ProfileImageUploadWidget] ERROR loading current profile picture: $error');
                       return _buildDefaultProfilePicture();
                     },
                   ),
@@ -141,7 +143,7 @@ class ProfileImageUploadWidget extends ConsumerWidget {
                           }
                         } catch (e) {
                           // If we can't mark it as dirty, continue anyway
-                          print('[ProfileImageUploadWidget] Error marking form dirty on delete: $e');
+                          debugPrint('[ProfileImageUploadWidget] Error marking form dirty on delete: $e');
                         }
                         
                         // Refresh the userProfileProvider to update profile after delete
@@ -292,7 +294,7 @@ class ProfileImageUploadWidget extends ConsumerWidget {
                   }
                 } catch (e) {
                   // If we can't mark it as dirty, continue anyway - profile will still be saved
-                  print('[ProfileImageUploadWidget] Error marking form dirty: $e');
+                  debugPrint('[ProfileImageUploadWidget] Error marking form dirty: $e');
                 }
                 
                 // Refresh the userProfileProvider to update profile with new image URL

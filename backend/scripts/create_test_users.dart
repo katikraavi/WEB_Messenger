@@ -11,6 +11,8 @@ import 'package:uuid/uuid.dart';
 /// - bob@example.com / bob123
 /// - charlie@example.com / charlie123
 /// - diane@test.org / diane123
+/// - testuser1@example.com / testuser1pass
+/// - testuser2@example.com / testuser2pass
 
 void main() async {
   print('╔════════════════════════════════════════════════════════╗');
@@ -73,10 +75,23 @@ void main() async {
         'password': 'diane123',
         'full_name': 'Diane Davis',
       },
+      {
+        'username': 'testuser1',
+        'email': 'testuser1@example.com',
+        'password': 'testuser1pass',
+        'full_name': 'Test User One',
+      },
+      {
+        'username': 'testuser2',
+        'email': 'testuser2@example.com',
+        'password': 'testuser2pass',
+        'full_name': 'Test User Two',
+      },
     ];
 
     int createdCount = 0;
     int updatedCount = 0;
+    final seededUserIds = <String, String>{};
 
     for (final user in testUsers) {
       final username = user['username'] as String;
@@ -100,6 +115,7 @@ void main() async {
 
       if (existing.isNotEmpty) {
         final userId = existing.first[0] as String;
+        seededUserIds[username] = userId;
         await connection.execute(
           '''UPDATE "users"
              SET email = @email,
@@ -139,6 +155,7 @@ void main() async {
         );
 
         print('     [✓] Created user: $userId');
+        seededUserIds[username] = userId;
 
         // Create profile for the user
         try {
@@ -166,6 +183,33 @@ void main() async {
       }
     }
 
+    final testUser1Id = seededUserIds['testuser1'];
+    final testUser2Id = seededUserIds['testuser2'];
+    if (testUser1Id != null && testUser2Id != null) {
+      final participantIds = [testUser1Id, testUser2Id]..sort();
+      await connection.execute(
+        '''INSERT INTO "chats" (
+             id,
+             participant_1_id,
+             participant_2_id,
+             is_participant_1_archived,
+             is_participant_2_archived,
+             created_at,
+             updated_at
+           )
+           VALUES (@id, @participant1, @participant2, false, false, @now, @now)
+           ON CONFLICT (participant_1_id, participant_2_id)
+           DO UPDATE SET updated_at = @now''',
+        substitutionValues: {
+          'id': const Uuid().v4(),
+          'participant1': participantIds[0],
+          'participant2': participantIds[1],
+          'now': DateTime.now().toUtc(),
+        },
+      );
+      print('     [✓] Ensured seeded chat between testuser1 and testuser2');
+    }
+
     print('\n╔════════════════════════════════════════════════════════╗');
     print('║ Summary                                              ║');
     print('╚════════════════════════════════════════════════════════╝');
@@ -177,8 +221,11 @@ void main() async {
     print('  • bob / bob123');
     print('  • charlie / charlie123');
     print('  • diane / diane123');
+    print('  • testuser1 / testuser1pass');
+    print('  • testuser2 / testuser2pass');
     print('');
     print('All test users have email_verified=true');
+    print('Seeded chat ready for: testuser1 <-> testuser2');
     print('');
   } catch (e) {
     print('[✗] Error: $e');

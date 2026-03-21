@@ -31,7 +31,7 @@ String _displayName(String? value) {
 }
 
 /// Root widget for Mobile Messenger application
-/// 
+///
 /// Responsible for:
 /// - Setting up Material Design theme
 /// - Configuring app navigation
@@ -65,12 +65,14 @@ class _MessengerAppState extends State<MessengerApp> {
       );
 
       if (Firebase.apps.isEmpty) {
-        print('[App] Firebase is not initialized - remote push disabled for this run');
+        debugPrint(
+          '[App] Firebase is not initialized - remote push disabled for this run',
+        );
         return;
       }
 
       await PushNotificationHandler().initialize(navigatorKey: _navigatorKey);
-      print('[App] Push notifications initialized');
+      debugPrint('[App] Push notifications initialized');
     } catch (e) {
       AppExceptionLogger.log(
         e,
@@ -93,18 +95,18 @@ class _MessengerAppState extends State<MessengerApp> {
   Future<void> _initializeBackendConnection() async {
     // Give the API client initialization from main() a moment to complete
     await Future.delayed(const Duration(milliseconds: 500));
-    
+
     // Initialize auth provider - restore session if token exists
     if (mounted) {
       await context.read<AuthProvider>().initialize();
     }
-    
+
     setState(() {
       _isConnected = ApiClient.isConnected;
       _isInitializing = false;
     });
 
-    print('[App] Backend connected: $_isConnected');
+    debugPrint('[App] Backend connected: $_isConnected');
   }
 
   Future<void> _retryBackendConnection() async {
@@ -158,9 +160,7 @@ class _MessengerAppState extends State<MessengerApp> {
         ),
       ),
       themeMode: ThemeMode.system,
-      routes: {
-        '/invitations': (context) => const InvitationsScreen(),
-      },
+      routes: {'/invitations': (context) => const InvitationsScreen()},
       home: _buildHome(),
     );
   }
@@ -237,10 +237,7 @@ class _ConnectionErrorScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: onRetry,
-              child: const Text('Retry'),
-            ),
+            ElevatedButton(onPressed: onRetry, child: const Text('Retry')),
           ],
         ),
       ),
@@ -258,12 +255,16 @@ class _HomeScreen extends riverpod.ConsumerStatefulWidget {
 
 class _HomeScreenState extends riverpod.ConsumerState<_HomeScreen> {
   String? _connectedRealtimeUserId;
-  riverpod.ProviderSubscription<riverpod.AsyncValue<WebSocketEvent>>? _messageEventSubscription;
+  riverpod.ProviderSubscription<riverpod.AsyncValue<WebSocketEvent>>?
+  _messageEventSubscription;
 
   @override
   void initState() {
     super.initState();
-    _messageEventSubscription = ref.listenManual(messageEventStreamProvider, (previous, next) {
+    _messageEventSubscription = ref.listenManual(messageEventStreamProvider, (
+      previous,
+      next,
+    ) {
       next.whenData((event) async {
         final authProvider = context.read<AuthProvider>();
         try {
@@ -298,18 +299,16 @@ class _HomeScreenState extends riverpod.ConsumerState<_HomeScreen> {
     }
 
     try {
-      await ref.read(messageWebSocketProvider.notifier).connect(
-        token: token,
-        userId: userId,
-      );
+      await ref
+          .read(messageWebSocketProvider.notifier)
+          .connect(token: token, userId: userId);
       await ChatNotificationSettingsService.instance.syncMutedChats(token);
-      await ChatNotificationSettingsService.instance.tryRegisterFcmToken(token: token);
+      await ChatNotificationSettingsService.instance.tryRegisterFcmToken(
+        token: token,
+      );
       _connectedRealtimeUserId = userId;
     } catch (e) {
-      AppExceptionLogger.log(
-        e,
-        context: 'HomeScreen._ensureRealtimeConnected',
-      );
+      AppExceptionLogger.log(e, context: 'HomeScreen._ensureRealtimeConnected');
       await _disconnectRealtime();
       AppFeedbackService.showWarning(
         'Realtime sync is unavailable. Messenger restored the last synced state.',
@@ -338,8 +337,10 @@ class _HomeScreenState extends riverpod.ConsumerState<_HomeScreen> {
           return;
         }
 
-        final chatId = (event.data['chatId'] ?? event.data['chat_id']) as String?;
-        if (chatId == null || ChatNotificationSettingsService.instance.isMutedLocally(chatId)) {
+        final chatId =
+            (event.data['chatId'] ?? event.data['chat_id']) as String?;
+        if (chatId == null ||
+            ChatNotificationSettingsService.instance.isMutedLocally(chatId)) {
           return;
         }
 
@@ -398,7 +399,9 @@ class _HomeScreenState extends riverpod.ConsumerState<_HomeScreen> {
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(
       builder: (context, authProvider, child) {
-        print('[HomeScreen] isAuthenticated: ${authProvider.isAuthenticated}, user: ${authProvider.user?.username}');
+        debugPrint(
+          '[HomeScreen] isAuthenticated: ${authProvider.isAuthenticated}, user: ${authProvider.user?.username}',
+        );
 
         if (!authProvider.isAuthenticated) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -406,12 +409,14 @@ class _HomeScreenState extends riverpod.ConsumerState<_HomeScreen> {
           });
           return AuthFlowScreen(
             onAuthSuccess: () {
-              print('[Auth] User logged in: ${authProvider.user?.username}');
+              debugPrint(
+                '[Auth] User logged in: ${authProvider.user?.username}',
+              );
               // Invalidate invite cache because a new user just logged in
-              print('[Auth] Invalidating invite cache for new user');
+              debugPrint('[Auth] Invalidating invite cache for new user');
               ref.read(invitesCacheInvalidatorProvider.notifier).state++;
               // Invalidate chat cache on login (T025)
-              print('[Auth] Invalidating chat cache for new user');
+              debugPrint('[Auth] Invalidating chat cache for new user');
               ref.read(chatsCacheInvalidatorProvider.notifier).state++;
             },
           );
@@ -442,10 +447,12 @@ class _AuthenticatedHomeScreen extends riverpod.ConsumerStatefulWidget {
   });
 
   @override
-  riverpod.ConsumerState<_AuthenticatedHomeScreen> createState() => _AuthenticatedHomeScreenState();
+  riverpod.ConsumerState<_AuthenticatedHomeScreen> createState() =>
+      _AuthenticatedHomeScreenState();
 }
 
-class _AuthenticatedHomeScreenState extends riverpod.ConsumerState<_AuthenticatedHomeScreen> {
+class _AuthenticatedHomeScreenState
+    extends riverpod.ConsumerState<_AuthenticatedHomeScreen> {
   int _selectedIndex = 1; // Start at Chats tab, skip Search page
 
   @override
@@ -465,12 +472,12 @@ class _AuthenticatedHomeScreenState extends riverpod.ConsumerState<_Authenticate
           children: [
             Text(
               _selectedIndex == 1
-                ? 'Chats'
-                : _selectedIndex == 2
-                ? 'Invitations'
-                : _selectedIndex == 3
-                ? 'My Profile'
-                : 'Search Users', // Fallback for index 0
+                  ? 'Chats'
+                  : _selectedIndex == 2
+                  ? 'Invitations'
+                  : _selectedIndex == 3
+                  ? 'My Profile'
+                  : 'Search Users', // Fallback for index 0
             ),
             Text(
               'Signed in as: ${_displayName(widget.user.username)}',
@@ -500,10 +507,7 @@ class _AuthenticatedHomeScreenState extends riverpod.ConsumerState<_Authenticate
         currentIndex: _selectedIndex - 1, // Adjust index since we start at 1
         type: BottomNavigationBarType.fixed,
         items: <BottomNavigationBarItem>[
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.chat),
-            label: 'Chats',
-          ),
+          const BottomNavigationBarItem(icon: Icon(Icons.chat), label: 'Chats'),
           BottomNavigationBarItem(
             icon: Badge(
               isLabelVisible: pendingCount > 0,
@@ -521,10 +525,10 @@ class _AuthenticatedHomeScreenState extends riverpod.ConsumerState<_Authenticate
           setState(() {
             _selectedIndex = index + 1; // Adjust index since we start at 1
           });
-          
+
           // Refresh chat list when switching to Chats tab (index 0 in BottomNavigationBar)
           if (index == 0) {
-            print('[App] Switching to Chats tab - refreshing chat list');
+            debugPrint('[App] Switching to Chats tab - refreshing chat list');
             ref.read(chatsCacheInvalidatorProvider.notifier).state++;
           }
         },
@@ -539,18 +543,15 @@ class _AuthenticatedHomeScreenState extends riverpod.ConsumerState<_Authenticate
       children: [
         // Index 0: Search Tab (now unused, kept for app stability)
         _SearchTab(user: widget.user),
-        
+
         // Index 1: Chat List Tab (T024) - Now the default
         const ChatListScreen(),
-        
+
         // Index 2: Invitations Tab
         const InvitationsScreen(),
-        
+
         // Index 3: Profile Tab - Show user's own profile with pre-loaded data
-        ProfileViewScreen(
-          userId: widget.user.userId,
-          isOwnProfile: true,
-        ),
+        ProfileViewScreen(userId: widget.user.userId, isOwnProfile: true),
       ],
     );
   }
@@ -578,14 +579,14 @@ class _SearchTab extends StatelessWidget {
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: 8),
-              Text(
-                user.email,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
+              Text(user.email, style: Theme.of(context).textTheme.bodyMedium),
               const SizedBox(height: 24),
               const Text(
                 'Status: Connected',
-                style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: Colors.green,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
@@ -593,7 +594,7 @@ class _SearchTab extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 32),
-              
+
               // Main Search Button - PROMINENT
               Container(
                 decoration: BoxDecoration(
@@ -623,11 +624,18 @@ class _SearchTab extends StatelessWidget {
                     },
                     borderRadius: BorderRadius.circular(12),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 32,
+                        vertical: 16,
+                      ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.person_search, color: Colors.white, size: 28),
+                          const Icon(
+                            Icons.person_search,
+                            color: Colors.white,
+                            size: 28,
+                          ),
                           const SizedBox(width: 12),
                           const Text(
                             'Search Users',
@@ -643,9 +651,9 @@ class _SearchTab extends StatelessWidget {
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: 32),
-              
+
               // Test Info Section
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
