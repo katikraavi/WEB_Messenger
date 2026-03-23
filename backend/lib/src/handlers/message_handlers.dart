@@ -268,29 +268,35 @@ class MessageHandlers {
     Connection connection,
   ) async {
     try {
+      print('[MessageHandlers] ✏️ editMessage start: chatId=$chatId messageId=$messageId');
       // Get JWT token
-      final authHeader = request.headers['Authorization'];
+      final authHeader = request.headers['authorization'];
       final token = authHeader?.replaceFirst('Bearer ', '');
       if (token == null || token.isEmpty) {
+        print('[MessageHandlers] ✏️ Missing token for edit');
         return Response(401, body: jsonEncode({'error': 'Missing token'}));
       }
 
       // Extract user ID from token
       final userId = _extractUserIdFromToken(token);
       if (userId == null) {
+        print('[MessageHandlers] ✏️ Invalid token for edit');
         return Response(401, body: jsonEncode({'error': 'Invalid token'}));
       }
+      print('[MessageHandlers] ✏️ Authenticated edit user: $userId');
 
       // Check user is in chat
       final isParticipant =
           await _isUserChatParticipant(connection, chatId, userId);
       if (!isParticipant) {
+        print('[MessageHandlers] ✏️ User is not a participant in chat: chatId=$chatId userId=$userId');
         return Response(403,
             body: jsonEncode({'error': 'Not a participant in this chat'}));
       }
 
       // Parse request body
       final bodyString = await request.readAsString();
+      print('[MessageHandlers] ✏️ Edit request body: $bodyString');
       final bodyJson = jsonDecode(bodyString) as Map<String, dynamic>;
       final newContent = bodyJson['encrypted_content'] as String?;
 
@@ -308,6 +314,7 @@ class MessageHandlers {
         newEncryptedContent: newContent,
         editedByUserId: userId,
       );
+      print('[MessageHandlers] ✏️ Message edited successfully: $messageId');
 
       // Broadcast message.edited event via WebSocket (T050)
       final editedEvent = WebSocketEvent(
@@ -319,6 +326,19 @@ class MessageHandlers {
       return Response(200,
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode(editedMessage.toJson()));
+    } on ArgumentError catch (e) {
+      final message = e.message?.toString() ?? e.toString();
+      print('[MessageHandlers] ✏️ Edit validation error: $message');
+      final status = message.contains('not found')
+          ? 404
+          : message.contains('Only the message sender')
+              ? 403
+              : 400;
+      return Response(
+        status,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'error': message}),
+      );
     } catch (e) {
       print('[MessageHandlers] ❌ Edit message error: $e');
       return Response(500,
@@ -377,23 +397,28 @@ class MessageHandlers {
     Connection connection,
   ) async {
     try {
+      print('[MessageHandlers] 🗑️ deleteMessage start: chatId=$chatId messageId=$messageId');
       // Get JWT token
-      final authHeader = request.headers['Authorization'];
+      final authHeader = request.headers['authorization'];
       final token = authHeader?.replaceFirst('Bearer ', '');
       if (token == null || token.isEmpty) {
+        print('[MessageHandlers] 🗑️ Missing token for delete');
         return Response(401, body: jsonEncode({'error': 'Missing token'}));
       }
 
       // Extract user ID from token
       final userId = _extractUserIdFromToken(token);
       if (userId == null) {
+        print('[MessageHandlers] 🗑️ Invalid token for delete');
         return Response(401, body: jsonEncode({'error': 'Invalid token'}));
       }
+      print('[MessageHandlers] 🗑️ Authenticated delete user: $userId');
 
       // Check user is in chat
       final isParticipant =
           await _isUserChatParticipant(connection, chatId, userId);
       if (!isParticipant) {
+        print('[MessageHandlers] 🗑️ User is not a participant in chat: chatId=$chatId userId=$userId');
         return Response(403,
             body: jsonEncode({'error': 'Not a participant in this chat'}));
       }
@@ -406,6 +431,7 @@ class MessageHandlers {
         messageId,
         userId,
       );
+      print('[MessageHandlers] 🗑️ Message deleted successfully: $messageId');
 
       // Fetch updated message to broadcast
       final deletedMessage = await messageService.getMessageById(messageId);
@@ -421,6 +447,19 @@ class MessageHandlers {
       _webSocketService.broadcastToChat(chatId, deletedEvent);
 
       return Response(204);
+    } on ArgumentError catch (e) {
+      final message = e.message?.toString() ?? e.toString();
+      print('[MessageHandlers] 🗑️ Delete validation error: $message');
+      final status = message.contains('not found')
+          ? 404
+          : message.contains('Only the message sender')
+              ? 403
+              : 400;
+      return Response(
+        status,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'error': message}),
+      );
     } catch (e) {
       print('[MessageHandlers] ❌ Delete message error: $e');
       return Response(500,

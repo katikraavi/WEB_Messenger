@@ -205,6 +205,15 @@ class LocalMessagesNotifier extends StateNotifier<List<Message>> {
           );
           updateMessageStatus(messageId, newStatus);
         }
+      } else if (event.type == WebSocketEventType.messageEdited) {
+        final message = Message.fromJson(event.data);
+        final decryptedMessage = await MessageEncryptionService.decryptMessage(
+          message,
+        );
+        upsertMessage(decryptedMessage);
+      } else if (event.type == WebSocketEventType.messageDeleted) {
+        final message = Message.fromJson(event.data);
+        upsertMessage(message.copyWith(decryptedContent: '[Message deleted]'));
       }
     } catch (e) {
       print('[LocalMessagesNotifier] ❌ Error handling WebSocket event: $e');
@@ -366,6 +375,21 @@ class LocalMessagesNotifier extends StateNotifier<List<Message>> {
     }
 
     addMessage(message);
+  }
+
+  void markMessageDeleted(String messageId) {
+    final index = state.indexWhere((message) => message.id == messageId);
+    if (index < 0) {
+      return;
+    }
+
+    final updatedMessages = [...state];
+    updatedMessages[index] = updatedMessages[index].copyWith(
+      isDeleted: true,
+      deletedAt: DateTime.now().toUtc(),
+      decryptedContent: '[Message deleted]',
+    );
+    state = updatedMessages;
   }
 
   /// Status hierarchy: sent (0) < delivered (1) < read (2)

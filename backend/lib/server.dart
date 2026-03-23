@@ -161,9 +161,9 @@ void main() async {
 
   print('╔═══════════════════════════════════════════════════════╗');
   print('║ 🚀 Messenger Backend Started                          ║');
-  print('║ Port: ${server.port}                                         ║');
-  print('║ Health: http://localhost:${server.port}/health              ║');
-  print('║ Schema: http://localhost:${server.port}/schema              ║');
+  print('║ Port: ${server.port}                                  ║');
+  print('║ Health: http://localhost:${server.port}/health        ║');
+  print('║ Schema: http://localhost:${server.port}/schema        ║');
   print('║                                                       ║');
   print('║ ✓ Services initialized                                ║');
   print('║ ✓ Email verification & password recovery enabled      ║');
@@ -1530,21 +1530,22 @@ Handler _createHandler(
       if (path.startsWith('api/chats/') &&
           path.contains('/messages/') &&
           !path.endsWith('/status') &&
-          !path.contains('/messages/') &&
-          path != path.replaceAll(RegExp(r'/messages/[^/]+$'), '/messages/X') &&
           method == 'PUT') {
         try {
+          print('[MessageHandler] ✏️ Edit route matched: method=$method path=$path');
           final parts = path.split('/');
           // Path format: api/chats/{chatId}/messages/{messageId}
-          if (parts.length >= 5 &&
+          if (parts.length == 5 &&
               parts[0] == 'api' &&
               parts[1] == 'chats' &&
               parts[3] == 'messages') {
             final chatId = parts[2];
             final messageId = parts[4];
+            print('[MessageHandler] ✏️ Dispatching edit: chatId=$chatId messageId=$messageId');
             return await MessageHandlers.editMessage(
                 request, chatId, messageId, database);
           }
+          print('[MessageHandler] ⚠️ Edit route matched but path format was invalid: $path');
         } on AuthException catch (e) {
           return Response(
             401,
@@ -1567,6 +1568,7 @@ Handler _createHandler(
           !path.endsWith('/status') &&
           method == 'DELETE') {
         try {
+          print('[MessageHandler] 🗑️ Delete route matched: method=$method path=$path');
           final parts = path.split('/');
           // Path format: api/chats/{chatId}/messages/{messageId}
           if (parts.length >= 5 &&
@@ -1575,6 +1577,7 @@ Handler _createHandler(
               parts[3] == 'messages') {
             final chatId = parts[2];
             final messageId = parts[4];
+            print('[MessageHandler] 🗑️ Dispatching delete: chatId=$chatId messageId=$messageId');
             return await MessageHandlers.deleteMessage(
                 request, chatId, messageId, database);
           }

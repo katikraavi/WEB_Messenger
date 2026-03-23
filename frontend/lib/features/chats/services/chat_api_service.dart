@@ -476,7 +476,9 @@ class ChatApiService {
 
       final body = {'encrypted_content': newEncryptedContent};
 
-      print('[ChatApiService] 📝 Editing message: $messageId');
+      print('[ChatApiService] 📝 Editing message: $messageId in chat $chatId');
+      print('[ChatApiService] 📝 Edit URL: $url');
+      print('[ChatApiService] 📝 Edit body: ${jsonEncode(body)}');
 
       final response = await _httpClient.put(
         url,
@@ -486,6 +488,9 @@ class ChatApiService {
         },
         body: jsonEncode(body),
       );
+
+      print('[ChatApiService] 📝 Edit response status: ${response.statusCode}');
+      print('[ChatApiService] 📝 Edit response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final messageData = jsonDecode(response.body) as Map<String, dynamic>;
@@ -527,7 +532,8 @@ class ChatApiService {
     try {
       final url = Uri.parse('$_baseUrl/api/chats/$chatId/messages/$messageId');
 
-      print('[ChatApiService] 🗑️ Deleting message: $messageId');
+      print('[ChatApiService] 🗑️ Deleting message: $messageId from chat $chatId');
+      print('[ChatApiService] 🗑️ Delete URL: $url');
 
       final response = await _httpClient.delete(
         url,
@@ -536,6 +542,9 @@ class ChatApiService {
           'Content-Type': 'application/json',
         },
       );
+
+      print('[ChatApiService] 🗑️ Delete response status: ${response.statusCode}');
+      print('[ChatApiService] 🗑️ Delete response body: ${response.body}');
 
       if (response.statusCode == 204) {
         print('[ChatApiService] ✅ Message deleted successfully: $messageId');

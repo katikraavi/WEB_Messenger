@@ -488,38 +488,30 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     String token,
   ) async {
     try {
-      // For now, we'll just show a snackbar since backend isn't deployed yet
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Message edit feature coming soon'),
-          action: SnackBarAction(label: 'OK', onPressed: () {}),
-        ),
+      debugPrint('[ChatDetail] ✏️ Starting edit for message ${message.id}');
+      debugPrint('[ChatDetail] ✏️ Old content: ${message.getDisplayContent()}');
+      debugPrint('[ChatDetail] ✏️ New content: $newContent');
+      final encryptedContent = MessageEncryptionService.encryptMessage(
+        newContent,
+      );
+      debugPrint('[ChatDetail] ✏️ Encrypted content length: ${encryptedContent.length}');
+      final editedMessage = await ChatApiService(baseUrl: _backendBaseUrl)
+          .editMessage(
+            token: token,
+            chatId: widget.chatId,
+            messageId: message.id,
+            newEncryptedContent: encryptedContent,
+          );
+      final decryptedMessage = await MessageEncryptionService.decryptMessage(
+        editedMessage,
       );
 
-      // TODO: Uncomment when backend is ready
-      /*
-      final editedMessage = await ref.read(editMessageProvider(
-        (
-          widget.chatId,
-          message.id,
-          newContent,
-          token,
-        ),
-      ).future);
-      
+      _localMessagesNotifier?.upsertMessage(decryptedMessage);
       debugPrint('[ChatDetail] ✅ Message edited: ${message.id}');
-      
-      // Refresh message list to show updated content
-      await ref.refresh(
-        messagesWithCacheProvider(
-          (chatId: widget.chatId, token: token),
-        ),
-      );
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Message edited successfully')),
       );
-      */
     } catch (e) {
       debugPrint('[ChatDetail] ❌ Error editing message: $e');
       ScaffoldMessenger.of(
@@ -531,32 +523,20 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   /// Handle message delete (T062)
   Future<void> _handleDeleteMessage(Message message, String token) async {
     try {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Deleting message...'),
-          duration: const Duration(seconds: 1),
-        ),
+      debugPrint('[ChatDetail] 🗑️ Starting delete for message ${message.id}');
+      await ChatApiService(baseUrl: _backendBaseUrl).deleteMessage(
+        token: token,
+        chatId: widget.chatId,
+        messageId: message.id,
       );
 
-      // TODO: Uncomment when backend is ready
-      /*
-      await ref.read(deleteMessageProvider(
-        (widget.chatId, message.id, token),
-      ).future);
+      _localMessagesNotifier?.markMessageDeleted(message.id);
 
       debugPrint('[ChatDetail] ✅ Message deleted: ${message.id}');
-
-      // Refresh message list to reflect deletion
-      await ref.refresh(
-        messagesWithCacheProvider(
-          (chatId: widget.chatId, token: token),
-        ),
-      );
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Message deleted')),
       );
-      */
     } catch (e) {
       debugPrint('[ChatDetail] ❌ Error deleting message: $e');
       ScaffoldMessenger.of(
@@ -1240,10 +1220,10 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           onRetry: message.hasError
               ? () => _handleRetry(message, token, currentUserId)
               : null,
-          onLongPress: message.senderId == currentUserId
+          onLongPress: message.senderId == currentUserId && !message.isDeleted
               ? () => _showMessageContextMenu(message, token)
               : null,
-          onEdit: message.senderId == currentUserId
+          onEdit: message.senderId == currentUserId && !message.isDeleted
               ? (newContent) => _handleEditMessage(message, newContent, token)
               : null,
         );

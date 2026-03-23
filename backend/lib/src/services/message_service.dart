@@ -251,7 +251,9 @@ class MessageService {
     try {
       final result = await connection.query(
         '''
-        SELECT id, chat_id, sender_id, encrypted_content, created_at
+        SELECT id, chat_id, sender_id, recipient_id, encrypted_content,
+               status, created_at, edited_at, deleted_at, is_deleted,
+               media_url, media_type
         FROM $_tableName
         WHERE id = @messageId
         ''',
@@ -264,8 +266,15 @@ class MessageService {
         id: result.first[0] as String,
         chatId: result.first[1] as String,
         senderId: result.first[2] as String,
-        encryptedContent: result.first[3] as String,
-        createdAt: result.first[4] as DateTime,
+        recipientId: result.first[3] as String?,
+        encryptedContent: result.first[4] as String,
+        status: result.first[5] as String? ?? 'sent',
+        createdAt: result.first[6] as DateTime,
+        editedAt: result.first[7] as DateTime?,
+        deletedAt: result.first[8] as DateTime?,
+        isDeleted: result.first[9] as bool? ?? false,
+        mediaUrl: result.first[10] as String?,
+        mediaType: result.first[11] as String?,
       );
 
       // Decrypt if key provided
@@ -308,7 +317,7 @@ class MessageService {
         SELECT id, chat_id, sender_id, recipient_id, encrypted_content, 
                status, created_at, edited_at, deleted_at, is_deleted
         FROM $_tableName
-        WHERE chat_id = @chatId AND is_deleted = FALSE
+        WHERE chat_id = @chatId
         ORDER BY created_at DESC
         LIMIT @limit OFFSET @offset
         ''',
@@ -437,21 +446,22 @@ class MessageService {
         throw ArgumentError('Invalid encrypted content: must be valid Base64');
       }
 
-      // Fetch current message
-      final results = await connection.query(
-        'SELECT * FROM $_tableName WHERE id = @messageId',
-        substitutionValues: {'messageId': messageId},
-      );
-
-      if (results.isEmpty) {
+      final message = await getMessageById(messageId);
+      if (message == null) {
         throw ArgumentError('Message not found: $messageId');
       }
-
-      final message = Message.fromPostgres(results.first);
 
       // Validate only sender can edit
       if (message.senderId != editedByUserId) {
         throw ArgumentError('Only the message sender can edit a message');
+      }
+
+      if (message.isDeleted) {
+        throw ArgumentError('Deleted messages cannot be edited');
+      }
+
+      if (message.encryptedContent == newEncryptedContent) {
+        throw ArgumentError('Edited content must be different from the current message');
       }
 
       // Get current edit count to generate next edit number
@@ -471,8 +481,15 @@ class MessageService {
       // Store previous content in message_edits table
       await connection.execute(
         '''
-        INSERT INTO message_edits (id, message_id, edit_number, previous_content, edited_at)
-        VALUES (@editId, @messageId, @editNumber, @previousContent, @now)
+        INSERT INTO message_edits (
+          id,
+          message_id,
+          edit_number,
+          previous_content,
+          edited_at,
+          edited_by
+        )
+        VALUES (@editId, @messageId, @editNumber, @previousContent, @now, @editedBy)
         ''',
         substitutionValues: {
           'editId': _uuid.v4(),
@@ -480,6 +497,7 @@ class MessageService {
           'editNumber': nextEditNumber,
           'previousContent': message.encryptedContent,
           'now': DateTime.now(),
+          'editedBy': editedByUserId,
         },
       );
 
@@ -496,13 +514,14 @@ class MessageService {
         },
       );
 
-      // Fetch updated message
-      final updatedResults = await connection.query(
-        'SELECT * FROM $_tableName WHERE id = @messageId',
-        substitutionValues: {'messageId': messageId},
-      );
+      final updated = await getMessageById(messageId);
+      if (updated == null) {
+        throw Exception('Message not found after edit');
+      }
 
-      return Message.fromPostgres(updatedResults.first);
+      return updated;
+    } on ArgumentError {
+      rethrow;
     } catch (e) {
       throw Exception('Failed to edit message: $e');
     }
@@ -527,6 +546,10 @@ class MessageService {
         throw ArgumentError('Only the message sender can delete a message');
       }
 
+      if (message.isDeleted) {
+        throw ArgumentError('Message is already deleted');
+      }
+
       // Soft-delete by marking is_deleted = true and setting deleted_at
       await connection.execute(
         '''
@@ -544,6 +567,8 @@ class MessageService {
       }
 
       return updated;
+    } on ArgumentError {
+      rethrow;
     } catch (e) {
       throw Exception('Failed to delete message: $e');
     }
