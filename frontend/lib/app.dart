@@ -17,6 +17,10 @@ import 'package:frontend/features/profile/screens/profile_view_screen.dart';
 import 'package:frontend/features/invitations/screens/invitations_screen.dart';
 import 'package:frontend/features/invitations/providers/invites_provider.dart';
 import 'package:frontend/features/chats/screens/chat_list_screen.dart';
+import 'package:frontend/features/chats/screens/create_group_screen.dart';
+import 'package:frontend/features/chats/screens/search_groups_screen.dart';
+import 'package:frontend/features/chats/providers/active_chats_provider.dart';
+import 'package:frontend/features/chats/providers/chats_provider.dart';
 import 'package:frontend/features/chats/providers/chat_cache_invalidator.dart';
 import 'package:frontend/features/chats/providers/websocket_provider.dart';
 import 'package:frontend/features/chats/services/message_websocket_service.dart';
@@ -379,6 +383,25 @@ class _HomeScreenState extends riverpod.ConsumerState<_HomeScreen> {
         );
         ref.invalidate(pendingInvitesProvider);
         ref.invalidate(pendingInviteCountProvider);
+        ref.invalidate(pendingGroupInvitesProvider);
+        ref.invalidate(pendingGroupInviteCountProvider);
+        return;
+      }
+
+      if (event.type == WebSocketEventType.invitationAccepted ||
+          event.type == WebSocketEventType.invitationDeclined ||
+          event.type == WebSocketEventType.invitationCancelled) {
+        final inviteId =
+            (event.data['inviteId'] ?? event.data['id']) as String?;
+        if (inviteId != null && inviteId.isNotEmpty) {
+          await LocalNotificationService.instance.dismissInviteNotification(
+            inviteId,
+          );
+        }
+        ref.invalidate(pendingInvitesProvider);
+        ref.invalidate(pendingInviteCountProvider);
+        ref.invalidate(pendingGroupInvitesProvider);
+        ref.invalidate(pendingGroupInviteCountProvider);
       }
     } catch (e, st) {
       AppExceptionLogger.log(
@@ -444,12 +467,8 @@ class _AuthenticatedHomeScreenState
 
   @override
   Widget build(BuildContext context) {
-    // Watch pending invites to show count badge
-    final pendingInvites = ref.watch(pendingInvitesProvider);
-    final pendingCount = pendingInvites.maybeWhen(
-      data: (invites) => invites.length,
-      orElse: () => 0,
-    );
+    // Watch combined pending invites (direct + group) for badge.
+    final pendingCount = ref.watch(totalPendingInviteCountProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -477,6 +496,47 @@ class _AuthenticatedHomeScreenState
         ),
         elevation: 0,
         actions: [
+          if (_selectedIndex == 1)
+            IconButton(
+              icon: const Icon(Icons.search),
+              tooltip: 'Search Groups',
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const SearchGroupsScreen(),
+                  ),
+                );
+              },
+            ),
+          if (_selectedIndex == 1)
+            IconButton(
+              icon: const Icon(Icons.group_add),
+              tooltip: 'Create Group Chat',
+              onPressed: () async {
+                final createdGroupId = await Navigator.of(context).push<String>(
+                  MaterialPageRoute(
+                    builder: (_) => const CreateGroupScreen(),
+                  ),
+                );
+
+                if (!context.mounted || createdGroupId == null) {
+                  return;
+                }
+
+                final token = widget.authProvider.token;
+                if (token != null && token.isNotEmpty) {
+                  ref.invalidate(chatsProvider(token));
+                  ref.invalidate(activeChatListProvider(token));
+                }
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Group created: $createdGroupId'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {

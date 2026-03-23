@@ -40,8 +40,68 @@ class ChatListTileConsumer extends ConsumerWidget {
     }
   }
 
+  String _buildGroupTitle(Chat chat) {
+    final groupName = chat.displayName?.trim() ?? '';
+    if (groupName.isNotEmpty && groupName.toLowerCase() != 'group') {
+      return groupName;
+    }
+
+    final participants =
+        (chat.participantNames ?? const <String>[])
+            .where((name) => name.trim().isNotEmpty)
+            .toList();
+    if (participants.isNotEmpty) {
+      return participants.join(', ');
+    }
+
+    return 'Group';
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (chat.isGroup) {
+      final groupTitle = _buildGroupTitle(chat);
+      return ListTile(
+        key: ValueKey('group-data-${chat.id}'),
+        leading: CircleAvatar(
+          radius: 24,
+          backgroundColor: Colors.indigo.shade100,
+          child: const Icon(Icons.group, color: Colors.indigo),
+        ),
+        title: Text(
+          groupTitle,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Text(
+          chat.memberCount == null
+              ? (chat.lastMessagePreview ?? 'Group chat')
+              : '${chat.memberCount} member${chat.memberCount == 1 ? '' : 's'}',
+          style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+          overflow: TextOverflow.ellipsis,
+          maxLines: 1,
+        ),
+        trailing: Text(
+          chat.lastMessageTimestamp != null
+              ? _formatTimestamp(chat.lastMessageTimestamp!)
+              : _formatTimestamp(chat.updatedAt),
+          style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+        ),
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => ChatDetailScreen(
+                chatId: chat.id,
+                otherUserId: chat.id,
+                otherUserName: groupTitle,
+                isGroup: true,
+              ),
+            ),
+          );
+        },
+      );
+    }
+
     final userProfileAsync = ref.watch(
       userProfileProvider((otherUserId, token)),
     );

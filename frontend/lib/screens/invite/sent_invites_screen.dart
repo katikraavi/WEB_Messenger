@@ -38,7 +38,7 @@ class _SentInvitesScreenState extends State<SentInvitesScreen> {
     try {
       final invites = await _inviteService.getSentInvites(widget.userId);
       setState(() {
-        _invites = invites;
+        _invites = invites.where((invite) => invite.status == 'pending').toList();
         _isLoading = false;
       });
     } catch (e) {

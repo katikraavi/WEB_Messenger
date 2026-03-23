@@ -32,7 +32,9 @@ class ChatListScreen extends ConsumerWidget {
     String currentUserId,
     List<Chat> chats,
   ) async {
-    if (chats.length < 2) {
+    final directChats = chats.where((chat) => !chat.isGroup).toList();
+
+    if (directChats.length < 2) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Need at least two chats to split view')),
@@ -57,7 +59,7 @@ class ChatListScreen extends ConsumerWidget {
                   DropdownButtonFormField<String>(
                     value: leftChatId,
                     decoration: const InputDecoration(labelText: 'Left pane'),
-                    items: chats
+                    items: directChats
                         .map((chat) => DropdownMenuItem<String>(
                               value: chat.id as String,
                               child: Text('Chat ${chat.id.toString().substring(0, 8)}'),
@@ -71,7 +73,7 @@ class ChatListScreen extends ConsumerWidget {
                   DropdownButtonFormField<String>(
                     value: rightChatId,
                     decoration: const InputDecoration(labelText: 'Right pane'),
-                    items: chats
+                    items: directChats
                         .map((chat) => DropdownMenuItem<String>(
                               value: chat.id as String,
                               child: Text('Chat ${chat.id.toString().substring(0, 8)}'),
@@ -106,8 +108,8 @@ class ChatListScreen extends ConsumerWidget {
 
     if (selected == null || !context.mounted) return;
 
-    final left = chats.firstWhere((c) => c.id == selected.$1);
-    final right = chats.firstWhere((c) => c.id == selected.$2);
+  final left = directChats.firstWhere((c) => c.id == selected.$1);
+  final right = directChats.firstWhere((c) => c.id == selected.$2);
     final leftOtherUserId = left.getOtherId(currentUserId) as String;
     final rightOtherUserId = right.getOtherId(currentUserId) as String;
 

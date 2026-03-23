@@ -24,9 +24,13 @@ import '../services/audio_recording_service.dart';
 import '../services/chat_notification_settings_service.dart';
 import '../widgets/message_search_bar.dart';
 import '../services/message_search_service.dart';
+import 'group_chat_screen.dart';
 import '../../auth/providers/auth_provider.dart' as auth;
 import '../../polls/widgets/poll_widget.dart';
 import '../../polls/services/poll_service.dart';
+
+part 'chat_detail_screen_handlers.dart';
+part 'chat_detail_screen_poll_widget.dart';
 
 String _displayName(String? value) {
   if (value == null || value.isEmpty) {
@@ -61,12 +65,16 @@ class ChatDetailScreen extends ConsumerStatefulWidget {
   /// The other participant's profile picture URL (optional)
   final String? otherUserAvatarUrl;
 
+  /// Whether this thread is a group conversation.
+  final bool isGroup;
+
   const ChatDetailScreen({
     Key? key,
     required this.chatId,
     required this.otherUserId,
     required this.otherUserName,
     this.otherUserAvatarUrl,
+    this.isGroup = false,
   }) : super(key: key);
 
   @override
@@ -89,7 +97,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
 
   // Message search state (T020 / GAP-003)
   bool _searchActive = false;
-  String _searchQuery = '';
   List<String> _searchResultIds = [];
   int _searchResultIndex = 0;
   final TextEditingController _searchController = TextEditingController();
@@ -336,463 +343,12 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
               chatId: widget.chatId,
               token: authProvider.token!,
               currentUserId: authProvider.user!.userId,
+              isGroup: widget.isGroup,
             )),
           );
         }
       }
     });
-  }
-
-  /// Send typing start/stop event via WebSocket (T044)
-  void _sendTypingEvent(String eventType) {
-    try {
-      if (eventType == 'typing.start') {
-        _webSocketNotifier.sendTyping(widget.chatId);
-      } else if (eventType == 'typing.stop') {
-        _webSocketNotifier.stopTyping(widget.chatId);
-      }
-
-    } catch (e) {
-      AppExceptionLogger.log(e, context: 'ChatDetailScreen._sendTypingEvent');
-    }
-  }
-
-  /// Scroll to bottom of message list (newest messages)
-  void _scrollToBottom() {
-    // Schedule scroll after frame is built
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
-  }
-
-  /// Handle message retry (T025 error state)
-  Future<void> _handleRetry(
-    Message failedMessage,
-    String token,
-    String currentUserId,
-  ) async {
-    // Only allow retry for messages with errors
-    if (failedMessage.error == null) {
-      return;
-    }
-
-    await ref
-        .read(sendMessageProvider.notifier)
-        .retryMessage(
-          failedMessage: failedMessage,
-          token: token,
-          currentUserId: currentUserId,
-        );
-    _scrollToBottom();
-  }
-
-  /// Show context menu for message edit/delete (T052, T061)
-  void _showMessageContextMenu(Message message, String token) {
-    // Don't show menu for already deleted messages
-    if (message.isDeleted) {
-      return;
-    }
-
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.edit),
-              title: const Text('Edit'),
-              onTap: () {
-                Navigator.pop(context);
-                _showEditMessageDialog(message, token);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete_outline, color: Colors.red),
-              title: const Text('Delete', style: TextStyle(color: Colors.red)),
-              onTap: () {
-                Navigator.pop(context);
-                _showDeleteConfirmationDialog(message, token);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Show edit message dialog (T052, T053)
-  void _showEditMessageDialog(Message message, String token) {
-    showDialog(
-      context: context,
-      builder: (context) => EditMessageDialog(
-        messageId: message.id,
-        currentContent: message.getDisplayContent(),
-        onSave: (newContent) {
-          _handleEditMessage(message, newContent, token);
-        },
-      ),
-    );
-  }
-
-  /// Show delete confirmation dialog (T061)
-  void _showDeleteConfirmationDialog(Message message, String token) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Message?'),
-        content: const Text('This action cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              unawaited(_handleDeleteMessage(message, token));
-            },
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Handle message edit (T055)
-  Future<void> _handleEditMessage(
-    Message message,
-    String newContent,
-    String token,
-  ) async {
-    try {
-      final encryptedContent = MessageEncryptionService.encryptMessage(
-        newContent,
-      );
-      final editedMessage = await ChatApiService(baseUrl: _backendBaseUrl)
-          .editMessage(
-            token: token,
-            chatId: widget.chatId,
-            messageId: message.id,
-            newEncryptedContent: encryptedContent,
-          );
-      final decryptedMessage = await MessageEncryptionService.decryptMessage(
-        editedMessage,
-      );
-
-      _localMessagesNotifier?.upsertMessage(decryptedMessage);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Message edited successfully')),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to edit: $e')));
-    }
-  }
-
-  /// Handle message delete (T062)
-  Future<void> _handleDeleteMessage(Message message, String token) async {
-    try {
-      await ChatApiService(baseUrl: _backendBaseUrl).deleteMessage(
-        token: token,
-        chatId: widget.chatId,
-        messageId: message.id,
-      );
-
-      _localMessagesNotifier?.markMessageDeleted(message.id);
-
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Message deleted')),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to delete: $e')));
-    }
-  }
-
-  /// Handle image attachment (T079)
-  Future<void> _handleImageAttachment(String token) async {
-    try {
-
-      // Pick image from device
-      final pickedMedia = await MediaPickerService.pickImage();
-      if (pickedMedia == null) {
-        return;
-      }
-
-      // Show loading
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Uploading image...'),
-          duration: Duration(seconds: 30),
-        ),
-      );
-
-      // Upload media to backend
-      final uploadService = MediaUploadService();
-      final uploadedMedia = await uploadService.uploadMedia(
-        pickedMedia: pickedMedia,
-        token: token,
-      );
-
-
-      final chatApiService = ChatApiService(baseUrl: 'http://localhost:8081');
-      final mediaPath = '/uploads/media/${uploadedMedia.fileName}';
-      final sentMessage = await chatApiService.sendMessage(
-        token: token,
-        chatId: widget.chatId,
-        encryptedContent: base64Encode(utf8.encode('[Image]')),
-        mediaUrl: mediaPath,
-        mediaType: uploadedMedia.mimeType,
-      );
-      final decryptedMessage = await MessageEncryptionService.decryptMessage(
-        sentMessage,
-      );
-
-      ref
-          .read(
-            localMessagesProvider((
-              chatId: widget.chatId,
-              token: token,
-              currentUserId: currentUserIdFromContext(),
-            )).notifier,
-          )
-          .upsertMessage(decryptedMessage);
-
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Image sent: ${uploadedMedia.originalName ?? uploadedMedia.fileName}',
-          ),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to upload image: $e')));
-    }
-  }
-
-  /// Handle video attachment (T080)
-  Future<void> _handleVideoAttachment(String token) async {
-    try {
-
-      // Pick video from device
-      final pickedMedia = await MediaPickerService.pickVideo();
-      if (pickedMedia == null) {
-        return;
-      }
-
-      // Show loading
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Uploading video...'),
-          duration: Duration(seconds: 60),
-        ),
-      );
-
-      // Upload media to backend
-      final uploadService = MediaUploadService();
-      final uploadedMedia = await uploadService.uploadMedia(
-        pickedMedia: pickedMedia,
-        token: token,
-      );
-
-
-      final chatApiService = ChatApiService(baseUrl: 'http://localhost:8081');
-      final mediaPath = '/uploads/media/${uploadedMedia.fileName}';
-      final sentMessage = await chatApiService.sendMessage(
-        token: token,
-        chatId: widget.chatId,
-        encryptedContent: base64Encode(utf8.encode('[Video]')),
-        mediaUrl: mediaPath,
-        mediaType: uploadedMedia.mimeType,
-      );
-      final decryptedMessage = await MessageEncryptionService.decryptMessage(
-        sentMessage,
-      );
-
-      ref
-          .read(
-            localMessagesProvider((
-              chatId: widget.chatId,
-              token: token,
-              currentUserId: currentUserIdFromContext(),
-            )).notifier,
-          )
-          .upsertMessage(decryptedMessage);
-
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Video sent: ${uploadedMedia.originalName ?? uploadedMedia.fileName}',
-          ),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to upload video: $e')));
-    }
-  }
-
-  Future<void> _handleAudioRecordingTap(String token) async {
-    final recordingService = AudioRecordingService.instance;
-
-    try {
-      if (!recordingService.isRecording) {
-        await recordingService.startRecording();
-        if (!mounted) {
-          return;
-        }
-        setState(() {
-          _isRecordingAudio = true;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Recording audio... tap the mic again to send'),
-          ),
-        );
-        return;
-      }
-
-      if (mounted) {
-        setState(() {
-          _isRecordingAudio = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Uploading audio...'),
-            duration: Duration(seconds: 30),
-          ),
-        );
-      }
-
-      final pickedMedia = await recordingService.stopRecording();
-      final uploadService = MediaUploadService();
-      final uploadedMedia = await uploadService.uploadMedia(
-        pickedMedia: pickedMedia,
-        token: token,
-      );
-
-      final chatApiService = ChatApiService(baseUrl: 'http://localhost:8081');
-      final mediaPath = '/uploads/media/${uploadedMedia.fileName}';
-      final sentMessage = await chatApiService.sendMessage(
-        token: token,
-        chatId: widget.chatId,
-        encryptedContent: base64Encode(utf8.encode('[Audio]')),
-        mediaUrl: mediaPath,
-        mediaType: uploadedMedia.mimeType,
-      );
-      final decryptedMessage = await MessageEncryptionService.decryptMessage(
-        sentMessage,
-      );
-
-      ref
-          .read(
-            localMessagesProvider((
-              chatId: widget.chatId,
-              token: token,
-              currentUserId: currentUserIdFromContext(),
-            )).notifier,
-          )
-          .upsertMessage(decryptedMessage);
-
-      if (!mounted) {
-        return;
-      }
-
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Audio message sent')));
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isRecordingAudio = false;
-        });
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to record audio: $e')));
-      }
-    }
-  }
-
-  Future<void> _loadNotificationSettings(String token) async {
-    try {
-      final isMuted = await ChatNotificationSettingsService.instance
-          .fetchMuteStatus(token: token, chatId: widget.chatId);
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _isChatMuted = isMuted;
-        _notificationSettingsLoaded = true;
-      });
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _notificationSettingsLoaded = true;
-      });
-    }
-  }
-
-  Future<void> _toggleChatMute(String token) async {
-    final nextValue = !_isChatMuted;
-    try {
-      await ChatNotificationSettingsService.instance.setMuted(
-        token: token,
-        chatId: widget.chatId,
-        isMuted: nextValue,
-      );
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _isChatMuted = nextValue;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            nextValue
-                ? 'Chat notifications muted'
-                : 'Chat notifications unmuted',
-          ),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update notifications: $e')),
-      );
-    }
-  }
-
-  String currentUserIdFromContext() {
-    final authProvider = provider_pkg.Provider.of<auth.AuthProvider>(
-      context,
-      listen: false,
-    );
-    return authProvider.user!.userId;
   }
 
   @override
@@ -809,7 +365,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       );
     }
 
-    if (!_notificationSettingsLoaded) {
+    if (!widget.isGroup && !_notificationSettingsLoaded) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _loadNotificationSettings(token);
       });
@@ -867,16 +423,14 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     // Watch message status updates via WebSocket (T020 - Message Status System)
     ref.watch(messageStatusUpdateProvider).whenData((statusUpdate) {
       if (statusUpdate != null) {
-        final (:messageId, :newStatus, :chatId) = statusUpdate;
-
         // Handle status change via notifier
         if (authProvider.token != null) {
           ref
               .read(messageStatusNotifierProvider.notifier)
               .handleStatusChange(
-                messageId,
-                newStatus,
-                chatId: chatId,
+                statusUpdate.messageId,
+                statusUpdate.newStatus,
+                chatId: statusUpdate.chatId,
                 token: authProvider.token!,
               );
         }
@@ -894,19 +448,26 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           children: [
             Row(
               children: [
-                // Avatar with proper fallback handling
-                UserAvatarWidget(
-                  imageUrl: widget.otherUserAvatarUrl,
-                  radius: 16,
-                  username: widget.otherUserName,
-                ),
+                widget.isGroup
+                    ? CircleAvatar(
+                        radius: 16,
+                        backgroundColor: Colors.indigo.shade100,
+                        child: const Icon(Icons.group, color: Colors.indigo, size: 18),
+                      )
+                    : UserAvatarWidget(
+                        imageUrl: widget.otherUserAvatarUrl,
+                        radius: 16,
+                        username: widget.otherUserName,
+                      ),
                 const SizedBox(width: 12),
                 // Name
                 Text(widget.otherUserName),
               ],
             ),
             Text(
-              'Signed in as: ${_displayName(authProvider.user?.username)}',
+              widget.isGroup
+                  ? 'Group conversation'
+                  : 'Signed in as: ${_displayName(authProvider.user?.username)}',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Colors.blue[900],
                 fontWeight: FontWeight.bold,
@@ -917,49 +478,64 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         centerTitle: false,
         elevation: 1,
         actions: [
-          // Search toggle (T020 / GAP-003)
-          IconButton(
-            icon: Icon(_searchActive ? Icons.search_off : Icons.search),
-            tooltip: _searchActive ? 'Close search' : 'Search messages',
-            onPressed: () {
-              setState(() {
-                _searchActive = !_searchActive;
-                if (!_searchActive) {
-                  _searchQuery = '';
-                  _searchResultIds = [];
-                  _searchResultIndex = 0;
+          if (!widget.isGroup)
+            IconButton(
+              icon: Icon(_searchActive ? Icons.search_off : Icons.search),
+              tooltip: _searchActive ? 'Close search' : 'Search messages',
+              onPressed: () {
+                setState(() {
+                  _searchActive = !_searchActive;
+                  if (!_searchActive) {
+                    _searchResultIds = [];
+                    _searchResultIndex = 0;
                     _searchController.clear();
+                  }
+                });
+              },
+            ),
+          if (widget.isGroup)
+            IconButton(
+              icon: const Icon(Icons.group),
+              tooltip: 'View members',
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => GroupChatScreen(
+                      groupId: widget.chatId,
+                      initialGroupName: widget.otherUserName,
+                    ),
+                  ),
+                );
+              },
+            )
+          else
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                if (value == 'toggle_mute') {
+                  _toggleChatMute(token);
                 }
-              });
-            },
-          ),
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              if (value == 'toggle_mute') {
-                _toggleChatMute(token);
-              }
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem<String>(
-                value: 'toggle_mute',
-                child: Row(
-                  children: [
-                    Icon(
-                      _isChatMuted
-                          ? Icons.notifications_active
-                          : Icons.notifications_off,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      _isChatMuted
-                          ? 'Unmute notifications'
-                          : 'Mute notifications',
-                    ),
-                  ],
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem<String>(
+                  value: 'toggle_mute',
+                  child: Row(
+                    children: [
+                      Icon(
+                        _isChatMuted
+                            ? Icons.notifications_active
+                            : Icons.notifications_off,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _isChatMuted
+                            ? 'Unmute notifications'
+                            : 'Mute notifications',
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
         ],
         bottom: _buildHeaderErrorBanner(),
       ),
@@ -972,7 +548,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
               onQueryChanged: (query) async {
                 final trimmed = query.trim();
                 setState(() {
-                  _searchQuery = trimmed;
                   _searchResultIndex = 0;
                 });
                 if (trimmed.length >= 2) {
@@ -1016,7 +591,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
               onClose: () {
                 setState(() {
                   _searchActive = false;
-                  _searchQuery = '';
                   _searchResultIds = [];
                   _searchResultIndex = 0;
                 });
@@ -1137,7 +711,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Start a conversation!',
+              widget.isGroup ? 'Start the group conversation!' : 'Start a conversation!',
               style: Theme.of(
                 context,
               ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
@@ -1202,114 +776,3 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
 ///
 /// Expects [message.decryptedContent] to be JSON with at minimum
 /// `{"pollId": "<uuid>"}`.
-class _PollMessageWidget extends StatefulWidget {
-  final Message message;
-  final String token;
-  final String currentUserId;
-
-  const _PollMessageWidget({
-    super.key,
-    required this.message,
-    required this.token,
-    required this.currentUserId,
-  });
-
-  @override
-  State<_PollMessageWidget> createState() => _PollMessageWidgetState();
-}
-
-class _PollMessageWidgetState extends State<_PollMessageWidget> {
-  PollData? _pollData;
-  String? _error;
-  bool _loading = true;
-
-  late final PollServiceClient _pollService;
-
-  @override
-  void initState() {
-    super.initState();
-    _pollService = PollServiceClient(baseUrl: _backendBaseUrl);
-    _loadPoll();
-  }
-
-  Future<void> _loadPoll() async {
-    final content = widget.message.decryptedContent;
-    if (content == null) {
-      setState(() {
-        _loading = false;
-        _error = 'No poll data';
-      });
-      return;
-    }
-
-    try {
-      final jsonBody = jsonDecode(content) as Map<String, dynamic>;
-      final pollId = jsonBody['pollId'] as String?;
-      if (pollId == null) {
-        setState(() {
-          _loading = false;
-          _error = 'Missing pollId in message';
-        });
-        return;
-      }
-
-      final data = await _pollService.getPoll(
-        pollId: pollId,
-        token: widget.token,
-      );
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _pollData = data;
-        _loading = false;
-      });
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _loading = false;
-        _error = e.toString();
-      });
-    }
-  }
-
-  Future<void> _handleVote(String optionId) async {
-    final pollId = _pollData?.id;
-    if (pollId == null) {
-      return;
-    }
-    await _pollService.vote(
-      token: widget.token,
-      pollId: pollId,
-      optionId: optionId,
-    );
-    await _loadPoll();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_loading) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-        child: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    if (_error != null || _pollData == null) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-        child: Text(
-          '(Poll unavailable)',
-          style: TextStyle(color: Colors.grey.shade600),
-        ),
-      );
-    }
-
-    return PollWidget(
-      poll: _pollData!,
-      onVote: _handleVote,
-    );
-  }
-}

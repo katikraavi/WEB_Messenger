@@ -11,6 +11,8 @@ class LocalNotificationService {
       FlutterLocalNotificationsPlugin();
   bool _initialized = false;
 
+  int _inviteNotificationId(String inviteId) => inviteId.hashCode;
+
   Future<void> initialize({
     required void Function(Map<String, dynamic> payload) onPayloadTap,
   }) async {
@@ -67,7 +69,7 @@ class LocalNotificationService {
     required String body,
   }) async {
     await _plugin.show(
-      inviteId.hashCode,
+      _inviteNotificationId(inviteId),
       title,
       body,
       const NotificationDetails(
@@ -80,5 +82,9 @@ class LocalNotificationService {
         'inviteId': inviteId,
       }),
     );
+  }
+
+  Future<void> dismissInviteNotification(String inviteId) async {
+    await _plugin.cancel(_inviteNotificationId(inviteId));
   }
 }

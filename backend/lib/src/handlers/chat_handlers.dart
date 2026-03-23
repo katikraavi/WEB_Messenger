@@ -1,9 +1,9 @@
 import 'package:shelf/shelf.dart';
 import 'dart:convert';
 import 'package:postgres/postgres.dart';
-import '../models/chat_model.dart';
-import '../models/message_model.dart';
 import '../services/chat_service.dart';
+import '../services/encryption_service.dart';
+import '../services/group_invite_service.dart';
 
 /// HTTP handlers for chat-related endpoints
 /// 
@@ -12,8 +12,9 @@ import '../services/chat_service.dart';
 /// - GET /api/chats/{chatId}/messages - Fetch message history with pagination
 class ChatHandlers {
   final PostgreSQLConnection connection;
+  final EncryptionService encryptionService;
 
-  ChatHandlers(this.connection);
+  ChatHandlers(this.connection, this.encryptionService);
 
   /// Middleware to extract and verify JWT token from request
   /// 
@@ -28,9 +29,6 @@ class ChatHandlers {
             jsonEncode({'error': 'Missing or invalid authorization header'}),
           );
         }
-
-        // Extract token (format: "Bearer <token>")
-        final token = authHeader.substring(7);
 
         // TODO: Validate JWT token and extract userId
         // For now, we'll assume token validation is handled elsewhere
@@ -87,28 +85,61 @@ class ChatHandlers {
 
       print('[ChatHandlers] Pagination: limit=$limit, offset=$offset');
 
-      // Use ChatService to fetch active chats
+      // Use ChatService to fetch active direct chats
       final chatService = ChatService(connection);
       final chats = await chatService.getActiveChats(userId);
 
-      print('[ChatHandlers] ✅ Fetched ${chats.length} chats from service');
+      final groupService = GroupInviteService(
+        connection: connection,
+        encryptionService: encryptionService,
+      );
+      final groups = await groupService.listGroupsForUser(userId);
 
-      // Apply pagination
-      final paginated = chats.skip(offset).take(limit).toList();
+      print('[ChatHandlers] ✅ Fetched ${chats.length} direct chats and ${groups.length} groups from service');
 
-      print('[ChatHandlers] 📦 Paginated to ${paginated.length} chats');
+      final combinedChatJsonList = <Map<String, dynamic>>[
+        for (final chat in chats) chat.toJson(),
+        for (final group in groups)
+          {
+            'id': group['id'],
+            'participant_1_id': userId,
+            'participant_2_id': 'group:${group['id']}',
+            'is_participant_1_archived': false,
+            'is_participant_2_archived': false,
+            'created_at': group['createdAt'],
+            'updated_at': group['createdAt'],
+            'last_message_preview': 'Group chat',
+            'last_message_timestamp': group['createdAt'],
+            'chat_type': 'group',
+            'display_name': group['name'],
+            'member_count': group['memberCount'],
+            'participant_names': group['participantNames'],
+            'my_role': group['myRole'],
+          },
+      ];
 
-      // Convert to JSON
-      final chatJsonList = [for (final chat in paginated) chat.toJson()];
+      combinedChatJsonList.sort((a, b) {
+        final aTime = DateTime.parse(
+          (a['last_message_timestamp'] ?? a['updated_at']) as String,
+        );
+        final bTime = DateTime.parse(
+          (b['last_message_timestamp'] ?? b['updated_at']) as String,
+        );
+        return bTime.compareTo(aTime);
+      });
+
+      final paginated = combinedChatJsonList.skip(offset).take(limit).toList();
+
+      print('[ChatHandlers] 📦 Paginated to ${paginated.length} combined chats');
       
       print('[ChatHandlers] 📤 Chat JSON samples:');
-      for (int i = 0; i < chatJsonList.take(2).length; i++) {
-        print('[ChatHandlers]   Chat $i: ${chatJsonList[i]}');
+      for (int i = 0; i < paginated.take(2).length; i++) {
+        print('[ChatHandlers]   Chat $i: ${paginated[i]}');
       }
 
       final response = {
-        'chats': chatJsonList,
-        'total': chats.length,
+        'chats': paginated,
+        'total': combinedChatJsonList.length,
         'limit': limit,
         'offset': offset,
       };
@@ -174,19 +205,37 @@ class ChatHandlers {
         }
       }
 
+      final groupService = GroupInviteService(
+        connection: connection,
+        encryptionService: encryptionService,
+      );
+
       // Verify user is a participant in this chat
       final chatService = ChatService(connection);
       final chat = await chatService.getChatById(chatId);
-      if (chat == null) {
-        return Response(404, body: jsonEncode({'error': 'Chat not found'}));
-      }
+      if (chat != null) {
+        if (!chat.isParticipant(userId)) {
+          return Response(403, body: jsonEncode({'error': 'User is not a participant in this chat'}));
+        }
+      } else {
+        final groupExists = await groupService.groupExists(chatId);
+        if (!groupExists) {
+          return Response(404, body: jsonEncode({'error': 'Chat not found'}));
+        }
 
-      if (!chat.isParticipant(userId)) {
-        return Response(403, body: jsonEncode({'error': 'User is not a participant in this chat'}));
+        final isGroupMember = await groupService.isGroupMember(chatId, userId);
+        if (!isGroupMember) {
+          return Response(403, body: jsonEncode({'error': 'User is not a participant in this chat'}));
+        }
       }
 
       // Fetch messages
-      final messages = await chatService.getMessages(chatId, limit: limit, beforeCursor: beforeCursor);
+      final messages = await chatService.getMessages(
+        chatId,
+        viewerUserId: userId,
+        limit: limit,
+        beforeCursor: beforeCursor,
+      );
 
       // For MVP: Frontend will decrypt the encrypted_content on the client side
       // Just pass through the messages as-is

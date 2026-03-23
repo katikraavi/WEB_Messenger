@@ -69,7 +69,11 @@ class LocalMessagesNotifier extends StateNotifier<List<Message>> {
   /// Mark all currently unread messages as read (called when chat becomes visible)
   Future<void> markAllUnreadAsRead() async {
     final unreadMessages = state
-        .where((m) => m.status != 'read' && m.senderId != currentUserId)
+        .where(
+          (m) =>
+              m.status != 'read' &&
+              m.senderId != currentUserId,
+        )
         .toList();
 
     if (unreadMessages.isEmpty) {
@@ -157,9 +161,20 @@ class LocalMessagesNotifier extends StateNotifier<List<Message>> {
       else if (event.type == WebSocketEventType.messageStatusChanged) {
         final messageId = event.data['messageId'] as String?;
         final newStatus = event.data['newStatus'] as String?;
+        final aggregateStatus = event.data['aggregateStatus'] as String?;
+        final recipientCount = event.data['recipientCount'] as int?;
+        final deliveredCount = event.data['deliveredCount'] as int?;
+        final readCount = event.data['readCount'] as int?;
 
         if (messageId != null && newStatus != null) {
-          updateMessageStatus(messageId, newStatus);
+          updateMessageStatus(
+            messageId,
+            newStatus,
+            aggregateStatus: aggregateStatus,
+            recipientCount: recipientCount,
+            deliveredCount: deliveredCount,
+            readCount: readCount,
+          );
         }
       } else if (event.type == WebSocketEventType.messageEdited) {
         final message = Message.fromJson(event.data);
@@ -317,19 +332,41 @@ class LocalMessagesNotifier extends StateNotifier<List<Message>> {
   }
 
   /// Update message status - only allow status upgrades (sent → delivered → read), never downgrades
-  void updateMessageStatus(String messageId, String newStatus) {
+  void updateMessageStatus(
+    String messageId,
+    String newStatus, {
+    String? aggregateStatus,
+    int? recipientCount,
+    int? deliveredCount,
+    int? readCount,
+  }) {
     final index = state.indexWhere((m) => m.id == messageId);
     if (index >= 0) {
       final updated = state[index];
+      final nextStatus = updated.senderId == currentUserId
+          ? (aggregateStatus ?? newStatus)
+          : newStatus;
       final currentStatus = updated.status;
 
       // Only update if it's a genuine upgrade in status hierarchy
-      if (_isStatusUpgrade(currentStatus, newStatus)) {
+      if (_isStatusUpgrade(currentStatus, nextStatus)) {
         final newList = [...state];
         // Use copyWith to preserve all fields and just update status
-        newList[index] = updated.copyWith(status: newStatus);
+        newList[index] = updated.copyWith(
+          status: nextStatus,
+          recipientCount: recipientCount,
+          deliveredCount: deliveredCount,
+          readCount: readCount,
+        );
         state = newList;
-      } else if (currentStatus == newStatus) {
+      } else if (currentStatus == nextStatus) {
+        final newList = [...state];
+        newList[index] = updated.copyWith(
+          recipientCount: recipientCount,
+          deliveredCount: deliveredCount,
+          readCount: readCount,
+        );
+        state = newList;
       } else {
       }
     } else {
@@ -339,6 +376,13 @@ class LocalMessagesNotifier extends StateNotifier<List<Message>> {
   /// Mark message as read AND call API (for incoming messages when chat is open)
   Future<void> markAsReadAndBroadcast(String messageId, String chatId) async {
     try {
+      final targetMessage = state.cast<Message?>().firstWhere(
+            (message) => message?.id == messageId,
+            orElse: () => null,
+          );
+      if (targetMessage == null) {
+        return;
+      }
 
       // First update local state
       updateMessageStatus(messageId, 'read');

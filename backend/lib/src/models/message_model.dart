@@ -63,6 +63,18 @@ class Message {
   @JsonKey(name: 'media_type')
   final String? mediaType;
 
+  /// Number of recipients tracked for this message.
+  @JsonKey(name: 'recipient_count')
+  final int? recipientCount;
+
+  /// Number of recipients that have received the message.
+  @JsonKey(name: 'delivered_count')
+  final int? deliveredCount;
+
+  /// Number of recipients that have read the message.
+  @JsonKey(name: 'read_count')
+  final int? readCount;
+
   /// Decrypted plaintext (in-memory only, never persisted)
   /// This is populated after decryption by the service layer
   @JsonKey(ignore: true)
@@ -81,6 +93,9 @@ class Message {
     this.isDeleted = false,
     this.mediaUrl,
     this.mediaType,
+    this.recipientCount,
+    this.deliveredCount,
+    this.readCount,
     this.decryptedContent,
   });
 
@@ -101,6 +116,9 @@ class Message {
       isDeleted: row.length > 10 && row[10] != null ? row[10] as bool : false,
       mediaUrl: row.length > 11 ? row[11] as String? : null,
       mediaType: row.length > 12 ? row[12] as String? : null,
+      recipientCount: row.length > 13 ? row[13] as int? : null,
+      deliveredCount: row.length > 14 ? row[14] as int? : null,
+      readCount: row.length > 15 ? row[15] as int? : null,
     );
   }
   
@@ -149,7 +167,10 @@ class Message {
           deletedAt == other.deletedAt &&
           isDeleted == other.isDeleted &&
           mediaUrl == other.mediaUrl &&
-          mediaType == other.mediaType;
+          mediaType == other.mediaType &&
+          recipientCount == other.recipientCount &&
+          deliveredCount == other.deliveredCount &&
+          readCount == other.readCount;
 
   @override
   int get hashCode =>
@@ -164,5 +185,8 @@ class Message {
       deletedAt.hashCode ^
       isDeleted.hashCode ^
       mediaUrl.hashCode ^
-      mediaType.hashCode;
+      mediaType.hashCode ^
+      recipientCount.hashCode ^
+      deliveredCount.hashCode ^
+      readCount.hashCode;
 }

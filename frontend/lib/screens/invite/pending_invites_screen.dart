@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'invite_service.dart';
+import '../../core/notifications/local_notification_service.dart';
 import '../../features/chats/widgets/user_avatar_widget.dart';
 
 class PendingInvitesScreen extends StatefulWidget {
@@ -57,6 +58,9 @@ class _PendingInvitesScreenState extends State<PendingInvitesScreen> {
 
     try {
       await _inviteService.acceptInvite(inviteId);
+      await LocalNotificationService.instance.dismissInviteNotification(
+        inviteId,
+      );
       setState(() {
         _invites.removeWhere((invite) => invite.id == inviteId);
         _acceptingInvites.remove(inviteId);
@@ -87,6 +91,9 @@ class _PendingInvitesScreenState extends State<PendingInvitesScreen> {
 
     try {
       await _inviteService.declineInvite(inviteId);
+      await LocalNotificationService.instance.dismissInviteNotification(
+        inviteId,
+      );
       setState(() {
         _invites.removeWhere((invite) => invite.id == inviteId);
         _decliningInvites.remove(inviteId);

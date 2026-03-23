@@ -8,19 +8,42 @@ import '../providers/network_provider.dart';
 import '../services/invite_error_handler.dart';
 import '../services/resilient_http_client.dart';
 import '../services/group_invite_service.dart';
+import '../../../core/notifications/local_notification_service.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../chats/widgets/user_avatar_widget.dart';
+import '../../chats/screens/create_group_screen.dart';
+import '../../chats/providers/active_chats_provider.dart';
+import '../../chats/providers/chats_provider.dart';
 import 'send_invite_picker_screen.dart';
+
+part 'invitations_helpers.dart';
+part 'invitations_group_list.dart';
 
 /// Main invitations screen - shows all invitations (pending and sent) in a single unified view
 class InvitationsScreen extends ConsumerWidget {
   const InvitationsScreen({Key? key}) : super(key: key);
+
+  String _badgeLabel(int count) {
+    if (count > 99) {
+      return '99+';
+    }
+    return count.toString();
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
 
     // Watch real-time updates from WebSocket to enable automatic refresh
     ref.watch(invitationRealtimeUpdatesProvider);
+
+    final directPendingCount = ref.watch(pendingInvitesProvider).maybeWhen(
+      data: (invites) => invites.length,
+      orElse: () => 0,
+    );
+    final groupPendingCount = ref.watch(pendingGroupInvitesProvider).maybeWhen(
+      data: (invites) => invites.length,
+      orElse: () => 0,
+    );
 
     // Watch network status
     final networkStatus = ref.watch(networkStatusProvider);
@@ -38,6 +61,7 @@ class InvitationsScreen extends ConsumerWidget {
               onPressed: () {
                 ref.refresh(pendingInvitesProvider);
                 ref.refresh(sentInvitesProvider);
+                ref.invalidate(pendingGroupInvitesProvider);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Refreshing invitations...'),
@@ -48,20 +72,93 @@ class InvitationsScreen extends ConsumerWidget {
             ),
             IconButton(
               icon: const Icon(Icons.add),
-              tooltip: 'Send New Invite',
-              onPressed: () {
-                Navigator.of(context).push(
+              tooltip: 'Create or Invite',
+              onPressed: () async {
+                final action = await showModalBottomSheet<String>(
+                  context: context,
+                  builder: (sheetContext) {
+                    return SafeArea(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ListTile(
+                            leading: const Icon(Icons.person_add_alt_1),
+                            title: const Text('Send Direct Invite'),
+                            subtitle: const Text('Invite a user to a 1:1 chat'),
+                            onTap: () => Navigator.of(sheetContext).pop('invite'),
+                          ),
+                          ListTile(
+                            leading: const Icon(Icons.group_add),
+                            title: const Text('Create Group Chat'),
+                            subtitle: const Text('Start a new group conversation'),
+                            onTap: () => Navigator.of(sheetContext).pop('group'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                );
+
+                if (!context.mounted || action == null) {
+                  return;
+                }
+
+                if (action == 'invite') {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const SendInvitePickerScreen(),
+                    ),
+                  );
+                  return;
+                }
+
+                final createdGroupId = await Navigator.of(context).push<String>(
                   MaterialPageRoute(
-                    builder: (context) => const SendInvitePickerScreen(),
+                    builder: (context) => const CreateGroupScreen(),
+                  ),
+                );
+
+                if (!context.mounted || createdGroupId == null) {
+                  return;
+                }
+
+                final authProvider = provider.Provider.of<AuthProvider>(
+                  context,
+                  listen: false,
+                );
+                final token = authProvider.token;
+                if (token != null && token.isNotEmpty) {
+                  ref.invalidate(chatsProvider(token));
+                  ref.invalidate(activeChatListProvider(token));
+                }
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Group created: $createdGroupId'),
+                    backgroundColor: Colors.green,
                   ),
                 );
               },
             ),
           ],
-          bottom: const TabBar(
+          bottom: TabBar(
             tabs: [
-              Tab(icon: Icon(Icons.person), text: 'Direct'),
-              Tab(icon: Icon(Icons.group), text: 'Groups'),
+              Tab(
+                icon: Badge(
+                  isLabelVisible: directPendingCount > 0,
+                  label: Text(_badgeLabel(directPendingCount)),
+                  child: const Icon(Icons.person),
+                ),
+                text: 'Direct',
+              ),
+              Tab(
+                icon: Badge(
+                  isLabelVisible: groupPendingCount > 0,
+                  label: Text(_badgeLabel(groupPendingCount)),
+                  child: const Icon(Icons.group),
+                ),
+                text: 'Groups',
+              ),
             ],
           ),
         ),
@@ -156,11 +253,12 @@ class _UnifiedInvitationsList extends ConsumerWidget {
       data: (pending) {
         return sentInvites.when(
           data: (sent) {
+            final pendingSent = sent.where((invite) => invite.status == 'pending');
 
             // Create unified list
             final allInvitations = [
               ...pending.map((i) => {'type': 'incoming', 'data': i}),
-              ...sent.map((i) => {'type': 'outgoing', 'data': i}),
+              ...pendingSent.map((i) => {'type': 'outgoing', 'data': i}),
             ];
 
             if (allInvitations.isEmpty) {
@@ -288,6 +386,11 @@ class _UnifiedInvitationsList extends ConsumerWidget {
                                                       .notifier,
                                                 )
                                                 .acceptInvite(invite.id);
+                                            await LocalNotificationService
+                                                .instance
+                                                .dismissInviteNotification(
+                                                  invite.id,
+                                                );
                                             if (context.mounted) {
                                               ref.refresh(
                                                 pendingInvitesProvider,
@@ -329,6 +432,11 @@ class _UnifiedInvitationsList extends ConsumerWidget {
                                                               .notifier,
                                                         )
                                                         .acceptInvite(
+                                                          invite.id,
+                                                        );
+                                                    await LocalNotificationService
+                                                        .instance
+                                                        .dismissInviteNotification(
                                                           invite.id,
                                                         );
                                                     if (context.mounted) {
@@ -387,6 +495,11 @@ class _UnifiedInvitationsList extends ConsumerWidget {
                                                       .notifier,
                                                 )
                                                 .declineInvite(invite.id);
+                                            await LocalNotificationService
+                                                .instance
+                                                .dismissInviteNotification(
+                                                  invite.id,
+                                                );
                                             if (context.mounted) {
                                               ref.refresh(
                                                 pendingInvitesProvider,
@@ -428,6 +541,11 @@ class _UnifiedInvitationsList extends ConsumerWidget {
                                                               .notifier,
                                                         )
                                                         .declineInvite(
+                                                          invite.id,
+                                                        );
+                                                    await LocalNotificationService
+                                                        .instance
+                                                        .dismissInviteNotification(
                                                           invite.id,
                                                         );
                                                     if (context.mounted) {
@@ -615,434 +733,6 @@ class _UnifiedInvitationsList extends ConsumerWidget {
                 child: const Text('Retry'),
               ),
             ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-String _formatDate(DateTime dateTime) {
-  final now = DateTime.now();
-  final difference = now.difference(dateTime);
-
-  if (difference.inSeconds < 60) {
-    return 'just now';
-  } else if (difference.inMinutes < 60) {
-    return '${difference.inMinutes}m ago';
-  } else if (difference.inHours < 24) {
-    return '${difference.inHours}h ago';
-  } else if (difference.inDays < 7) {
-    return '${difference.inDays}d ago';
-  } else {
-    return '${dateTime.month}/${dateTime.day}/${dateTime.year}';
-  }
-}
-
-Widget _buildStatusBadge(String status) {
-  Color backgroundColor;
-  Color textColor;
-  String displayText;
-  IconData? icon;
-
-  switch (status.toLowerCase()) {
-    case 'pending':
-      backgroundColor = Colors.amber.withValues(alpha: 0.2);
-      textColor = Colors.amber[800]!;
-      displayText = 'Pending';
-      icon = Icons.schedule;
-      break;
-    case 'accepted':
-      backgroundColor = Colors.green.withValues(alpha: 0.2);
-      textColor = Colors.green[800]!;
-      displayText = 'Accepted';
-      icon = Icons.check_circle;
-      break;
-    case 'declined':
-      backgroundColor = Colors.red.withValues(alpha: 0.2);
-      textColor = Colors.red[800]!;
-      displayText = 'Declined';
-      icon = Icons.cancel;
-      break;
-    case 'canceled':
-      backgroundColor = Colors.grey.withValues(alpha: 0.2);
-      textColor = Colors.grey[800]!;
-      displayText = 'Canceled';
-      icon = Icons.block;
-      break;
-    default:
-      backgroundColor = Colors.grey.withValues(alpha: 0.2);
-      textColor = Colors.grey[800]!;
-      displayText = status;
-      icon = null;
-  }
-
-  return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-    decoration: BoxDecoration(
-      color: backgroundColor,
-      borderRadius: BorderRadius.circular(12),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (icon != null) ...[
-          Icon(icon, size: 12, color: textColor),
-          const SizedBox(width: 4),
-        ],
-        Text(
-          displayText,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: textColor,
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-void _showErrorDialog(
-  BuildContext context,
-  String title,
-  String message, {
-  VoidCallback? onRetry,
-  dynamic error,
-}) {
-  final isOffline =
-      InviteErrorHandler.indicatesOfflineState(error) ||
-      (error?.toString().contains('Connection') ?? false);
-  final isRecoverable = InviteErrorHandler.isRecoverableError(error);
-  final suggestion = InviteErrorHandler.getRecoverySuggestion(error);
-  final severity = InviteErrorHandler.getErrorSeverity(error);
-
-  showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: Row(
-        children: [
-          Icon(
-            severity == ErrorSeverity.critical ? Icons.error : Icons.warning,
-            color: severity == ErrorSeverity.critical
-                ? Colors.red
-                : Colors.orange,
-            size: 24,
-          ),
-          const SizedBox(width: 8),
-          Expanded(child: Text(title)),
-        ],
-      ),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(message),
-            if (isOffline) ...[const SizedBox(height: 12), _buildOfflineHint()],
-            if (isRecoverable && !isOffline) ...[
-              const SizedBox(height: 12),
-              _buildRecoveryHint(suggestion),
-            ],
-            if (suggestion.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              _buildSuggestionChips(suggestion),
-            ],
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Dismiss'),
-        ),
-        if (isRecoverable && onRetry != null)
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.pop(context);
-              onRetry();
-            },
-            icon: const Icon(Icons.refresh),
-            label: const Text('Retry'),
-          )
-        else if (isOffline && onRetry != null)
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.pop(context);
-              // Show Toast instead of immediate retry
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Waiting for connection... Please check your network.',
-                  ),
-                  duration: Duration(seconds: 3),
-                  backgroundColor: Colors.orange,
-                ),
-              );
-            },
-            icon: const Icon(Icons.cloud_off),
-            label: const Text('Waiting...'),
-          ),
-      ],
-    ),
-  );
-}
-
-/// Build offline connection hint
-Widget _buildOfflineHint() {
-  return Container(
-    padding: const EdgeInsets.all(8),
-    decoration: BoxDecoration(
-      color: Colors.red[50],
-      border: Border.all(color: Colors.red[200]!),
-      borderRadius: BorderRadius.circular(4),
-    ),
-    child: Row(
-      children: [
-        Icon(Icons.cloud_off, color: Colors.red[700], size: 18),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            'No internet connection detected. Please enable WiFi or mobile data.',
-            style: TextStyle(color: Colors.red[700], fontSize: 12),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-/// Build recovery hint
-Widget _buildRecoveryHint(String suggestion) {
-  return Container(
-    padding: const EdgeInsets.all(8),
-    decoration: BoxDecoration(
-      color: Colors.blue[50],
-      border: Border.all(color: Colors.blue[200]!),
-      borderRadius: BorderRadius.circular(4),
-    ),
-    child: Row(
-      children: [
-        Icon(Icons.info, color: Colors.blue[700], size: 18),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            'Try: $suggestion',
-            style: TextStyle(color: Colors.blue[700], fontSize: 12),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-/// Build suggestion action chips
-Widget _buildSuggestionChips(String suggestionText) {
-  final suggestions = suggestionText.split('•').map((s) => s.trim()).toList();
-
-  return Wrap(
-    spacing: 6,
-    children: suggestions
-        .where((s) => s.isNotEmpty)
-        .map(
-          (suggestion) => Chip(
-            label: Text(suggestion, style: const TextStyle(fontSize: 11)),
-            backgroundColor: Colors.grey[200],
-            onDeleted: null,
-          ),
-        )
-        .toList(),
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Group Invitations Tab
-// ---------------------------------------------------------------------------
-
-/// Stateful widget that loads and displays pending group invitations.
-class _GroupInvitationsList extends StatefulWidget {
-  final String token;
-
-  const _GroupInvitationsList({required this.token});
-
-  @override
-  State<_GroupInvitationsList> createState() => _GroupInvitationsListState();
-}
-
-class _GroupInvitationsListState extends State<_GroupInvitationsList> {
-  static const String _baseUrl = 'http://localhost:8081';
-
-  late final GroupInviteService _service;
-  late Future<List<GroupInviteModel>> _future;
-
-  @override
-  void initState() {
-    super.initState();
-    _service = GroupInviteService(baseUrl: _baseUrl);
-    _load();
-  }
-
-  void _load() {
-    _future = _service.fetchPendingInvites(token: widget.token);
-  }
-
-  Future<void> _refresh() async {
-    setState(() => _load());
-  }
-
-  Future<void> _accept(String inviteId) async {
-    try {
-      await _service.acceptInvite(token: widget.token, inviteId: inviteId);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Group invite accepted!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        _refresh();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to accept: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _decline(String inviteId) async {
-    try {
-      await _service.declineInvite(token: widget.token, inviteId: inviteId);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Group invite declined')),
-        );
-        _refresh();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to decline: $e')),
-        );
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<List<GroupInviteModel>>(
-      future: _future,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (snapshot.hasError) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
-                const SizedBox(height: 12),
-                Text('Failed to load group invites'),
-                const SizedBox(height: 12),
-                ElevatedButton.icon(
-                  onPressed: _refresh,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Retry'),
-                ),
-              ],
-            ),
-          );
-        }
-
-        final invites = snapshot.data ?? [];
-
-        if (invites.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.group_outlined, size: 64, color: Colors.grey[400]),
-                const SizedBox(height: 16),
-                const Text('No pending group invitations'),
-              ],
-            ),
-          );
-        }
-
-        return RefreshIndicator(
-          onRefresh: _refresh,
-          child: ListView.builder(
-            padding: const EdgeInsets.all(8),
-            itemCount: invites.length,
-            itemBuilder: (context, index) {
-              final invite = invites[index];
-              return Card(
-                margin: const EdgeInsets.symmetric(vertical: 8),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.group, size: 36, color: Colors.indigo),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  invite.groupName,
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Invited by ${invite.invitedByUsername}',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () => _accept(invite.id),
-                              icon: const Icon(Icons.check, size: 18),
-                              label: const Text('Accept'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                foregroundColor: Colors.white,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () => _decline(invite.id),
-                              icon: const Icon(Icons.close, size: 18),
-                              label: const Text('Decline'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
           ),
         );
       },

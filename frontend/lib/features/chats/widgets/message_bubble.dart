@@ -177,7 +177,7 @@ class MessageBubble extends StatelessWidget {
                               ],
                               const SizedBox(width: 6),
                               // Status indicator (only for sent messages)
-                              if (isSentByUser)
+                              if (isSentByUser && message.hasReceiptTracking)
                                 MessageStatusIndicator(
                                   key: ValueKey('${message.id}_${message.status}'),
                                   message: message,

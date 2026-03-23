@@ -54,31 +54,48 @@ class MessageService {
     }
 
     try {
-      // Verify sender is a participant of the chat
-      final chatResult = await connection.query(
+      final directChatResult = await connection.query(
         'SELECT participant_1_id, participant_2_id FROM chats WHERE id = @chatId',
         substitutionValues: {'chatId': chatId},
       );
 
-      if (chatResult.isEmpty) {
-        throw ArgumentError('Chat not found: $chatId');
-      }
+      String? recipientId;
+      List<String> trackedRecipientIds = const [];
+      final isDirectChat = directChatResult.isNotEmpty;
 
-      final participant1 = chatResult.first[0] as String;
-      final participant2 = chatResult.first[1] as String;
+      if (isDirectChat) {
+        final participant1 = directChatResult.first[0] as String;
+        final participant2 = directChatResult.first[1] as String;
 
-      if (senderId != participant1 && senderId != participant2) {
-        throw ArgumentError(
-          'Sender $senderId is not a participant in chat $chatId',
+        if (senderId != participant1 && senderId != participant2) {
+          throw ArgumentError(
+            'Sender $senderId is not a participant in chat $chatId',
+          );
+        }
+
+        recipientId = senderId == participant1 ? participant2 : participant1;
+        trackedRecipientIds = [recipientId];
+      } else {
+        final groupResult = await connection.query(
+          '''SELECT 1
+             FROM group_members
+             WHERE group_id = @chatId AND user_id = @senderId
+             LIMIT 1''',
+          substitutionValues: {
+            'chatId': chatId,
+            'senderId': senderId,
+          },
         );
-      }
 
-      // Determine recipient (the other participant)
-      final recipientId = senderId == participant1 ? participant2 : participant1;
+        if (groupResult.isEmpty) {
+          throw ArgumentError('Chat not found: $chatId');
+        }
+
+        trackedRecipientIds = await _listOtherGroupMemberIds(chatId, senderId);
+      }
 
       // Create and store the message
       final messageId = _uuid.v4();
-      final statusId = _uuid.v4();
       final now = DateTime.now();
 
       await connection.execute(
@@ -98,25 +115,27 @@ class MessageService {
         },
       );
 
-      // Create message_delivery_status entry with 'sent' status (T020)
-      await connection.execute(
-        '''
-        INSERT INTO message_delivery_status (id, message_id, recipient_id, status, updated_at)
-        VALUES (@statusId, @messageId, @recipientId, 'sent', @now)
-        ''',
-        substitutionValues: {
-          'statusId': statusId,
-          'messageId': messageId,
-          'recipientId': recipientId,
-          'now': now,
-        },
-      );
+      for (final trackedRecipientId in trackedRecipientIds) {
+        await connection.execute(
+          '''
+          INSERT INTO message_delivery_status (id, message_id, recipient_id, status, updated_at)
+          VALUES (@statusId, @messageId, @recipientId, 'sent', @now)
+          ''',
+          substitutionValues: {
+            'statusId': _uuid.v4(),
+            'messageId': messageId,
+            'recipientId': trackedRecipientId,
+            'now': now,
+          },
+        );
+      }
 
-      // Update chat's updated_at timestamp to reflect latest message
-      await connection.execute(
-        'UPDATE chats SET updated_at = NOW() WHERE id = @chatId',
-        substitutionValues: {'chatId': chatId},
-      );
+      if (recipientId != null) {
+        await connection.execute(
+          'UPDATE chats SET updated_at = NOW() WHERE id = @chatId',
+          substitutionValues: {'chatId': chatId},
+        );
+      }
 
       return Message(
         id: messageId,
@@ -128,6 +147,9 @@ class MessageService {
         createdAt: now,
         mediaUrl: mediaUrl,
         mediaType: mediaType,
+        recipientCount: trackedRecipientIds.length,
+        deliveredCount: 0,
+        readCount: 0,
       );
     } catch (e) {
       throw Exception(
@@ -188,6 +210,108 @@ class MessageService {
     } catch (e) {
       throw Exception('Failed to validate receiver: $e');
     }
+  }
+
+  Future<bool> isGroupMessage(String messageId) async {
+    try {
+      final result = await connection.query(
+        '''SELECT recipient_id
+           FROM $_tableName
+           WHERE id = @messageId
+           LIMIT 1''',
+        substitutionValues: {'messageId': messageId},
+      );
+
+      if (result.isEmpty) {
+        return false;
+      }
+
+      return result.first[0] == null;
+    } catch (e) {
+      throw Exception('Failed to check message type: $e');
+    }
+  }
+
+  Future<Map<String, int>> getMessageReceiptCounts(String messageId) async {
+    try {
+      final result = await connection.query(
+        '''SELECT COUNT(*)::int AS recipient_count,
+                  COUNT(CASE WHEN status IN ('delivered', 'read') THEN 1 END)::int AS delivered_count,
+                  COUNT(CASE WHEN status = 'read' THEN 1 END)::int AS read_count
+           FROM message_delivery_status
+           WHERE message_id = @messageId''',
+        substitutionValues: {'messageId': messageId},
+      );
+
+      if (result.isEmpty) {
+        return {
+          'recipient_count': 0,
+          'delivered_count': 0,
+          'read_count': 0,
+        };
+      }
+
+      return {
+        'recipient_count': result.first[0] as int? ?? 0,
+        'delivered_count': result.first[1] as int? ?? 0,
+        'read_count': result.first[2] as int? ?? 0,
+      };
+    } catch (e) {
+      throw Exception('Failed to get receipt counts: $e');
+    }
+  }
+
+  Future<String> getAggregateMessageStatus(String messageId) async {
+    try {
+      final counts = await getMessageReceiptCounts(messageId);
+      final recipientCount = counts['recipient_count'] ?? 0;
+      final deliveredCount = counts['delivered_count'] ?? 0;
+      final readCount = counts['read_count'] ?? 0;
+
+      if (recipientCount == 0) {
+        final message = await getMessageById(messageId);
+        return message?.status ?? 'sent';
+      }
+
+      if (readCount == recipientCount) {
+        return 'read';
+      }
+
+      if (deliveredCount > 0) {
+        return 'delivered';
+      }
+
+      return 'sent';
+    } catch (e) {
+      throw Exception('Failed to get aggregate status: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> getReceiptSummary(String messageId) async {
+    final counts = await getMessageReceiptCounts(messageId);
+    final aggregateStatus = await getAggregateMessageStatus(messageId);
+
+    return {
+      ...counts,
+      'aggregate_status': aggregateStatus,
+    };
+  }
+
+  Future<List<String>> _listOtherGroupMemberIds(
+    String groupId,
+    String senderId,
+  ) async {
+    final result = await connection.query(
+      '''SELECT user_id
+         FROM group_members
+         WHERE group_id = @groupId AND user_id != @senderId''',
+      substitutionValues: {
+        'groupId': groupId,
+        'senderId': senderId,
+      },
+    );
+
+    return result.map((row) => row[0] as String).toList();
   }
 
   /// Encrypt plaintext message content (MVP: Base64 encoding)

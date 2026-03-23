@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/message_model.dart';
 import '../services/chat_api_service.dart';
 import '../services/message_websocket_service.dart';
 import '../services/message_encryption_service.dart';
@@ -11,6 +10,11 @@ final messageStatusUpdateProvider = StreamProvider.autoDispose<({
   String messageId,
   String newStatus,
   String chatId,
+  String? aggregateStatus,
+  int? recipientCount,
+  int? deliveredCount,
+  int? readCount,
+  String? updatedBy,
 })?>(
   (ref) async* {
     // Watch WebSocket service to get access to event stream
@@ -27,6 +31,11 @@ final messageStatusUpdateProvider = StreamProvider.autoDispose<({
             messageId: messageId,
             newStatus: newStatus,
             chatId: event.chatId,
+            aggregateStatus: event.data['aggregateStatus'] as String?,
+            recipientCount: event.data['recipientCount'] as int?,
+            deliveredCount: event.data['deliveredCount'] as int?,
+            readCount: event.data['readCount'] as int?,
+            updatedBy: event.data['updatedBy'] as String?,
           );
         }
       }
@@ -37,9 +46,9 @@ final messageStatusUpdateProvider = StreamProvider.autoDispose<({
 /// Provider to auto-mark messages as read when viewing a chat
 /// Call this when entering a chat to mark all unread messages as 'read'
 final autoMarkAsReadProvider =
-    FutureProvider.family<void, ({String chatId, String token, String currentUserId})>(
+    FutureProvider.family<void, ({String chatId, String token, String currentUserId, bool isGroup})>(
   (ref, params) async {
-    final (:chatId, :token, :currentUserId) = params;
+    final (:chatId, :token, :currentUserId, :isGroup) = params;
     final apiService = ChatApiService(baseUrl: 'http://localhost:8081');
 
     try {
@@ -51,12 +60,6 @@ final autoMarkAsReadProvider =
         limit: 50,
       );
       
-      
-      // Show all message statuses to debug
-      final statuses = fetchedMessages.map((m) => m.status).toList();
-      final sentCount = fetchedMessages.where((m) => m.status == 'sent').length;
-      final deliveredCount = fetchedMessages.where((m) => m.status == 'delivered').length;
-      final readCount = fetchedMessages.where((m) => m.status == 'read').length;
       
       // Decrypt messages
       final decryptedMessages = await MessageEncryptionService.decryptMessages(fetchedMessages);
@@ -74,7 +77,6 @@ final autoMarkAsReadProvider =
       }
 
       // Mark each unread message as read
-      int successCount = 0;
       for (final message in unreadMessages) {
         try {
           await apiService.updateMessageStatus(
@@ -83,7 +85,6 @@ final autoMarkAsReadProvider =
             messageId: message.id,
             newStatus: 'read',
           );
-          successCount++;
         } catch (e) {
         }
       }
@@ -97,12 +98,9 @@ final autoMarkAsReadProvider =
 /// Provider to update local message with new status
 /// This is called when a messageStatusChanged event is received
 class MessageStatusNotifier extends StateNotifier<void> {
-  final ChatApiService _apiService;
-  final Ref _ref;
-
   MessageStatusNotifier(
-    this._apiService,
-    this._ref,
+    ChatApiService apiService,
+    Ref ref,
   ) : super(null);
 
   /// Handle status change event

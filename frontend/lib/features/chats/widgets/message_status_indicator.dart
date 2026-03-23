@@ -89,6 +89,10 @@ class _MessageStatusIndicatorState extends State<MessageStatusIndicator>
 
   /// Build status icon based on message status
   Widget _buildStatusIcon() {
+    if (widget.message.isGroupReceiptTracking) {
+      return _buildGroupReceiptSummary();
+    }
+
     final status = widget.message.status;
     final isRead = status == 'read';
     final isDelivered = status == 'delivered';
@@ -100,6 +104,44 @@ class _MessageStatusIndicatorState extends State<MessageStatusIndicator>
     } else {
       return _buildSingleCheckmark();
     }
+  }
+
+  Widget _buildGroupReceiptSummary() {
+    final recipientCount = widget.message.recipientCount ?? 0;
+    final deliveredCount = widget.message.deliveredCount ?? 0;
+    final readCount = widget.message.readCount ?? 0;
+
+    String label;
+    Color color;
+
+    if (recipientCount == 0) {
+      label = 'Sent';
+      color = Colors.grey.shade500;
+    } else if (readCount == recipientCount) {
+      label = 'Read $readCount/$recipientCount';
+      color = Colors.yellow.shade700;
+    } else if (readCount > 0) {
+      label = 'Read $readCount/$recipientCount';
+      color = Colors.yellow.shade700;
+    } else if (deliveredCount > 0) {
+      label = 'Delivered $deliveredCount/$recipientCount';
+      color = Colors.grey.shade600;
+    } else {
+      label = 'Sent';
+      color = Colors.grey.shade500;
+    }
+
+    return Tooltip(
+      message: label,
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
+    );
   }
 
   /// Build single checkmark icon (sent status)

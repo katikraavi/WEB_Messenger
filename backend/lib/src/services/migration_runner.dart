@@ -608,6 +608,62 @@ class MigrationRunner {
           DROP TABLE IF EXISTS device_sessions CASCADE;
         ''',
       ),
+      Migration(
+        version: 23,
+        description: 'Create group_chats, group_members, group_invites tables',
+        upSql: '''
+          CREATE TABLE IF NOT EXISTS group_chats (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            name TEXT NOT NULL,
+            created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            is_public BOOLEAN NOT NULL DEFAULT false
+          );
+
+          CREATE TABLE IF NOT EXISTS group_members (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            group_id UUID NOT NULL REFERENCES group_chats(id) ON DELETE CASCADE,
+            user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            role TEXT NOT NULL DEFAULT 'member',
+            joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            UNIQUE (group_id, user_id)
+          );
+
+          CREATE TABLE IF NOT EXISTS group_invites (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            group_id UUID NOT NULL REFERENCES group_chats(id) ON DELETE CASCADE,
+            sender_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            receiver_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            status TEXT NOT NULL DEFAULT 'pending',
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            UNIQUE (group_id, receiver_id)
+          );
+
+          CREATE INDEX IF NOT EXISTS idx_group_members_user
+          ON group_members(user_id);
+
+          CREATE INDEX IF NOT EXISTS idx_group_invites_receiver
+          ON group_invites(receiver_id, status);
+        ''',
+        downSql: '''
+          DROP TABLE IF EXISTS group_invites CASCADE;
+          DROP TABLE IF EXISTS group_members CASCADE;
+          DROP TABLE IF EXISTS group_chats CASCADE;
+        ''',
+      ),
+      Migration(
+        version: 24,
+        description: 'Allow messages.chat_id to reference direct or group threads',
+        upSql: '''
+          ALTER TABLE messages
+          DROP CONSTRAINT IF EXISTS messages_chat_id_fkey;
+        ''',
+        downSql: '''
+          ALTER TABLE messages
+          ADD CONSTRAINT messages_chat_id_fkey
+          FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE;
+        ''',
+      ),
     ]);
   }
 

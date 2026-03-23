@@ -34,6 +34,114 @@ class GroupInviteModel {
   }
 }
 
+class GroupSummaryModel {
+  final String id;
+  final String name;
+  final String createdBy;
+  final DateTime createdAt;
+  final bool isPublic;
+  final String myRole;
+  final int memberCount;
+
+  GroupSummaryModel({
+    required this.id,
+    required this.name,
+    required this.createdBy,
+    required this.createdAt,
+    required this.isPublic,
+    required this.myRole,
+    required this.memberCount,
+  });
+
+  factory GroupSummaryModel.fromJson(Map<String, dynamic> json) {
+    return GroupSummaryModel(
+      id: json['id'] as String,
+      name: json['name'] as String? ?? 'Group',
+      createdBy: json['createdBy'] as String? ?? '',
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      isPublic: json['isPublic'] as bool? ?? false,
+      myRole: json['myRole'] as String? ?? 'member',
+      memberCount: json['memberCount'] as int? ?? 0,
+    );
+  }
+}
+
+class GroupMemberModel {
+  final String id;
+  final String groupId;
+  final String userId;
+  final String role;
+  final DateTime joinedAt;
+  final String username;
+  final String email;
+  final String? profilePictureUrl;
+
+  GroupMemberModel({
+    required this.id,
+    required this.groupId,
+    required this.userId,
+    required this.role,
+    required this.joinedAt,
+    required this.username,
+    required this.email,
+    this.profilePictureUrl,
+  });
+
+  factory GroupMemberModel.fromJson(Map<String, dynamic> json) {
+    return GroupMemberModel(
+      id: json['id'] as String,
+      groupId: json['groupId'] as String,
+      userId: json['userId'] as String,
+      role: json['role'] as String? ?? 'member',
+      joinedAt: DateTime.parse(json['joinedAt'] as String),
+      username: json['username'] as String? ?? 'Unknown',
+      email: json['email'] as String? ?? '',
+      profilePictureUrl: json['profilePictureUrl'] as String?,
+    );
+  }
+}
+
+class GroupSentInviteModel {
+  final String id;
+  final String groupId;
+  final String senderId;
+  final String receiverId;
+  final String status;
+  final DateTime createdAt;
+  final String senderUsername;
+  final String receiverUsername;
+  final String receiverEmail;
+  final String? receiverProfilePictureUrl;
+
+  GroupSentInviteModel({
+    required this.id,
+    required this.groupId,
+    required this.senderId,
+    required this.receiverId,
+    required this.status,
+    required this.createdAt,
+    required this.senderUsername,
+    required this.receiverUsername,
+    required this.receiverEmail,
+    this.receiverProfilePictureUrl,
+  });
+
+  factory GroupSentInviteModel.fromJson(Map<String, dynamic> json) {
+    return GroupSentInviteModel(
+      id: json['id'] as String,
+      groupId: json['groupId'] as String,
+      senderId: json['senderId'] as String,
+      receiverId: json['receiverId'] as String,
+      status: json['status'] as String? ?? 'pending',
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      senderUsername: json['senderUsername'] as String? ?? 'Unknown',
+      receiverUsername: json['receiverUsername'] as String? ?? 'Unknown',
+      receiverEmail: json['receiverEmail'] as String? ?? '',
+      receiverProfilePictureUrl: json['receiverProfilePictureUrl'] as String?,
+    );
+  }
+}
+
 /// HTTP client for the group invitation endpoints.
 ///
 /// Endpoint contract (backend/lib/src/endpoints/invite_endpoints.dart):
@@ -127,6 +235,73 @@ class GroupInviteService {
     return list
         .map((e) => GroupInviteModel.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  Future<List<GroupSummaryModel>> fetchGroups({
+    required String token,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/groups');
+    final response = await _client.get(uri, headers: _headers(token));
+    _assertSuccess(response, 'fetch groups');
+    final list = jsonDecode(response.body) as List<dynamic>;
+    return list
+        .map((e) => GroupSummaryModel.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<GroupSummaryModel> fetchGroupDetails({
+    required String token,
+    required String groupId,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/groups/$groupId');
+    final response = await _client.get(uri, headers: _headers(token));
+    _assertSuccess(response, 'fetch group details');
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    return GroupSummaryModel.fromJson(body);
+  }
+
+  Future<List<GroupMemberModel>> fetchGroupMembers({
+    required String token,
+    required String groupId,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/groups/$groupId/members');
+    final response = await _client.get(uri, headers: _headers(token));
+    _assertSuccess(response, 'fetch group members');
+    final list = jsonDecode(response.body) as List<dynamic>;
+    return list
+        .map((e) => GroupMemberModel.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<GroupSentInviteModel>> fetchGroupSentInvites({
+    required String token,
+    required String groupId,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/groups/$groupId/invites');
+    final response = await _client.get(uri, headers: _headers(token));
+    _assertSuccess(response, 'fetch group sent invites');
+    final list = jsonDecode(response.body) as List<dynamic>;
+    return list
+        .map((e) => GroupSentInviteModel.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> deleteInvite({
+    required String token,
+    required String inviteId,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/groups/invites/$inviteId');
+    final response = await _client.delete(uri, headers: _headers(token));
+    _assertSuccess(response, 'delete group invite');
+  }
+
+  Future<void> leaveGroup({
+    required String token,
+    required String groupId,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/groups/$groupId/leave');
+    final response = await _client.delete(uri, headers: _headers(token));
+    _assertSuccess(response, 'leave group');
   }
 
   void _assertSuccess(http.Response response, String operation) {
