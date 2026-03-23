@@ -61,8 +61,6 @@ dependencies:
 
   # Flutter's official video player (GStreamer on Linux — no PipeWire required)
   video_player: ^2.9.1
-  # Linux video player backend (MDK/FFmpeg - no PipeWire dependency)
-  fvp: ^0.23.0
 
   # Launch URLs in external browser/app (used for video fallback on Linux)
   url_launcher: ^6.3.1

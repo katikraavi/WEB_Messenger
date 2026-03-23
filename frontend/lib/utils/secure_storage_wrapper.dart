@@ -1,17 +1,20 @@
-import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Wrapper around secure storage with fallback to in-memory storage
 /// Handles Linux keyring issues gracefully
 class SecureStorageWrapper {
-  static final SecureStorageWrapper _instance = SecureStorageWrapper._internal();
-  
+  static final SecureStorageWrapper _instance =
+      SecureStorageWrapper._internal();
+
   final _secureStorage = const FlutterSecureStorage();
   final Map<String, String> _memoryCache = {};
   bool _useMemoryFallback = false;
 
   bool _isLinuxKeyringError(Object error) {
-    if (!Platform.isLinux) return false;
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.linux) {
+      return false;
+    }
     final errorText = error.toString().toLowerCase();
     return errorText.contains('libsecret') ||
         errorText.contains('keyring') ||
@@ -33,13 +36,15 @@ class SecureStorageWrapper {
     }
 
     try {
-      final value = await _secureStorage.read(key: key).timeout(
-        const Duration(seconds: 3),
-        onTimeout: () {
-          _useMemoryFallback = true;
-          return null;
-        },
-      );
+      final value = await _secureStorage
+          .read(key: key)
+          .timeout(
+            const Duration(seconds: 3),
+            onTimeout: () {
+              _useMemoryFallback = true;
+              return null;
+            },
+          );
 
       if (value != null) {
         // Cache it in memory for future use
@@ -76,12 +81,14 @@ class SecureStorageWrapper {
       // Try to write to secure storage
       if (!_useMemoryFallback) {
         try {
-          await _secureStorage.write(key: key, value: value).timeout(
-            const Duration(seconds: 3),
-            onTimeout: () {
-              _useMemoryFallback = true;
-            },
-          );
+          await _secureStorage
+              .write(key: key, value: value)
+              .timeout(
+                const Duration(seconds: 3),
+                onTimeout: () {
+                  _useMemoryFallback = true;
+                },
+              );
         } catch (e) {
           if (_isLinuxKeyringError(e)) {
             _useMemoryFallback = true;
@@ -104,9 +111,9 @@ class SecureStorageWrapper {
       // Try to delete from secure storage
       if (!_useMemoryFallback) {
         try {
-          await _secureStorage.delete(key: key).timeout(
-            const Duration(seconds: 3),
-          );
+          await _secureStorage
+              .delete(key: key)
+              .timeout(const Duration(seconds: 3));
         } catch (e) {
           if (_isLinuxKeyringError(e)) {
             // Not critical if delete fails
@@ -127,9 +134,7 @@ class SecureStorageWrapper {
 
       if (!_useMemoryFallback) {
         try {
-          await _secureStorage.deleteAll().timeout(
-            const Duration(seconds: 3),
-          );
+          await _secureStorage.deleteAll().timeout(const Duration(seconds: 3));
         } catch (e) {
           if (_isLinuxKeyringError(e)) {
           } else {
@@ -137,8 +142,7 @@ class SecureStorageWrapper {
           }
         }
       }
-    } catch (_) {
-    }
+    } catch (_) {}
   }
 
   /// Check if using memory fallback (for diagnostics)

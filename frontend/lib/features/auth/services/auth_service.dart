@@ -18,7 +18,7 @@ class AuthException implements Exception {
 }
 
 /// Frontend authentication service
-/// 
+///
 /// Handles API communication with the backend for registration, login, and session validation
 class AuthService {
   // Using localhost to connect to Docker container (accessible via 127.0.0.1 on host)
@@ -29,8 +29,7 @@ class AuthService {
   static const Uuid _uuid = Uuid();
 
   static void _log(String message) {
-    if (_debugLogs) {
-    }
+    if (_debugLogs) {}
   }
 
   /// Get the base URL (can be overridden for testing)
@@ -48,20 +47,27 @@ class AuthService {
   }
 
   /// Register a new user
-  /// 
+  ///
   /// Throws [AuthException] on error
   static Future<AuthResponse> register(RegistrationRequest request) async {
-      _log('[Frontend Register] Sending registration request: email=${request.email}, username=${request.username}');
+    _log(
+      '[Frontend Register] Sending registration request: email=${request.email}, username=${request.username}',
+    );
     try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/auth/register'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(request.toJson()),
-      ).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () => throw AuthException('Request timeout - check your connection'),
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/auth/register'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(request.toJson()),
+          )
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () =>
+                throw AuthException('Request timeout - check your connection'),
+          );
+      _log(
+        '[Frontend Register] Response status: ${response.statusCode}, body: ${response.body}',
       );
-      _log('[Frontend Register] Response status: ${response.statusCode}, body: ${response.body}');
 
       if (response.statusCode == 201) {
         try {
@@ -69,22 +75,37 @@ class AuthService {
           _log('[Frontend Register] Registration successful: $data');
           return AuthResponse.fromJson(data);
         } catch (parseError) {
-          _log('[Frontend Register] Error parsing register response: $parseError');
+          _log(
+            '[Frontend Register] Error parsing register response: $parseError',
+          );
           _log('[Frontend Register] Response body: ${response.body}');
-          throw AuthException('Invalid server response - please try again', code: 'parse_error');
+          throw AuthException(
+            'Invalid server response - please try again',
+            code: 'parse_error',
+          );
         }
       } else if (response.statusCode == 400) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         final details = data['details'] as List<dynamic>?;
-        final error = details?.isNotEmpty == true ? details!.first : data['error'];
+        final error = details?.isNotEmpty == true
+            ? details!.first
+            : data['error'];
         _log('[Frontend Register] Validation error: $error');
-        throw AuthException(error?.toString() ?? 'Validation failed', code: 'validation_error');
+        throw AuthException(
+          error?.toString() ?? 'Validation failed',
+          code: 'validation_error',
+        );
       } else if (response.statusCode == 409) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         _log('[Frontend Register] Duplicate error: ${data['error']}');
-        throw AuthException(data['error'] as String? ?? 'User already exists', code: 'user_exists');
+        throw AuthException(
+          data['error'] as String? ?? 'User already exists',
+          code: 'user_exists',
+        );
       } else {
-        _log('[Frontend Register] Server error: status=${response.statusCode}, body=${response.body}');
+        _log(
+          '[Frontend Register] Server error: status=${response.statusCode}, body=${response.body}',
+        );
         String errorMessage = 'Server error - please try again later';
         try {
           final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -101,27 +122,33 @@ class AuthService {
       rethrow;
     } catch (e) {
       _log('[AuthService] Register network error: $e');
-      throw AuthException('Network error - check your connection', code: 'network_error');
+      throw AuthException(
+        'Network error - check your connection',
+        code: 'network_error',
+      );
     }
   }
 
   /// Login with email and password
-  /// 
+  ///
   /// Throws [AuthException] on error
   static Future<AuthResponse> login(LoginRequest request) async {
     try {
       final deviceId = await _getOrCreateDeviceId();
-      final response = await http.post(
-        Uri.parse('$baseUrl/auth/login'),
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Device-ID': deviceId,
-        },
-        body: jsonEncode(request.toJson()),
-      ).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () => throw AuthException('Request timeout - check your connection'),
-      );
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/auth/login'),
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Device-ID': deviceId,
+            },
+            body: jsonEncode(request.toJson()),
+          )
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () =>
+                throw AuthException('Request timeout - check your connection'),
+          );
 
       if (response.statusCode == 200) {
         try {
@@ -130,15 +157,25 @@ class AuthService {
         } catch (parseError) {
           _log('[AuthService] Error parsing login response: $parseError');
           _log('[AuthService] Response body: ${response.body}');
-          throw AuthException('Invalid server response - please try again', code: 'parse_error');
+          throw AuthException(
+            'Invalid server response - please try again',
+            code: 'parse_error',
+          );
         }
       } else if (response.statusCode == 400) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
-        throw AuthException(data['error'] as String? ?? 'Validation failed', code: 'validation_error');
+        throw AuthException(
+          data['error'] as String? ?? 'Validation failed',
+          code: 'validation_error',
+        );
       } else if (response.statusCode == 401) {
-        throw AuthException('Invalid email or password', code: 'invalid_credentials');
+        throw AuthException(
+          'Invalid email or password',
+          code: 'invalid_credentials',
+        );
       } else if (response.statusCode == 403) {
-        String message = 'Email not verified. Please verify your email before logging in.';
+        String message =
+            'Email not verified. Please verify your email before logging in.';
         try {
           final data = jsonDecode(response.body) as Map<String, dynamic>;
           final backendError = data['error'];
@@ -152,31 +189,42 @@ class AuthService {
       } else if (response.statusCode == 409) {
         throw AuthException('User already exists', code: 'user_exists');
       } else if (response.statusCode == 429) {
-        throw AuthException('Too many login attempts. Try again later.', code: 'rate_limit');
+        throw AuthException(
+          'Too many login attempts. Try again later.',
+          code: 'rate_limit',
+        );
       } else {
-        throw AuthException('Server error - please try again later', code: 'server_error');
+        throw AuthException(
+          'Server error - please try again later',
+          code: 'server_error',
+        );
       }
     } on AuthException {
       rethrow;
     } catch (e) {
       _log('[AuthService] Login network error: $e');
-      throw AuthException('Network error - check your connection', code: 'network_error');
+      throw AuthException(
+        'Network error - check your connection',
+        code: 'network_error',
+      );
     }
   }
 
   /// Validate current session (requires token)
   static Future<User> validateSession(String token) async {
     try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/auth/me'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      ).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () => throw AuthException('Request timeout'),
-      );
+      final response = await http
+          .get(
+            Uri.parse('$baseUrl/auth/me'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+          )
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () => throw AuthException('Request timeout'),
+          );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -196,16 +244,20 @@ class AuthService {
   /// Logout (requires token)
   static Future<void> logout(String token) async {
     try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/auth/logout'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      ).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () => throw AuthException('Request timeout'),
-      );
+      final deviceId = await _getOrCreateDeviceId();
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/auth/logout'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+              'X-Device-ID': deviceId,
+            },
+          )
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () => throw AuthException('Request timeout'),
+          );
 
       if (response.statusCode != 200) {
         throw AuthException('Failed to logout', code: 'logout_failed');
@@ -234,7 +286,7 @@ class AuthService {
   /// Requirements: 8+ chars, lowercase, uppercase, digit, special char
   static List<String> validatePassword(String password) {
     final errors = <String>[];
-    
+
     if (password.length < 8) {
       errors.add('Password must be at least 8 characters');
     }
@@ -250,7 +302,7 @@ class AuthService {
     if (!password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'))) {
       errors.add('Password must contain a special character');
     }
-    
+
     return errors;
   }
 }

@@ -265,7 +265,8 @@ Future<Response> _handleLogin(
     // Generate JWT token
     final userId = user['id'] as String;
     final jwtToken = JwtService.generateToken(userId, email);
-    final deviceId = await tokenService.extractOrGenerateDeviceId(request.headers);
+    final deviceId =
+        await tokenService.extractOrGenerateDeviceId(request.headers);
     final deviceName = tokenService.inferDeviceName(request.headers);
 
     await tokenService.createDeviceSession(
@@ -381,14 +382,17 @@ Future<Response> _handleLogout(
 
     final token = authHeader.substring('Bearer '.length);
     final payload = JwtService.validateToken(token);
+    final deviceId =
+        await tokenService.extractOrGenerateDeviceId(request.headers);
 
-    await tokenService.revokeAllDeviceSessions(
+    await tokenService.revokeDeviceSession(
       connection: database,
       userId: payload.userId,
+      deviceId: deviceId,
     );
 
     return Response.ok(
-      jsonEncode({'message': 'Logged out successfully'}),
+      jsonEncode({'message': 'Logged out from current device successfully'}),
       headers: {'Content-Type': 'application/json'},
     );
   } catch (e) {
@@ -496,4 +500,3 @@ Future<Response> _handleRevokeDeviceSession(
     );
   }
 }
-

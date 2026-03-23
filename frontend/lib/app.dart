@@ -25,6 +25,7 @@ import 'package:frontend/features/chats/providers/chat_cache_invalidator.dart';
 import 'package:frontend/features/chats/providers/websocket_provider.dart';
 import 'package:frontend/features/chats/services/message_websocket_service.dart';
 import 'package:frontend/features/chats/services/chat_notification_settings_service.dart';
+import 'package:flutter/foundation.dart';
 
 String _displayName(String? value) {
   if (value == null || value.isEmpty) {
@@ -465,36 +466,92 @@ class _AuthenticatedHomeScreenState
     extends riverpod.ConsumerState<_AuthenticatedHomeScreen> {
   int _selectedIndex = 1; // Start at Chats tab, skip Search page
 
+  String _pageTitle() {
+    return _selectedIndex == 1
+        ? 'Chats'
+        : _selectedIndex == 2
+        ? 'Invitations'
+        : _selectedIndex == 3
+        ? 'My Profile'
+        : 'Search Users';
+  }
+
+  Widget _buildShellBody() {
+    final body = _buildBody();
+    if (!kIsWeb) {
+      return body;
+    }
+
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFFEAF2FF), Color(0xFFF8FBFF)],
+        ),
+      ),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1240),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: body,
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Watch combined pending invites (direct + group) for badge.
     final pendingCount = ref.watch(totalPendingInviteCountProvider);
 
     return Scaffold(
+      extendBody: kIsWeb,
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+        titleSpacing: kIsWeb ? 24 : null,
+        title: Row(
           children: [
-            Text(
-              _selectedIndex == 1
-                  ? 'Chats'
-                  : _selectedIndex == 2
-                  ? 'Invitations'
-                  : _selectedIndex == 3
-                  ? 'My Profile'
-                  : 'Search Users', // Fallback for index 0
-            ),
-            Text(
-              'Signed in as: ${_displayName(widget.user.username)}',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.blue[900],
-                fontWeight: FontWeight.bold,
+            if (kIsWeb)
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF2563EB), Color(0xFF0EA5E9)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                child: const Icon(
+                  Icons.forum_rounded,
+                  color: Colors.white,
+                  size: 22,
+                ),
+              ),
+            if (kIsWeb) const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(_pageTitle()),
+                  Text(
+                    'Signed in as ${_displayName(widget.user.username)}',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.blue[900],
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
         ),
         elevation: 0,
+        backgroundColor: kIsWeb ? const Color(0xFFF8FBFF) : null,
         actions: [
           if (_selectedIndex == 1)
             IconButton(
@@ -549,35 +606,44 @@ class _AuthenticatedHomeScreenState
           ),
         ],
       ),
-      body: _buildBody(),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex - 1, // Adjust index since we start at 1
-        type: BottomNavigationBarType.fixed,
-        items: <BottomNavigationBarItem>[
-          const BottomNavigationBarItem(icon: Icon(Icons.chat), label: 'Chats'),
-          BottomNavigationBarItem(
-            icon: Badge(
-              isLabelVisible: pendingCount > 0,
-              label: Text(pendingCount.toString()),
-              child: const Icon(Icons.mail),
-            ),
-            label: 'Invitations',
-          ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
-        onTap: (index) {
-          setState(() {
-            _selectedIndex = index + 1; // Adjust index since we start at 1
-          });
+      body: _buildShellBody(),
+      bottomNavigationBar: Padding(
+        padding: EdgeInsets.fromLTRB(kIsWeb ? 24 : 0, 0, kIsWeb ? 24 : 0, kIsWeb ? 18 : 0),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(kIsWeb ? 22 : 0),
+          child: BottomNavigationBar(
+            currentIndex: _selectedIndex - 1,
+            type: BottomNavigationBarType.fixed,
+            backgroundColor: kIsWeb ? Colors.white : null,
+            selectedItemColor: const Color(0xFF1D4ED8),
+            unselectedItemColor: Colors.blueGrey,
+            elevation: kIsWeb ? 10 : 8,
+            items: <BottomNavigationBarItem>[
+              const BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline), label: 'Chats'),
+              BottomNavigationBarItem(
+                icon: Badge(
+                  isLabelVisible: pendingCount > 0,
+                  label: Text(pendingCount.toString()),
+                  child: const Icon(Icons.mail_outline),
+                ),
+                label: 'Invitations',
+              ),
+              const BottomNavigationBarItem(
+                icon: Icon(Icons.person_outline),
+                label: 'Profile',
+              ),
+            ],
+            onTap: (index) {
+              setState(() {
+                _selectedIndex = index + 1;
+              });
 
-          // Refresh chat list when switching to Chats tab (index 0 in BottomNavigationBar)
-          if (index == 0) {
-            ref.read(chatsCacheInvalidatorProvider.notifier).state++;
-          }
-        },
+              if (index == 0) {
+                ref.read(chatsCacheInvalidatorProvider.notifier).state++;
+              }
+            },
+          ),
+        ),
       ),
     );
   }

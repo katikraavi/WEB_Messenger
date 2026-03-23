@@ -1,9 +1,7 @@
-import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:fvp/fvp.dart' as fvp;
 import 'package:provider/provider.dart' as provider_pkg;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -15,30 +13,15 @@ import 'package:frontend/core/services/api_client.dart';
 import 'package:frontend/features/auth/providers/auth_provider.dart';
 import 'package:frontend/utils/secure_storage_wrapper.dart';
 import 'package:media_kit/media_kit.dart';
+import 'package:frontend/core/platform/fvp_register.dart';
+import 'package:frontend/core/platform/runtime_env.dart';
 
 const bool _suppressConsoleLogs = true;
 const bool _skipEagerMediaInitOnWsl = true;
 
-bool _isWslRuntime() {
-  if (!Platform.isLinux) {
-    return false;
-  }
-
-  if (Platform.environment.containsKey('WSL_DISTRO_NAME')) {
-    return true;
-  }
-
-  try {
-    final version = File('/proc/version').readAsStringSync().toLowerCase();
-    return version.contains('microsoft');
-  } catch (_) {
-    return false;
-  }
-}
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final shouldSkipMediaInit = _skipEagerMediaInitOnWsl && _isWslRuntime();
+  final shouldSkipMediaInit = _skipEagerMediaInitOnWsl && isWslRuntime();
   if (shouldSkipMediaInit) {
     // Avoid libsecret warnings on WSL where keyring integration is often unavailable.
     SecureStorageWrapper().forceMemoryMode();
@@ -46,9 +29,7 @@ void main() async {
 
   if (!shouldSkipMediaInit) {
     MediaKit.ensureInitialized();
-    fvp.registerWith(options: {
-      'platforms': ['linux'],
-    });
+    await registerFvpIfSupported();
   }
 
   FlutterError.onError = (details) {

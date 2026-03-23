@@ -50,10 +50,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
         AppFeedbackService.showInfo('Invitation sent.');
       }
     } catch (e) {
-      AppExceptionLogger.log(
-        e,
-        context: 'ProfileViewScreen._sendInvite',
-      );
+      AppExceptionLogger.log(e, context: 'ProfileViewScreen._sendInvite');
       setState(() {
         _inviteError = e.toString();
       });
@@ -107,12 +104,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                     ),
                 ],
               ),
-              body: _buildProfileContent(
-                context,
-                ref,
-                profile,
-                token,
-              ),
+              body: _buildProfileContent(context, ref, profile, token),
             );
           },
         );
@@ -161,9 +153,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                 color: Colors.grey[300],
                 shape: BoxShape.circle,
               ),
-              child: const Center(
-                child: CircularProgressIndicator(),
-              ),
+              child: const Center(child: CircularProgressIndicator()),
             ),
             const SizedBox(height: 16),
 
@@ -224,11 +214,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.error_outline,
-                  size: 64,
-                  color: Colors.red[400],
-                ),
+                Icon(Icons.error_outline, size: 64, color: Colors.red[400]),
                 const SizedBox(height: 16),
                 Text(
                   'Unable to Load Profile',
@@ -293,9 +279,9 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
             // Username display (read-only)
             Text(
               profile.username,
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
@@ -322,8 +308,8 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                     Text(
                       'Bio',
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -331,13 +317,13 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                           ? profile.aboutMe
                           : 'No bio added yet',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontStyle: profile.aboutMe.isEmpty
-                                ? FontStyle.italic
-                                : null,
-                            color: profile.aboutMe.isEmpty
-                                ? Colors.grey[600]
-                                : null,
-                          ),
+                        fontStyle: profile.aboutMe.isEmpty
+                            ? FontStyle.italic
+                            : null,
+                        color: profile.aboutMe.isEmpty
+                            ? Colors.grey[600]
+                            : null,
+                      ),
                     ),
                   ],
                 ),
@@ -441,25 +427,24 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
 class _DeviceSessionInfo {
   final String id;
   final String deviceId;
-  final String? userAgent;
-  final String? ipAddress;
+  final String? deviceName;
   final DateTime lastActiveAt;
 
   _DeviceSessionInfo({
     required this.id,
     required this.deviceId,
-    this.userAgent,
-    this.ipAddress,
+    this.deviceName,
     required this.lastActiveAt,
   });
 
   factory _DeviceSessionInfo.fromJson(Map<String, dynamic> json) {
+    final lastSeenRaw =
+        json['lastSeenAt'] ?? json['lastActiveAt'] ?? json['createdAt'];
     return _DeviceSessionInfo(
-      id: json['id'] as String,
+      id: (json['id'] ?? json['deviceId'] ?? '') as String,
       deviceId: json['deviceId'] as String,
-      userAgent: json['userAgent'] as String?,
-      ipAddress: json['ipAddress'] as String?,
-      lastActiveAt: DateTime.parse(json['lastActiveAt'] as String),
+      deviceName: (json['deviceName'] ?? json['userAgent']) as String?,
+      lastActiveAt: DateTime.parse(lastSeenRaw as String),
     );
   }
 }
@@ -496,24 +481,30 @@ class _ActiveSessionsSectionState extends State<_ActiveSessionsSection> {
       _error = null;
     });
     try {
-      final response = await http.get(
-        Uri.parse('$_baseUrl/api/auth/sessions'),
-        headers: {'Authorization': 'Bearer ${widget.token}'},
-      ).timeout(const Duration(seconds: 15));
+      final response = await http
+          .get(
+            Uri.parse('$_baseUrl/api/auth/sessions'),
+            headers: {'Authorization': 'Bearer ${widget.token}'},
+          )
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final list = jsonDecode(response.body) as List<dynamic>;
         if (mounted) {
           setState(() {
             _sessions = list
-                .map((e) => _DeviceSessionInfo.fromJson(e as Map<String, dynamic>))
+                .map(
+                  (e) => _DeviceSessionInfo.fromJson(e as Map<String, dynamic>),
+                )
                 .toList();
             _loaded = true;
           });
         }
       } else {
         if (mounted) {
-          setState(() => _error = 'Failed to load sessions (${response.statusCode})');
+          setState(
+            () => _error = 'Failed to load sessions (${response.statusCode})',
+          );
         }
       }
     } catch (e) {
@@ -527,10 +518,12 @@ class _ActiveSessionsSectionState extends State<_ActiveSessionsSection> {
 
   Future<void> _revoke(String deviceId) async {
     try {
-      final response = await http.delete(
-        Uri.parse('$_baseUrl/api/auth/sessions/$deviceId'),
-        headers: {'Authorization': 'Bearer ${widget.token}'},
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .delete(
+            Uri.parse('$_baseUrl/api/auth/sessions/$deviceId'),
+            headers: {'Authorization': 'Bearer ${widget.token}'},
+          )
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200 || response.statusCode == 204) {
         if (mounted) {
@@ -557,9 +550,9 @@ class _ActiveSessionsSectionState extends State<_ActiveSessionsSection> {
           children: [
             Text(
               'Active Sessions',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const Spacer(),
             if (_isLoading)
@@ -584,16 +577,17 @@ class _ActiveSessionsSectionState extends State<_ActiveSessionsSection> {
         else if (_sessions.isEmpty)
           Text(
             'No active sessions found.',
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(color: Colors.grey[600]),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
           )
         else
-          ...(_sessions.map((session) => _SessionTile(
-                session: session,
-                onRevoke: () => _revoke(session.deviceId),
-              ))),
+          ...(_sessions.map(
+            (session) => _SessionTile(
+              session: session,
+              onRevoke: () => _revoke(session.deviceId),
+            ),
+          )),
       ],
     );
   }
@@ -614,44 +608,42 @@ class _SessionTile extends StatelessWidget {
       child: ListTile(
         leading: const Icon(Icons.devices, color: Colors.indigo),
         title: Text(
-          session.userAgent ?? 'Unknown device',
+          session.deviceName ?? 'Unknown device',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
         subtitle: Text(
-          [
-            if (session.ipAddress != null) session.ipAddress!,
-            'Last seen: ${_formatRelative(session.lastActiveAt)}',
-          ].join(' · '),
+          'Last seen: ${_formatRelative(session.lastActiveAt)}',
           style: const TextStyle(fontSize: 12),
         ),
         trailing: IconButton(
           icon: const Icon(Icons.logout, color: Colors.red),
           tooltip: 'Sign out this session',
-          onPressed: () => showDialog<bool>(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Text('Sign out session?'),
-              content: const Text(
-                'This will revoke access for the selected device.',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('Cancel'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx, true),
-                  child: const Text(
-                    'Sign out',
-                    style: TextStyle(color: Colors.red),
+          onPressed: () =>
+              showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Sign out session?'),
+                  content: const Text(
+                    'This will revoke access for the selected device.',
                   ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text(
+                        'Sign out',
+                        style: TextStyle(color: Colors.red),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ).then((confirmed) {
-            if (confirmed == true) onRevoke();
-          }),
+              ).then((confirmed) {
+                if (confirmed == true) onRevoke();
+              }),
         ),
       ),
     );
@@ -665,4 +657,3 @@ class _SessionTile extends StatelessWidget {
     return '${diff.inDays}d ago';
   }
 }
-
