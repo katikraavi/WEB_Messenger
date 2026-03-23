@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:frontend/core/services/app_exception_logger.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -25,7 +24,6 @@ enum WebSocketEventType {
     try {
       return WebSocketEventType.values.firstWhere((e) => e.name == value);
     } catch (e) {
-      debugPrint('[WebSocketEventType] ⚠️  Unknown event type: $value');
       return unknown;
     }
   }
@@ -112,7 +110,6 @@ class MessageWebSocketService {
     String baseUrl = 'ws://localhost:8081',
   }) async {
     if (_isConnected) {
-      debugPrint('[MessageWebSocket] Already connected');
       return;
     }
 
@@ -120,34 +117,24 @@ class MessageWebSocketService {
       _currentUserId = userId;
       final wsUrl = Uri.parse('$baseUrl/ws/messages?token=$token');
 
-      debugPrint('[MessageWebSocket] 🔗 Attempting to connect to $wsUrl');
       _webSocket = WebSocketChannel.connect(wsUrl);
 
-      debugPrint(
-        '[MessageWebSocket] 🔗 WebSocket channel created, setting up listeners...',
-      );
 
       // Listen for incoming messages
       _webSocket!.stream.listen(
         (message) {
-          debugPrint('[MessageWebSocket] 📩 RAW DATA RECEIVED: $message');
           _handleMessage(message);
         },
         onError: (error) {
-          debugPrint('[MessageWebSocket] ❌ Stream Error: $error');
           _isConnected = false;
         },
         onDone: () {
-          debugPrint('[MessageWebSocket] ⚠️  Connection closed by server');
           _isConnected = false;
           _cleanup();
         },
       );
 
       _isConnected = true;
-      debugPrint(
-        '[MessageWebSocket] ✓ Connected successfully and listening for messages',
-      );
 
       // Start heartbeat
       _startHeartbeat();
@@ -165,37 +152,30 @@ class MessageWebSocketService {
   /// Subscribe to a specific chat
   void subscribeToChat(String chatId) {
     _currentChatId = chatId;
-    debugPrint('[MessageWebSocket] 📦 Subscribing to chat: $chatId');
 
     if (!_isConnected || _webSocket == null) {
-      debugPrint(
-        '[MessageWebSocket] ⚠️  Not connected, cannot subscribe to chat',
-      );
       return;
     }
 
     try {
       _webSocket!.sink.add(jsonEncode({'type': 'subscribe', 'chatId': chatId}));
-      debugPrint(
-        '[MessageWebSocket] ✓ Sent subscribe message for chat: $chatId',
+    } catch (e, st) {
+      AppExceptionLogger.log(
+        e,
+        stackTrace: st,
+        context: 'MessageWebSocketService.subscribeToChat',
       );
-    } catch (e) {
-      debugPrint('[MessageWebSocket] ❌ Failed to send subscribe message: $e');
     }
   }
 
   /// Unsubscribe from current chat
   void unsubscribeFromChat() {
     _currentChatId = null;
-    debugPrint('[MessageWebSocket] 📦 Unsubscribed from chat');
   }
 
   /// Send a typing indicator
   void sendTyping({required String chatId}) {
     if (!_isConnected || _webSocket == null) {
-      print(
-        '[MessageWebSocket] ⚠️  Not connected, cannot send typing indicator',
-      );
       return;
     }
 
@@ -206,15 +186,18 @@ class MessageWebSocketService {
         'data': {'userId': _currentUserId},
       };
       _webSocket!.sink.add(jsonEncode(event));
-      debugPrint('[MessageWebSocket] 📤 Sent typing indicator');
 
       // Debounce: cancel previous timer and set new one
       _typingDebounceTimer?.cancel();
       _typingDebounceTimer = Timer(Duration(seconds: 3), () {
         sendStoppedTyping(chatId: chatId);
       });
-    } catch (e) {
-      debugPrint('[MessageWebSocket] ❌ Failed to send typing indicator: $e');
+    } catch (e, st) {
+      AppExceptionLogger.log(
+        e,
+        stackTrace: st,
+        context: 'MessageWebSocketService.sendTyping',
+      );
     }
   }
 
@@ -229,9 +212,12 @@ class MessageWebSocketService {
         'data': {'userId': _currentUserId},
       };
       _webSocket!.sink.add(jsonEncode(event));
-      debugPrint('[MessageWebSocket] 📤 Sent stopped typing indicator');
-    } catch (e) {
-      debugPrint('[MessageWebSocket] ❌ Failed to send stopped typing: $e');
+    } catch (e, st) {
+      AppExceptionLogger.log(
+        e,
+        stackTrace: st,
+        context: 'MessageWebSocketService.sendStoppedTyping',
+      );
     }
   }
 
@@ -249,7 +235,6 @@ class MessageWebSocketService {
       _currentUserId = null;
       _currentChatId = null;
 
-      debugPrint('[MessageWebSocket] 🔌 Disconnected');
     } catch (e, st) {
       AppExceptionLogger.log(
         e,
@@ -262,22 +247,11 @@ class MessageWebSocketService {
   /// Handle incoming WebSocket message
   void _handleMessage(dynamic message) {
     try {
-      debugPrint(
-        '[MessageWebSocket] 🔍 Processing message type: ${message.runtimeType}',
-      );
 
       if (message is String) {
-        final previewLength = message.length > 100 ? 100 : message.length;
-        debugPrint(
-          '[MessageWebSocket] 🔍 Parsing JSON: ${message.substring(0, previewLength)}...',
-        );
         final json = jsonDecode(message) as Map<String, dynamic>;
-        debugPrint('[MessageWebSocket] ✓ JSON decoded: $json');
 
         var event = WebSocketEvent.fromJson(json);
-        debugPrint(
-          '[MessageWebSocket] ✓ Event parsed: type=${event.type.name}, chatId=${event.chatId}',
-        );
 
         // Use current chat ID if not in event
         if (event.chatId.isEmpty && _currentChatId != null) {
@@ -286,46 +260,26 @@ class MessageWebSocketService {
             chatId: _currentChatId!,
             data: event.data,
           );
-          debugPrint(
-            '[MessageWebSocket] ✓ Updated event chatId to $_currentChatId',
-          );
         }
 
-        debugPrint(
-          '[MessageWebSocket] 📨 Received ${event.type.name} for chat ${event.chatId}',
-        );
 
         // Check if this is a typing indicator wrapped in messageCreated
         if (event.type == WebSocketEventType.messageCreated &&
             event.data['type'] == 'typing_indicator') {
           final isTyping = event.data['isTyping'] as bool? ?? true;
-          debugPrint(
-            '[MessageWebSocket] 🎹 TYPING_INDICATOR: userId=${event.data['userId']}, isTyping=$isTyping',
-          );
           _typingIndicatorsController.add((
             userId: event.data['userId'] as String? ?? '',
             chatId: event.chatId,
             isTyping: isTyping,
           ));
-          debugPrint('[MessageWebSocket] ✓ Added to typing indicators stream');
         } else if (event.type != WebSocketEventType.unknown &&
             event.type != WebSocketEventType.ping &&
             event.type != WebSocketEventType.pong) {
           // Emit real message events to stream (skip ping/pong and unknown)
-          debugPrint(
-            '[MessageWebSocket] 💬 Adding event to eventStream: ${event.type.name}',
-          );
           _eventStreamController.add(event);
-          debugPrint('[MessageWebSocket] ✓ Event added to stream');
         } else {
-          debugPrint(
-            '[MessageWebSocket] ⏭️  Skipping event: ${event.type.name}',
-          );
         }
       } else {
-        debugPrint(
-          '[MessageWebSocket] ⚠️  Received non-string message: $message',
-        );
       }
     } catch (e, st) {
       AppExceptionLogger.log(

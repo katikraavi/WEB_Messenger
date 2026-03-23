@@ -80,7 +80,6 @@ class ResilientHttpClient {
     while (attempt <= maxRetryAttempts) {
       try {
         attempt++;
-        print('[ResilientHttpClient] $method $url (attempt $attempt/$maxRetryAttempts)');
         
         // Execute request with timeout
         final response = await request().timeout(
@@ -94,7 +93,6 @@ class ResilientHttpClient {
         // Check if we should retry based on status code
         if (_shouldRetry(response.statusCode, retryOn401)) {
           if (attempt <= maxRetryAttempts) {
-            print('[ResilientHttpClient] Status ${response.statusCode} - retrying after ${delay.inMilliseconds}ms');
             await Future.delayed(delay);
             delay *= retryBackoffMultiplier;
             continue;
@@ -105,7 +103,6 @@ class ResilientHttpClient {
         return response;
       } on TimeoutException catch (e) {
         if (attempt <= maxRetryAttempts) {
-          print('[ResilientHttpClient] Timeout on attempt $attempt - retrying after ${delay.inMilliseconds}ms');
           await Future.delayed(delay);
           delay *= retryBackoffMultiplier;
           continue;
@@ -114,7 +111,6 @@ class ResilientHttpClient {
         }
       } on SocketException catch (e) {
         if (attempt <= maxRetryAttempts && _isRetryableSocketError(e)) {
-          print('[ResilientHttpClient] Socket error on attempt $attempt - retrying after ${delay.inMilliseconds}ms');
           await Future.delayed(delay);
           delay *= retryBackoffMultiplier;
           continue;
@@ -229,7 +225,6 @@ class NetworkStateListener {
     if (_currentState != newState) {
       _currentState = newState;
       _stateController.add(newState);
-      print('[NetworkStateListener] Network state changed to: $newState');
     }
   }
 }

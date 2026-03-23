@@ -51,7 +51,6 @@ class ReceiveMessagesListener {
   /// 
   /// Handles: message creation, read receipts, typing, edit, delete
   void _setupListeners() {
-    print('[ReceiveMessagesListener] Setting up WebSocket listeners for user $_currentUserId');
 
     // Listen for all events
     _webSocketService.eventStream.listen((event) {
@@ -76,20 +75,16 @@ class ReceiveMessagesListener {
   /// Handle incoming typing.start event (T047)
   void _handleTypingStart(Map<String, dynamic> event) {
     try {
-      print('[ReceiveMessagesListener] ⌨️ User typing start: $event');
       // Event will be handled by app_initialization_service which routes to typing_indicator_provider
     } catch (e) {
-      print('[ReceiveMessagesListener] ❌ Error handling typing start: $e');
     }
   }
   
   /// Handle incoming typing.stop event (T047)
   void _handleTypingStop(Map<String, dynamic> event) {
     try {
-      print('[ReceiveMessagesListener] ⌨️ User typing stop: $event');
       // Event will be handled by app_initialization_service which routes to typing_indicator_provider
     } catch (e) {
-      print('[ReceiveMessagesListener] ❌ Error handling typing stop: $e');
     }
   }
 
@@ -105,12 +100,10 @@ class ReceiveMessagesListener {
   ///    c. Cache message locally
   Future<void> _handleMessageCreated(Map<String, dynamic> event) async {
     try {
-      print('[ReceiveMessagesListener] 📨 Message received event: $event');
 
       // Extract message data from event
       final messageData = event['data'] as Map<String, dynamic>?;
       if (messageData == null) {
-        print('[ReceiveMessagesListener] ⚠️ No data in event');
         return;
       }
 
@@ -120,12 +113,9 @@ class ReceiveMessagesListener {
 
       // Only process if message is for current user
       if (message.recipientId != _currentUserId) {
-        print(
-            '[ReceiveMessagesListener] ⚠️ Message not for current user (recipient: ${message.recipientId}, current: $_currentUserId)');
         return;
       }
 
-      print('[ReceiveMessagesListener] ✓ Message is for current user');
 
       // Emit message received event
       _messageReceivedController.add(
@@ -139,10 +129,7 @@ class ReceiveMessagesListener {
       // Auto-mark message as delivered
       await _markMessageDelivered(message.id, chatId);
 
-      print('[ReceiveMessagesListener] ✓ Message processed: ${message.id}');
     } catch (e, st) {
-      print(
-          '[ReceiveMessagesListener] ❌ Error handling message created: $e\n$st');
     }
   }
 
@@ -152,7 +139,6 @@ class ReceiveMessagesListener {
   /// to 'delivered' when recipient receives the message
   Future<void> _markMessageDelivered(String messageId, String chatId) async {
     try {
-      print('[ReceiveMessagesListener] 📤 Marking message as delivered: $messageId');
 
       // Call API to update status
       await _apiService.updateMessageStatus(
@@ -162,10 +148,7 @@ class ReceiveMessagesListener {
         newStatus: 'delivered',
       );
 
-      print('[ReceiveMessagesListener] ✓ Message marked as delivered');
     } catch (e) {
-      print(
-          '[ReceiveMessagesListener] ⚠️ Error marking message as delivered: $e');
       // Non-blocking - don't rethrow, message still displays
     }
   }
@@ -175,12 +158,10 @@ class ReceiveMessagesListener {
   /// Called when user comes online and messages are marked as read
   Future<void> _handleMessageRead(Map<String, dynamic> event) async {
     try {
-      print('[ReceiveMessagesListener] 👁️ Message read event: $event');
 
       // For now, just log - actual read receipt handling in Phase 4+
       // This would trigger UI update to show ✓✓ blue checkmark
     } catch (e) {
-      print('[ReceiveMessagesListener] ❌ Error handling message read: $e');
     }
   }
 
@@ -190,22 +171,18 @@ class ReceiveMessagesListener {
   /// Triggers cache invalidation for message list refresh.
   void _handleMessageEdited(Map<String, dynamic> event) {
     try {
-      print('[ReceiveMessagesListener] ✏️ Message edited event: $event');
 
       // Extract message data
       final messageData = event['data'] as Map<String, dynamic>?;
       if (messageData == null) {
-        print('[ReceiveMessagesListener] ⚠️ No data in message.edited event');
         return;
       }
 
       final message = Message.fromJson(messageData);
-      print('[ReceiveMessagesListener] ✓ Message edited: ${message.id}');
       
       // Cache invalidation happens through messagesWithCacheProvider watching WebSocket
       // The providers will automatically refresh when receive_messages_provider is notified
     } catch (e) {
-      print('[ReceiveMessagesListener] ❌ Error handling message edited: $e');
     }
   }
 
@@ -215,22 +192,18 @@ class ReceiveMessagesListener {
   /// Triggers cache invalidation for message list refresh.
   void _handleMessageDeleted(Map<String, dynamic> event) {
     try {
-      print('[ReceiveMessagesListener] 🗑️ Message deleted event: $event');
 
       // Extract message data
       final messageData = event['data'] as Map<String, dynamic>?;
       if (messageData == null) {
-        print('[ReceiveMessagesListener] ⚠️ No data in message.deleted event');
         return;
       }
 
       final message = Message.fromJson(messageData);
-      print('[ReceiveMessagesListener] ✓ Message deleted: ${message.id}');
       
       // Cache invalidation happens through messagesWithCacheProvider watching WebSocket
       // The providers will automatically refresh when receive_messages_provider is notified
     } catch (e) {
-      print('[ReceiveMessagesListener] ❌ Error handling message deleted: $e');
     }
   }
 

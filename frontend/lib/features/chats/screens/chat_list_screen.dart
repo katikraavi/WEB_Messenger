@@ -147,13 +147,8 @@ class ChatListScreen extends ConsumerWidget {
     final currentUserId = authProvider.user?.userId ?? '';
     final token = authProvider.token ?? '';
 
-    debugPrint(
-      '[ChatListScreen] Building with token: ${token.isNotEmpty ? 'present' : 'EMPTY'}',
-    );
-    debugPrint('[ChatListScreen] Current user: ${authProvider.user?.username}');
 
     if (token.isEmpty) {
-      debugPrint('[ChatListScreen] ❌ No token available');
       return Scaffold(
         appBar: AppBar(title: const Text('Chats')),
         body: const Center(child: Text('Not authenticated')),
@@ -161,9 +156,6 @@ class ChatListScreen extends ConsumerWidget {
     }
 
     // Get active chats with token parameter
-    debugPrint(
-      '[ChatListScreen] 📡 Watching activeChatListProvider for token: ${token.substring(0, 20)}...',
-    );
     final activeChatsStream = ref.watch(activeChatListProvider(token));
 
     const baseUrl = String.fromEnvironment(

@@ -21,8 +21,6 @@ final uploadMediaToMessageProvider =
     final uploadService = ref.watch(mediaUploadServiceProvider);
 
     try {
-      print(
-          '[UploadMediaToMessageProvider] 📎 Attaching media $mediaId to message');
 
       // Note: In a real implementation, we would:
       // 1. Create a message first
@@ -34,7 +32,6 @@ final uploadMediaToMessageProvider =
         'attached': true,
       };
     } catch (e) {
-      print('[UploadMediaToMessageProvider] ❌ Error: $e');
       rethrow;
     }
   },

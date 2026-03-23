@@ -15,7 +15,7 @@ import '../../../core/constants/asset_constants.dart';
 /// )
 /// ```
 
-class ProfilePictureWidget extends StatelessWidget {
+class ProfilePictureWidget extends StatefulWidget {
   /// URL to the profile picture (HTTPS)
   /// If null or empty, displays default avatar
   final String? imageUrl;
@@ -34,20 +34,38 @@ class ProfilePictureWidget extends StatelessWidget {
 
   /// Creates a ProfilePictureWidget
   const ProfilePictureWidget({
-    Key? key,
+    super.key,
     this.imageUrl,
     this.size = 120,
     this.isLoading = false,
     this.onTap,
-  }) : super(key: key);
+  });
+
+  @override
+  State<ProfilePictureWidget> createState() => _ProfilePictureWidgetState();
+}
+
+class _ProfilePictureWidgetState extends State<ProfilePictureWidget> {
+  int _retryCount = 0;
+  int _reloadNonce = 0;
+
+  @override
+  void didUpdateWidget(covariant ProfilePictureWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.imageUrl != widget.imageUrl) {
+      _retryCount = 0;
+      _reloadNonce = 0;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Container(
-        width: size,
-        height: size,
+        width: widget.size,
+        height: widget.size,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: Colors.grey[200],
@@ -57,10 +75,10 @@ class ProfilePictureWidget extends StatelessWidget {
           ),
         ),
         // T037: Display loading skeleton while fetching
-        child: isLoading
+        child: widget.isLoading
             ? _buildLoadingSkeleton()
             // Show network image if URL provided, otherwise default avatar
-            : (imageUrl != null && imageUrl!.isNotEmpty)
+          : (widget.imageUrl != null && widget.imageUrl!.isNotEmpty)
                 ? _buildNetworkImage()
                 : _buildDefaultAvatar(),
       ),
@@ -83,9 +101,10 @@ class ProfilePictureWidget extends StatelessWidget {
   Widget _buildNetworkImage() {
     return ClipOval(
       child: Image.network(
-        imageUrl!,
-        width: size,
-        height: size,
+        key: ValueKey('${widget.imageUrl}|$_reloadNonce'),
+        widget.imageUrl!,
+        width: widget.size,
+        height: widget.size,
         fit: BoxFit.cover,
         loadingBuilder: (context, child, loadingProgress) {
           // Show loading skeleton while image loads
@@ -102,8 +121,17 @@ class ProfilePictureWidget extends StatelessWidget {
           );
         },
         errorBuilder: (context, error, stackTrace) {
-          // Silently fall back to default avatar on error (common for missing profile pics)
-          print('[ProfilePictureWidget] Using default avatar (image not available)');
+
+          if (_retryCount < 1) {
+            _retryCount += 1;
+            Future.delayed(const Duration(milliseconds: 900), () {
+              if (!mounted) return;
+              setState(() {
+                _reloadNonce += 1;
+              });
+            });
+          }
+
           // Fallback to default avatar on error
           return _buildDefaultAvatar();
         },
@@ -118,14 +146,14 @@ class ProfilePictureWidget extends StatelessWidget {
     return ClipOval(
       child: Image.asset(
         AssetConstants.defaultProfilePicture,
-        width: size,
-        height: size,
+        width: widget.size,
+        height: widget.size,
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) {
           // Fallback to gradient if asset not found
           return Container(
-            width: size,
-            height: size,
+            width: widget.size,
+            height: widget.size,
             decoration: const BoxDecoration(
               shape: BoxShape.circle,
               gradient: LinearGradient(
@@ -140,7 +168,7 @@ class ProfilePictureWidget extends StatelessWidget {
             child: Center(
               child: Icon(
                 Icons.person,
-                size: size * 0.5,
+                size: widget.size * 0.5,
                 color: Colors.white,
               ),
             ),

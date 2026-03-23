@@ -106,9 +106,6 @@ class MediaUploadService {
         throw Exception('Invalid media file');
       }
 
-      debugPrint(
-        '[MediaUploadService] Uploading ${pickedMedia.mimeType}: ${pickedMedia.sizeBytes ~/ 1024}KB',
-      );
 
       final url = Uri.parse('$_baseUrl/api/media/upload');
       late int statusCode;
@@ -161,9 +158,6 @@ class MediaUploadService {
           throw Exception('Video file not found at ${pickedMedia.path}');
         }
 
-        debugPrint(
-          '[MediaUploadService] Streaming video from: ${pickedMedia.path}',
-        );
 
         final fileLength = await file.length();
         final fileStream = file.openRead();
@@ -184,7 +178,6 @@ class MediaUploadService {
         statusCode = response.statusCode;
         responseBody = await response.stream.bytesToString();
       } catch (e) {
-        debugPrint('[MediaUploadService] Upload stream error: $e');
         rethrow;
       }
 
@@ -192,15 +185,8 @@ class MediaUploadService {
         try {
           final mediaData = jsonDecode(responseBody) as Map<String, dynamic>;
           final uploadedMedia = UploadedMedia.fromJson(mediaData);
-          debugPrint(
-            '[MediaUploadService] Upload successful: ${uploadedMedia.id}',
-          );
           return uploadedMedia;
         } catch (parseError) {
-          debugPrint(
-            '[MediaUploadService] Response parsing error: $parseError',
-          );
-          debugPrint('[MediaUploadService] Response body: $responseBody');
           throw Exception('Server returned invalid response: $parseError');
         }
       } else if (statusCode == 413) {
@@ -218,7 +204,6 @@ class MediaUploadService {
         throw Exception('Upload failed: $statusCode');
       }
     } catch (e) {
-      debugPrint('[MediaUploadService] Upload error: $e');
       rethrow;
     }
   }
@@ -252,9 +237,6 @@ class MediaUploadService {
 
       if (response.statusCode == 200) {
         final result = jsonDecode(response.body) as Map<String, dynamic>;
-        debugPrint(
-          '[MediaUploadService] Media attached to message: $messageId',
-        );
         return result;
       } else if (response.statusCode == 401) {
         throw Exception('Unauthorized: Invalid or expired token');
@@ -266,7 +248,6 @@ class MediaUploadService {
         throw Exception('Failed to attach media: ${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('[MediaUploadService] Attach error: $e');
       rethrow;
     }
   }
@@ -285,7 +266,6 @@ class MediaUploadService {
     try {
       final url = Uri.parse('$_baseUrl/api/media/$mediaId/download');
 
-      debugPrint('[MediaUploadService] Downloading media: $mediaId');
 
       final response = await _httpClient.get(
         url,
@@ -293,7 +273,6 @@ class MediaUploadService {
       );
 
       if (response.statusCode == 200) {
-        debugPrint('[MediaUploadService] Download complete: $mediaId');
         return response.bodyBytes;
       } else if (response.statusCode == 401) {
         throw Exception('Unauthorized: Invalid or expired token');
@@ -303,7 +282,6 @@ class MediaUploadService {
         throw Exception('Download failed: ${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('[MediaUploadService] Download error: $e');
       rethrow;
     }
   }

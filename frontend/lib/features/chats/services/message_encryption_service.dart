@@ -25,7 +25,6 @@ class MessageEncryptionService {
       final decrypted = utf8.decode(base64Decode(message.encryptedContent));
       return message.copyWith(decryptedContent: decrypted);
     } catch (e) {
-      debugPrint('[MessageEncryptionService] Failed to decrypt message ${message.id}: $e');
       // If decryption fails, return the encrypted content as-is
       return message.copyWith(decryptedContent: 'Could not decrypt message');
     }

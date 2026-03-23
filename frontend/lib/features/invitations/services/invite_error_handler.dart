@@ -141,9 +141,7 @@ class InviteErrorHandler {
 
   /// Log errors for debugging (non-production logging)
   static void logError(String context, dynamic error, [StackTrace? stackTrace]) {
-    print('[$context] ❌ Error: $error');
     if (stackTrace != null) {
-      print('[$context] Stack Trace: $stackTrace');
     }
   }
 

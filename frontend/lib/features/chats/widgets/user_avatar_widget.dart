@@ -25,8 +25,8 @@ class UserAvatarWidget extends StatefulWidget {
     this.radius = 24,
     this.backgroundColor,
     this.username,
-    Key? key,
-  }) : super(key: key);
+    super.key,
+  });
 
   @override
   State<UserAvatarWidget> createState() => _UserAvatarWidgetState();
@@ -35,12 +35,27 @@ class UserAvatarWidget extends StatefulWidget {
 class _UserAvatarWidgetState extends State<UserAvatarWidget> {
   late bool _useNetworkImage;
   late bool _useAssetImage;
+  int _retryCount = 0;
+  int _reloadNonce = 0;
 
   @override
   void initState() {
     super.initState();
     _useNetworkImage = widget.imageUrl != null && widget.imageUrl!.isNotEmpty;
     _useAssetImage = true;
+  }
+
+  @override
+  void didUpdateWidget(covariant UserAvatarWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // The avatar URL can arrive after the first frame (async profile load).
+    // Keep local state in sync so we don't get stuck on the fallback image.
+    if (oldWidget.imageUrl != widget.imageUrl) {
+      _useNetworkImage = widget.imageUrl != null && widget.imageUrl!.isNotEmpty;
+      _retryCount = 0;
+      _reloadNonce = 0;
+    }
   }
 
   @override
@@ -77,13 +92,25 @@ class _UserAvatarWidgetState extends State<UserAvatarWidget> {
   /// Build network image with error handling
   Widget _buildNetworkAvatar() {
     return Image.network(
+      key: ValueKey('${widget.imageUrl}|$_reloadNonce'),
       widget.imageUrl!,
       fit: BoxFit.cover,
       width: widget.radius * 2,
       height: widget.radius * 2,
       errorBuilder: (context, error, stackTrace) {
-        print('[UserAvatarWidget] ❌ Network image failed to load: $error');
-        // Don't call setState, just return fallback immediately
+
+        // Handle startup races (backend/file service not ready) with one soft retry.
+        if (_retryCount < 1) {
+          _retryCount += 1;
+          Future.delayed(const Duration(milliseconds: 900), () {
+            if (!mounted) return;
+            setState(() {
+              _reloadNonce += 1;
+            });
+          });
+        }
+
+        // Return fallback immediately while retry runs in the background.
         return _buildAssetFallback();
       },
       loadingBuilder: (context, child, loadingProgress) {
@@ -118,7 +145,6 @@ class _UserAvatarWidgetState extends State<UserAvatarWidget> {
       width: widget.radius * 2,
       height: widget.radius * 2,
       errorBuilder: (context, error, stackTrace) {
-        print('[UserAvatarWidget] ❌ Asset image failed to load: $error');
         // Asset failed, return icon directly
         return _buildIconAvatar();
       },

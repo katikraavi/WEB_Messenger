@@ -43,8 +43,6 @@ final autoMarkAsReadProvider =
     final apiService = ChatApiService(baseUrl: 'http://localhost:8081');
 
     try {
-      print('[AutoMarkAsRead] ⭐ PROVIDER INVOKED for chat $chatId');
-      print('[AutoMarkAsRead] 🔄 Starting to mark messages as read for chat $chatId');
       
       // Fetch messages directly from API (don't use localMessagesProvider to avoid duplicate notifier)
       final fetchedMessages = await apiService.fetchMessages(
@@ -53,32 +51,25 @@ final autoMarkAsReadProvider =
         limit: 50,
       );
       
-      print('[AutoMarkAsRead] 📥 Fetched ${fetchedMessages.length} messages from API');
       
       // Show all message statuses to debug
       final statuses = fetchedMessages.map((m) => m.status).toList();
-      print('[AutoMarkAsRead] 📊 All message statuses from API: $statuses');
       final sentCount = fetchedMessages.where((m) => m.status == 'sent').length;
       final deliveredCount = fetchedMessages.where((m) => m.status == 'delivered').length;
       final readCount = fetchedMessages.where((m) => m.status == 'read').length;
-      print('[AutoMarkAsRead] 📊 Status breakdown: sent=$sentCount, delivered=$deliveredCount, read=$readCount');
       
       // Decrypt messages
       final decryptedMessages = await MessageEncryptionService.decryptMessages(fetchedMessages);
       
-      print('[AutoMarkAsRead] 🔐 Decrypted ${decryptedMessages.length} messages');
       
       final unreadMessages = decryptedMessages
           .where((msg) => msg.status != 'read' && msg.senderId != currentUserId)
           .toList();
 
-      print('[AutoMarkAsRead] 📖 Found ${unreadMessages.length} unread messages (status != "read")');
       if (unreadMessages.isNotEmpty) {
-        print('[AutoMarkAsRead] 📋 Unread message statuses: ${unreadMessages.map((m) => '${m.id.substring(0, 8)} (status=${m.status})').toList()}');
       }
 
       if (unreadMessages.isEmpty) {
-        print('[AutoMarkAsRead] ℹ️ No unread messages to mark');
         return;
       }
 
@@ -86,24 +77,18 @@ final autoMarkAsReadProvider =
       int successCount = 0;
       for (final message in unreadMessages) {
         try {
-          print('[AutoMarkAsRead] 📤 Marking ${message.id} as read (current status: ${message.status})');
           await apiService.updateMessageStatus(
             token: token,
             chatId: chatId,
             messageId: message.id,
             newStatus: 'read',
           );
-          print('[AutoMarkAsRead] ✓ Marked ${message.id} as read');
           successCount++;
         } catch (e) {
-          print('[AutoMarkAsRead] ⚠️ Error marking ${message.id} as read: $e');
         }
       }
       
-      print('[AutoMarkAsRead] ✅ Finished marking messages as read ($successCount/${unreadMessages.length} succeeded)');
-      print('[AutoMarkAsRead] 💙 Sender should now see blue checkmarks for these messages');
     } catch (e) {
-      print('[AutoMarkAsRead] ❌ Error auto-marking as read: $e');
       rethrow;
     }
   },
@@ -129,13 +114,9 @@ class MessageStatusNotifier extends StateNotifier<void> {
     required String token,
   }) {
     try {
-      print(
-          '[MessageStatusNotifier] 📨 Status changed: $messageId → $newStatus');
       // Note: Message status is already being updated in real-time via 
       // WebSocket messageStatusChanged events handled in LocalMessagesNotifier._handleWebSocketEvent()
-      print('[MessageStatusNotifier] ✓ Status updated for message $messageId');
     } catch (e) {
-      print('[MessageStatusNotifier] ❌ Error handling status change: $e');
     }
   }
 }

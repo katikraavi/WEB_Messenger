@@ -23,7 +23,6 @@ class WebSocketNotifier extends StateNotifier<MessageWebSocketService> {
         baseUrl: 'ws://localhost:8081',
       );
     } catch (e) {
-      print('[WebSocketNotifier] Error connecting: $e');
       rethrow;
     }
   }

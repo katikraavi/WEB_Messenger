@@ -96,7 +96,6 @@ final activeChatListProvider = StreamProvider.family<List<Chat>, String>((ref, t
         }
       } catch (e) {
         // Skip errors (e.g., 403 if user is not a participant in this chat)
-        debugPrint('[ActiveChatListProvider] Error fetching messages for chat $chatId: $e');
       }
     }
   }

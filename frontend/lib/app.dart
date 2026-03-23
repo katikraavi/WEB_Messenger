@@ -65,14 +65,10 @@ class _MessengerAppState extends State<MessengerApp> {
       );
 
       if (Firebase.apps.isEmpty) {
-        debugPrint(
-          '[App] Firebase is not initialized - remote push disabled for this run',
-        );
         return;
       }
 
       await PushNotificationHandler().initialize(navigatorKey: _navigatorKey);
-      debugPrint('[App] Push notifications initialized');
     } catch (e) {
       AppExceptionLogger.log(
         e,
@@ -106,7 +102,6 @@ class _MessengerAppState extends State<MessengerApp> {
       _isInitializing = false;
     });
 
-    debugPrint('[App] Backend connected: $_isConnected');
   }
 
   Future<void> _retryBackendConnection() async {
@@ -399,9 +394,6 @@ class _HomeScreenState extends riverpod.ConsumerState<_HomeScreen> {
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(
       builder: (context, authProvider, child) {
-        debugPrint(
-          '[HomeScreen] isAuthenticated: ${authProvider.isAuthenticated}, user: ${authProvider.user?.username}',
-        );
 
         if (!authProvider.isAuthenticated) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -409,14 +401,9 @@ class _HomeScreenState extends riverpod.ConsumerState<_HomeScreen> {
           });
           return AuthFlowScreen(
             onAuthSuccess: () {
-              debugPrint(
-                '[Auth] User logged in: ${authProvider.user?.username}',
-              );
               // Invalidate invite cache because a new user just logged in
-              debugPrint('[Auth] Invalidating invite cache for new user');
               ref.read(invitesCacheInvalidatorProvider.notifier).state++;
               // Invalidate chat cache on login (T025)
-              debugPrint('[Auth] Invalidating chat cache for new user');
               ref.read(chatsCacheInvalidatorProvider.notifier).state++;
             },
           );
@@ -528,7 +515,6 @@ class _AuthenticatedHomeScreenState
 
           // Refresh chat list when switching to Chats tab (index 0 in BottomNavigationBar)
           if (index == 0) {
-            debugPrint('[App] Switching to Chats tab - refreshing chat list');
             ref.read(chatsCacheInvalidatorProvider.notifier).state++;
           }
         },

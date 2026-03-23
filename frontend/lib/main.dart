@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -12,14 +13,43 @@ import 'package:frontend/app.dart';
 import 'package:frontend/core/services/app_exception_logger.dart';
 import 'package:frontend/core/services/api_client.dart';
 import 'package:frontend/features/auth/providers/auth_provider.dart';
+import 'package:frontend/utils/secure_storage_wrapper.dart';
 import 'package:media_kit/media_kit.dart';
+
+const bool _suppressConsoleLogs = true;
+const bool _skipEagerMediaInitOnWsl = true;
+
+bool _isWslRuntime() {
+  if (!Platform.isLinux) {
+    return false;
+  }
+
+  if (Platform.environment.containsKey('WSL_DISTRO_NAME')) {
+    return true;
+  }
+
+  try {
+    final version = File('/proc/version').readAsStringSync().toLowerCase();
+    return version.contains('microsoft');
+  } catch (_) {
+    return false;
+  }
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  MediaKit.ensureInitialized();
-  fvp.registerWith(options: {
-    'platforms': ['linux'],
-  });
+  final shouldSkipMediaInit = _skipEagerMediaInitOnWsl && _isWslRuntime();
+  if (shouldSkipMediaInit) {
+    // Avoid libsecret warnings on WSL where keyring integration is often unavailable.
+    SecureStorageWrapper().forceMemoryMode();
+  }
+
+  if (!shouldSkipMediaInit) {
+    MediaKit.ensureInitialized();
+    fvp.registerWith(options: {
+      'platforms': ['linux'],
+    });
+  }
 
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
@@ -59,7 +89,11 @@ void main() async {
   } catch (e) {
     // Firebase is not supported on this platform (e.g. Linux desktop).
     // The app will run without push notifications.
-    debugPrint('[Firebase] initializeApp failed: $e');
+  }
+
+  if (_suppressConsoleLogs) {
+    // Suppress ad-hoc debug logs and print spam in terminal during local runs.
+    debugPrint = (String? message, {int? wrapWidth}) {};
   }
 
   // Initialize API client before running app

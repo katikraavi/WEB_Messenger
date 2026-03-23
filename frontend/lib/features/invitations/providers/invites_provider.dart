@@ -32,15 +32,11 @@ final pendingInvitesProvider = FutureProvider<List<ChatInviteModel>>((
   // Watch the cache invalidator to refresh when user changes
   ref.watch(invitesCacheInvalidatorProvider);
 
-  print('[Invites] Fetching pending invitations...');
   final apiService = ref.watch(inviteApiServiceProvider);
   try {
-    print('[Invites] API Service base URL: ${ApiClient.getBaseUrl()}');
     final invites = await apiService.fetchPendingInvites();
-    print('[Invites] ✅ Successfully fetched ${invites.length} pending invites');
     return invites;
   } catch (e) {
-    print('[Invites] ❌ Error fetching pending invites: $e');
     rethrow;
   }
 });
@@ -50,28 +46,22 @@ final sentInvitesProvider = FutureProvider<List<ChatInviteModel>>((ref) async {
   // Watch the cache invalidator to refresh when user changes
   ref.watch(invitesCacheInvalidatorProvider);
 
-  print('[Invites] Fetching sent invitations...');
   final apiService = ref.watch(inviteApiServiceProvider);
   try {
     final invites = await apiService.fetchSentInvites();
-    print('[Invites] ✅ Successfully fetched ${invites.length} sent invites');
     return invites;
   } catch (e) {
-    print('[Invites] ❌ Error fetching sent invites: $e');
     rethrow;
   }
 });
 
 /// Provides count of pending invitations (for badge display)
 final pendingInviteCountProvider = FutureProvider<int>((ref) async {
-  print('[Invites] Fetching pending invite count...');
   final apiService = ref.watch(inviteApiServiceProvider);
   try {
     final count = await apiService.getPendingInviteCount();
-    print('[Invites] ✅ Pending invite count: $count');
     return count;
   } catch (e) {
-    print('[Invites] ❌ Error fetching pending invite count: $e');
     rethrow;
   }
 });
@@ -252,7 +242,6 @@ class AcceptInviteMutationNotifier extends StateNotifier<AcceptInviteState> {
           _ref.invalidate(chatsProvider(token));
         }
       } catch (e) {
-        print('[AcceptInvite] Could not invalidate chat providers: $e');
       }
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -336,25 +325,16 @@ final invitationRealtimeUpdatesProvider = FutureProvider.autoDispose<void>((
 
     final (:eventType, :invite) = event;
 
-    print(
-      '[InvitationsRealtime] 📡 Received invitation event: $eventType (inviteId: ${invite.id})',
-    );
 
     // Invalidate appropriate caches based on event type
     switch (eventType) {
       case 'sent':
         // When we send an invitation, refresh sent invitations list
-        print(
-          '[InvitationsRealtime] 📤 Sent invitation - refreshing sent list',
-        );
         ref.invalidate(sentInvitesProvider);
         break;
 
       case 'accepted':
         // When an invitation is accepted (either by current user or sender sees acceptance)
-        print(
-          '[InvitationsRealtime] ✅ Invitation accepted - refreshing both lists',
-        );
         ref.invalidate(pendingInvitesProvider);
         ref.invalidate(sentInvitesProvider);
         ref.invalidate(pendingInviteCountProvider);
@@ -365,9 +345,6 @@ final invitationRealtimeUpdatesProvider = FutureProvider.autoDispose<void>((
 
       case 'declined':
         // When an invitation is declined, refresh both lists
-        print(
-          '[InvitationsRealtime] ❌ Invitation declined - refreshing both lists',
-        );
         ref.invalidate(pendingInvitesProvider);
         ref.invalidate(sentInvitesProvider);
         ref.invalidate(pendingInviteCountProvider);
@@ -375,14 +352,10 @@ final invitationRealtimeUpdatesProvider = FutureProvider.autoDispose<void>((
 
       case 'cancelled':
         // When an invitation is cancelled, refresh sent invitations
-        print(
-          '[InvitationsRealtime] 🚫 Invitation cancelled - refreshing sent list',
-        );
         ref.invalidate(sentInvitesProvider);
         break;
 
       default:
-        print('[InvitationsRealtime] ⚠️  Unknown event type: $eventType');
     }
   });
 });

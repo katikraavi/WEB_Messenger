@@ -30,7 +30,6 @@ class AuthService {
 
   static void _log(String message) {
     if (_debugLogs) {
-      debugPrint(message);
     }
   }
 

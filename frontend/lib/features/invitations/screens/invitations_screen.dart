@@ -18,7 +18,6 @@ class InvitationsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    print('[InvitationsScreen] Building unified invitations screen');
 
     // Watch real-time updates from WebSocket to enable automatic refresh
     ref.watch(invitationRealtimeUpdatesProvider);
@@ -37,7 +36,6 @@ class InvitationsScreen extends ConsumerWidget {
               icon: const Icon(Icons.refresh),
               tooltip: 'Refresh Invitations',
               onPressed: () {
-                print('[InvitationsScreen] Refreshing invitations...');
                 ref.refresh(pendingInvitesProvider);
                 ref.refresh(sentInvitesProvider);
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -145,7 +143,6 @@ class _UnifiedInvitationsList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    print('[InvitationsList] Building unified invitations list');
 
     // Watch both pending and sent invites
     final pendingInvites = ref.watch(pendingInvitesProvider);
@@ -159,9 +156,6 @@ class _UnifiedInvitationsList extends ConsumerWidget {
       data: (pending) {
         return sentInvites.when(
           data: (sent) {
-            print(
-              '[InvitationsList] ✅ Loaded ${pending.length} pending + ${sent.length} sent invites',
-            );
 
             // Create unified list
             final allInvitations = [
@@ -579,11 +573,9 @@ class _UnifiedInvitationsList extends ConsumerWidget {
             );
           },
           loading: () {
-            print('[InvitationsList] Loading sent invites...');
             return const Center(child: CircularProgressIndicator());
           },
           error: (error, stack) {
-            print('[InvitationsList] ❌ Error loading sent invites: $error');
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -594,7 +586,6 @@ class _UnifiedInvitationsList extends ConsumerWidget {
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: () {
-                      print('[InvitationsList] Retrying...');
                       ref.refresh(sentInvitesProvider);
                     },
                     child: const Text('Retry'),
@@ -606,11 +597,9 @@ class _UnifiedInvitationsList extends ConsumerWidget {
         );
       },
       loading: () {
-        print('[InvitationsList] Loading pending invites...');
         return const Center(child: CircularProgressIndicator());
       },
       error: (error, stack) {
-        print('[InvitationsList] ❌ Error loading pending invites: $error');
         return Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -621,7 +610,6 @@ class _UnifiedInvitationsList extends ConsumerWidget {
               const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: () {
-                  print('[InvitationsList] Retrying...');
                   ref.refresh(pendingInvitesProvider);
                 },
                 child: const Text('Retry'),

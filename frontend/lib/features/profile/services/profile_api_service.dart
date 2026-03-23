@@ -59,7 +59,6 @@ class ProfileApiService {
       final cleanBaseUrl = baseUrl.replaceAll(RegExp(r'/api$'), '');
       final absoluteUrl = cleanBaseUrl + imageUrl;
       if (debugLogging) {
-        debugPrint('[ProfileApiService] Image URL converted: $imageUrl → $absoluteUrl');
       }
       return profile.copyWith(profilePictureUrl: absoluteUrl);
     }
@@ -105,7 +104,6 @@ class ProfileApiService {
           final jsonBody = jsonDecode(response.body) as Map<String, dynamic>;
           final profile = UserProfile.fromJson(jsonBody);
           if (debugLogging) {
-            debugPrint('[ProfileApiService] Profile fetched - image URL: ${profile.profilePictureUrl}');
           }
           return _ensureAbsoluteImageUrl(profile);
         } catch (e) {
@@ -119,7 +117,6 @@ class ProfileApiService {
         throw HttpException('Failed to fetch profile: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
-      debugPrint('[ProfileApiService] Error fetching profile: $e');
       rethrow;
     }
   }
@@ -163,8 +160,6 @@ class ProfileApiService {
       });
 
       if (debugLogging) {
-        debugPrint('[ProfileApiService] PATCH $url');
-        debugPrint('[ProfileApiService] Request body: $body');
       }
       
       final response = await http.patch(
@@ -177,8 +172,6 @@ class ProfileApiService {
       );
 
       if (debugLogging) {
-        debugPrint('[ProfileApiService] Response status: ${response.statusCode}');
-        debugPrint('[ProfileApiService] Response body: ${response.body}');
       }
 
       if (response.statusCode == 200) {
@@ -198,7 +191,6 @@ class ProfileApiService {
         throw HttpException('Failed to update profile: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
-      debugPrint('[ProfileApiService] Error updating profile: $e');
       rethrow;
     }
   }
@@ -283,8 +275,6 @@ class ProfileApiService {
           final profileData = jsonBody['profile'] ?? jsonBody['data'] ?? jsonBody;
           return _ensureAbsoluteImageUrl(UserProfile.fromJson(profileData as Map<String, dynamic>));
         } catch (e) {
-          debugPrint('[ProfileApiService] Error parsing profile response: $e');
-          debugPrint('[ProfileApiService] Response body: $responseBody');
           throw FormatException(
             'Failed to parse profile response: $e',
             responseBody,
@@ -309,7 +299,6 @@ class ProfileApiService {
         );
       }
     } catch (e) {
-      debugPrint('[ProfileApiService] Error uploading image: $e');
       rethrow;
     }
   }
@@ -371,7 +360,6 @@ class ProfileApiService {
         );
       }
     } catch (e) {
-      debugPrint('[ProfileApiService] Error deleting image: $e');
       rethrow;
     }
   }

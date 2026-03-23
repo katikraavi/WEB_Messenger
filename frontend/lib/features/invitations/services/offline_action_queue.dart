@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../../../utils/secure_storage_wrapper.dart';
 
 /// Offline action queue for deferred operations
 /// 
@@ -10,10 +10,10 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 class OfflineActionQueue {
   static const String _queueKey = 'offline_action_queue';
   
-  final FlutterSecureStorage _secureStorage;
+  final SecureStorageWrapper _secureStorage;
   
-  OfflineActionQueue({FlutterSecureStorage? secureStorage})
-    : _secureStorage = secureStorage ?? const FlutterSecureStorage();
+  OfflineActionQueue({SecureStorageWrapper? secureStorage})
+    : _secureStorage = secureStorage ?? SecureStorageWrapper();
 
   /// Action types
   static const String actionSendInvite = 'send_invite';
@@ -53,10 +53,8 @@ class OfflineActionQueue {
       
       await _setQueue(queue);
       
-      print('[OfflineQueue] Action queued: $type (ID: ${action['id']})');
       return true;
     } catch (e) {
-      print('[OfflineQueue Error] Failed to queue action: $e');
       return false;
     }
   }
@@ -68,7 +66,6 @@ class OfflineActionQueue {
     try {
       return await _getQueue();
     } catch (e) {
-      print('[OfflineQueue Error] Failed to retrieve queue: $e');
       return [];
     }
   }
@@ -85,10 +82,8 @@ class OfflineActionQueue {
       queue.removeWhere((action) => action['id'] == actionId);
       await _setQueue(queue);
       
-      print('[OfflineQueue] Action removed: $actionId');
       return true;
     } catch (e) {
-      print('[OfflineQueue Error] Failed to remove action: $e');
       return false;
     }
   }
@@ -112,7 +107,6 @@ class OfflineActionQueue {
           action['retries'] = (action['retries'] as int) + 1;
           
           if (action['retries'] > maxRetries) {
-            print('[OfflineQueue] Action ${action['id']} exceeded max retries');
             queue.removeWhere((a) => a['id'] == actionId);
             return -1;
           }
@@ -124,7 +118,6 @@ class OfflineActionQueue {
       
       return -1; // Action not found
     } catch (e) {
-      print('[OfflineQueue Error] Failed to increment retry: $e');
       return -1;
     }
   }
@@ -137,10 +130,8 @@ class OfflineActionQueue {
   Future<bool> clearQueue() async {
     try {
       await _secureStorage.delete(key: _queueKey);
-      print('[OfflineQueue] Queue cleared');
       return true;
     } catch (e) {
-      print('[OfflineQueue Error] Failed to clear queue: $e');
       return false;
     }
   }
@@ -174,7 +165,6 @@ class OfflineActionQueue {
       
       return stats;
     } catch (e) {
-      print('[OfflineQueue Error] Failed to get stats: $e');
       return {};
     }
   }
@@ -188,7 +178,6 @@ class OfflineActionQueue {
       final list = jsonDecode(data) as List;
       return list.map((item) => Map<String, dynamic>.from(item as Map)).toList();
     } catch (e) {
-      print('[OfflineQueue Error] Failed to parse queue: $e');
       return [];
     }
   }

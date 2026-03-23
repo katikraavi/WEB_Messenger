@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:provider/provider.dart' as provider_pkg;
 import 'dart:async';
@@ -121,9 +120,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       final userId = authProvider.user?.userId;
 
       if (token == null || userId == null) {
-        debugPrint(
-          '[ChatDetail] Cannot connect to WebSocket - not authenticated',
-        );
         return;
       }
 
@@ -138,9 +134,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       await _reloadMessagesAfterReconnect();
       _clearHeaderError();
 
-      debugPrint(
-        '[ChatDetail] ✓ Connected to WebSocket for chat ${widget.chatId}',
-      );
     } catch (e) {
       AppExceptionLogger.log(e, context: 'ChatDetailScreen._connectWebSocket');
       _showHeaderError(
@@ -307,9 +300,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   /// This is where we safely disable viewer mode
   @override
   void deactivate() {
-    debugPrint(
-      '[ChatDetail] 🚪 deactivate() called - disabling viewer mode for chat ${widget.chatId}',
-    );
 
     if (_viewerActiveEnabled) {
       try {
@@ -317,7 +307,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           // Disable viewer mode - new messages should NOT auto-read
           _localMessagesNotifier!.setChatBeingViewed(false);
           _viewerActiveEnabled = false;
-          debugPrint('[ChatDetail] ✓ Viewer mode disabled');
         }
       } catch (e) {
         AppExceptionLogger.log(e, context: 'ChatDetailScreen.deactivate');
@@ -342,9 +331,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         if (authProvider.token != null) {
           // Trigger auto-read provider to mark unread messages as read
           // This will cause the recipient to show "read" status (blue checkmarks) to the sender
-          debugPrint(
-            '[ChatDetail] 🔔 Triggering auto-mark-as-read for chat ${widget.chatId}',
-          );
           ref.read(
             autoMarkAsReadProvider((
               chatId: widget.chatId,
@@ -366,7 +352,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         _webSocketNotifier.stopTyping(widget.chatId);
       }
 
-      debugPrint('[ChatDetail] Sent typing event: $eventType');
     } catch (e) {
       AppExceptionLogger.log(e, context: 'ChatDetailScreen._sendTypingEvent');
     }
@@ -488,13 +473,9 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     String token,
   ) async {
     try {
-      debugPrint('[ChatDetail] ✏️ Starting edit for message ${message.id}');
-      debugPrint('[ChatDetail] ✏️ Old content: ${message.getDisplayContent()}');
-      debugPrint('[ChatDetail] ✏️ New content: $newContent');
       final encryptedContent = MessageEncryptionService.encryptMessage(
         newContent,
       );
-      debugPrint('[ChatDetail] ✏️ Encrypted content length: ${encryptedContent.length}');
       final editedMessage = await ChatApiService(baseUrl: _backendBaseUrl)
           .editMessage(
             token: token,
@@ -507,13 +488,11 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       );
 
       _localMessagesNotifier?.upsertMessage(decryptedMessage);
-      debugPrint('[ChatDetail] ✅ Message edited: ${message.id}');
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Message edited successfully')),
       );
     } catch (e) {
-      debugPrint('[ChatDetail] ❌ Error editing message: $e');
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to edit: $e')));
@@ -523,7 +502,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   /// Handle message delete (T062)
   Future<void> _handleDeleteMessage(Message message, String token) async {
     try {
-      debugPrint('[ChatDetail] 🗑️ Starting delete for message ${message.id}');
       await ChatApiService(baseUrl: _backendBaseUrl).deleteMessage(
         token: token,
         chatId: widget.chatId,
@@ -532,13 +510,11 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
 
       _localMessagesNotifier?.markMessageDeleted(message.id);
 
-      debugPrint('[ChatDetail] ✅ Message deleted: ${message.id}');
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Message deleted')),
       );
     } catch (e) {
-      debugPrint('[ChatDetail] ❌ Error deleting message: $e');
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to delete: $e')));
@@ -548,12 +524,10 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   /// Handle image attachment (T079)
   Future<void> _handleImageAttachment(String token) async {
     try {
-      debugPrint('[ChatDetail] 📸 Image attachment started');
 
       // Pick image from device
       final pickedMedia = await MediaPickerService.pickImage();
       if (pickedMedia == null) {
-        debugPrint('[ChatDetail] ℹ️ Image selection cancelled');
         return;
       }
 
@@ -572,7 +546,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         token: token,
       );
 
-      debugPrint('[ChatDetail] ✅ Image uploaded: ${uploadedMedia.id}');
 
       final chatApiService = ChatApiService(baseUrl: 'http://localhost:8081');
       final mediaPath = '/uploads/media/${uploadedMedia.fileName}';
@@ -607,7 +580,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         ),
       );
     } catch (e) {
-      debugPrint('[ChatDetail] ❌ Image upload error: $e');
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to upload image: $e')));
@@ -617,12 +589,10 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   /// Handle video attachment (T080)
   Future<void> _handleVideoAttachment(String token) async {
     try {
-      debugPrint('[ChatDetail] 🎬 Video attachment started');
 
       // Pick video from device
       final pickedMedia = await MediaPickerService.pickVideo();
       if (pickedMedia == null) {
-        debugPrint('[ChatDetail] ℹ️ Video selection cancelled');
         return;
       }
 
@@ -641,7 +611,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         token: token,
       );
 
-      debugPrint('[ChatDetail] ✅ Video uploaded: ${uploadedMedia.id}');
 
       final chatApiService = ChatApiService(baseUrl: 'http://localhost:8081');
       final mediaPath = '/uploads/media/${uploadedMedia.fileName}';
@@ -676,7 +645,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         ),
       );
     } catch (e) {
-      debugPrint('[ChatDetail] ❌ Video upload error: $e');
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to upload video: $e')));
@@ -900,7 +868,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     ref.watch(messageStatusUpdateProvider).whenData((statusUpdate) {
       if (statusUpdate != null) {
         final (:messageId, :newStatus, :chatId) = statusUpdate;
-        debugPrint('[ChatDetail] 📡 Status update: $messageId -> $newStatus');
 
         // Handle status change via notifier
         if (authProvider.token != null) {
@@ -1107,7 +1074,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
 
                 _scrollToBottom();
               } catch (e) {
-                debugPrint('[ChatDetail] Send error: $e');
 
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(

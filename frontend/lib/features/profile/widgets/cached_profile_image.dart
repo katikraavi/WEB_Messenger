@@ -209,7 +209,6 @@ class ProfileImageCacheManager {
       await CachedNetworkImage(imageUrl: '').cacheManager?.emptyCache();
     } catch (e) {
       // Silently fail - cache clearing is not critical
-      print('[ProfileImageCacheManager] Error clearing cache: $e');
     }
   }
 
@@ -220,7 +219,6 @@ class ProfileImageCacheManager {
       await CachedNetworkImage(imageUrl: imageUrl).cacheManager?.removeFile(imageUrl);
     } catch (e) {
       // Silently fail
-      print('[ProfileImageCacheManager] Error clearing image cache for $imageUrl: $e');
     }
   }
 

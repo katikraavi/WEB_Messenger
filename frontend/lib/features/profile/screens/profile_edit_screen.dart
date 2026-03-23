@@ -439,9 +439,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
           final refreshedProfile = await ref.refresh(
             userProfileWithTokenProvider((widget.profile.userId, token)).future,
           );
-          print('[ProfileEditScreen] Profile refreshed successfully. Image URL: ${refreshedProfile.profilePictureUrl}');
         } catch (e) {
-          print('[ProfileEditScreen] Error refreshing profile after save: $e');
         }
         
         // Wait a brief moment to ensure UI updates with new data

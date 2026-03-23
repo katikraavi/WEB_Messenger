@@ -624,7 +624,6 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
   @override
   void initState() {
     super.initState();
-    debugPrint('[InlineVideoPlayer] Video widget created (tap to play)');
   }
 
   @override
@@ -655,7 +654,6 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
   Future<void> _ensureInitialized() async {
     if (_playerCreated || _hasError) return;
     try {
-      debugPrint('[InlineVideoPlayer] Initializing: ${widget.url}');
       final player = fvp_mdk.Player();
       _player = player;
       _playerCreated = true;
@@ -709,7 +707,6 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
         _initialized = true;
       });
     } catch (e) {
-      debugPrint('[InlineVideoPlayer] Init error: $e');
       widget.onError();
       if (!mounted) return;
       setState(() { _hasError = true; });

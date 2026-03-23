@@ -16,14 +16,11 @@ final authTokenProvider = FutureProvider<String>((ref) async {
     final token = await storage.read(key: 'auth_token');
     
     if (token != null) {
-      print('[AuthToken] Successfully retrieved token');
       return token;
     }
     
-    print('[AuthToken] No token stored');
     return '';
   } catch (e) {
-    print('[AuthToken] Error reading token: $e');
     return '';
   }
 });
@@ -144,7 +141,6 @@ final combinedSearchProvider = FutureProvider.family<List<UserSearchResult>, Str
       try {
         return await searchService.searchByEmail(query);
       } catch (e) {
-        print('[CombinedSearch] Email search failed, trying username search: $e');
         try {
           return await searchService.searchByUsername(query);
         } catch (_) {
@@ -178,7 +174,6 @@ final combinedSearchProvider = FutureProvider.family<List<UserSearchResult>, Str
         return merged;
       } catch (e) {
         // If parallel search completely fails, try username first
-        print('[CombinedSearch] Parallel search failed: $e, trying individual searches');
         try {
           return await searchService.searchByUsername(query);
         } catch (_) {
@@ -191,7 +186,6 @@ final combinedSearchProvider = FutureProvider.family<List<UserSearchResult>, Str
       }
     }
   } catch (e) {
-    print('[CombinedSearch] All search attempts failed: $e');
     rethrow;
   }
 });

@@ -77,7 +77,6 @@ class _MessageStatusIndicatorState extends State<MessageStatusIndicator>
     }
 
     final status = widget.message.status;
-    print('[MessageStatusIndicator] 📊 Building status indicator for ${widget.message.id}: status=$status');
 
     return ScaleTransition(
       scale: _scaleAnimation,
@@ -95,13 +94,10 @@ class _MessageStatusIndicatorState extends State<MessageStatusIndicator>
     final isDelivered = status == 'delivered';
 
     if (isRead) {
-      print('[MessageStatusIndicator] � Rendering YELLOW checkmarks (read) for ${widget.message.id}');
       return _buildDoubleCheckmark(isYellow: true);
     } else if (isDelivered) {
-      print('[MessageStatusIndicator] ⚫ Rendering GRAY double checkmarks (delivered) for ${widget.message.id}');
       return _buildDoubleCheckmark(isYellow: false);
     } else {
-      print('[MessageStatusIndicator] ⚪ Rendering GRAY single checkmark (sent) for ${widget.message.id}');
       return _buildSingleCheckmark();
     }
   }

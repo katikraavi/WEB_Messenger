@@ -34,12 +34,10 @@ class AppInitializationService {
     required WidgetRef ref,
   }) async {
     if (_isInitialized) {
-      debugPrint('[AppInitialization] Realtime messaging already initialized');
       return;
     }
 
     try {
-      debugPrint('[AppInitialization] 🚀 Initializing realtime messaging...');
       
       _riverpodRef = ref;
 
@@ -50,7 +48,6 @@ class AppInitializationService {
         url: 'ws://localhost:8081/ws/messages',
       );
 
-      debugPrint('[AppInitialization] ✓ WebSocket connected');
 
       // Initialize receive messages listener (will subscribe to WebSocket events)
       final listener = ReceiveMessagesListener(
@@ -60,15 +57,12 @@ class AppInitializationService {
         token: token,
       );
 
-      debugPrint('[AppInitialization] ✓ Receive messages listener initialized');
       
       // Setup typing event routing (T047)
       _setupTypingEventRouting(webSocketService, ref);
 
       _isInitialized = true;
-      debugPrint('[AppInitialization] ✅ Realtime messaging initialized');
     } catch (e, st) {
-      debugPrint('[AppInitialization] ❌ Error initializing: $e\n$st');
       rethrow;
     }
   }
@@ -78,7 +72,6 @@ class AppInitializationService {
     WebSocketService webSocketService,
     WidgetRef ref,
   ) {
-    debugPrint('[AppInitialization] 📡 Setting up typing event routing...');
     
     webSocketService.eventStream.listen((event) {
       final eventType = event['type'];
@@ -104,7 +97,6 @@ class AppInitializationService {
       
       if (userId == null || username == null) return;
       
-      debugPrint('[AppInitialization] ⌨️ User typing: $username in chat $chatId');
       
       // Update typing indicator state
       ref.read(typingIndicatorProvider.notifier).handleTypingStart(
@@ -113,7 +105,6 @@ class AppInitializationService {
         username,
       );
     } catch (e) {
-      debugPrint('[AppInitialization] ❌ Error handling typing start: $e');
     }
   }
   
@@ -129,7 +120,6 @@ class AppInitializationService {
       
       if (userId == null) return;
       
-      debugPrint('[AppInitialization] ⌨️ User stopped typing in chat $chatId');
       
       // Update typing indicator state
       ref.read(typingIndicatorProvider.notifier).handleTypingStop(
@@ -137,7 +127,6 @@ class AppInitializationService {
         userId,
       );
     } catch (e) {
-      debugPrint('[AppInitialization] ❌ Error handling typing stop: $e');
     }
   }
 
@@ -145,7 +134,6 @@ class AppInitializationService {
   static Future<void> shutdown({
     required WebSocketService webSocketService,
   }) async {
-    debugPrint('[AppInitialization] 🛑 Shutting down realtime messaging');
     await webSocketService.disconnect();
     _isInitialized = false;
   }

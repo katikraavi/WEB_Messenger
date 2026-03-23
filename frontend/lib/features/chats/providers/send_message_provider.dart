@@ -154,10 +154,8 @@ class SendMessageNotifier extends StateNotifier<SendMessageState> {
       }
 
       if (addOptimisticMessage) {
-        print('[SendMessage] 📤 Optimistic update: Adding message ${optimisticMessage.id}');
         _updateMessagesOptimistic(chatId, token, currentUserId, optimisticMessage, isAdding: true);
       } else {
-        print('[SendMessage] 🔁 Retrying failed message ${optimisticMessage.id}');
         _upsertLocalMessage(chatId, token, currentUserId, optimisticMessage);
       }
 
@@ -172,7 +170,6 @@ class SendMessageNotifier extends StateNotifier<SendMessageState> {
 
       final decryptedMessage = await MessageEncryptionService.decryptMessage(sentMessage);
 
-      print('[SendMessage] ✓ Message sent and decrypted: ${decryptedMessage.id}');
 
       _updateMessagesOptimistic(
         chatId,
@@ -188,7 +185,6 @@ class SendMessageNotifier extends StateNotifier<SendMessageState> {
         lastSentMessageId: sentMessage.id,
       );
     } catch (e, st) {
-      print('[SendMessage] ❌ Error sending message: $e\n$st');
 
       final errorMessage = e.toString();
       final failedMessage = optimisticMessage.copyWith(
@@ -227,7 +223,6 @@ class SendMessageNotifier extends StateNotifier<SendMessageState> {
       final messagesNotifier = ref.read(localMessagesProvider(cacheKey).notifier);
       messagesNotifier.upsertMessage(message);
     } catch (e) {
-      print('[SendMessage] ⚠️ Error updating failed message for retry: $e');
     }
   }
 
@@ -250,15 +245,12 @@ class SendMessageNotifier extends StateNotifier<SendMessageState> {
       
       if (isAdding) {
         // Add new optimistic message directly to the notifier
-        print('[SendMessage] 📥 Adding optimistic message ${message.id} to local state');
         messagesNotifier.addMessage(message);
       } else if (replaceId != null) {
         // Replace optimistic message with server response
-        print('[SendMessage] 🔄 Replacing optimistic message $replaceId → ${message.id}');
         messagesNotifier.replaceOptimisticMessage(replaceId, message);
       }
     } catch (e) {
-      print('[SendMessage] ⚠️ Error updating optimistic message: $e');
       // Continue anyway - message will still appear from server
     }
   }

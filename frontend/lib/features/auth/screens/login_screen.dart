@@ -14,13 +14,13 @@ class LoginScreen extends StatefulWidget {
   final String? initialPassword;
 
   const LoginScreen({
-    Key? key,
+    super.key,
     this.onLoginSuccess,
     this.onNavigateToRegistration,
     this.onNavigateToForgotPassword,
     this.initialEmail,
     this.initialPassword,
-  }) : super(key: key);
+  });
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -95,7 +95,6 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleLogin(AuthProvider authProvider) async {
-    print('[LoginScreen] Login attempt started');
     
     // Clear any previous form-level errors
     if (mounted) {
@@ -108,7 +107,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
     // Check for any field errors
     if (_fieldErrors.values.any((error) => error != null)) {
-      print('[LoginScreen] Validation errors found');
       return;
     }
 
@@ -118,11 +116,7 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _passwordController.text,
       );
 
-      print('[LoginScreen] Calling authProvider.login()');
       await authProvider.login(request);
-      print('[LoginScreen] Login successful');
-      print('[LoginScreen] authProvider.user: ${authProvider.user?.username}');
-      print('[LoginScreen] authProvider.token: ${authProvider.token != null ? 'present' : 'null'}');
 
       if (mounted) {
         // Show success message
@@ -133,13 +127,10 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         );
 
-        print('[LoginScreen] Calling onLoginSuccess callback');
         // Call success callback or navigate
         widget.onLoginSuccess?.call();
       }
-    } catch (e, stackTrace) {
-      print('[LoginScreen] Login error: $e');
-      print('[LoginScreen] Stack trace: $stackTrace');
+    } catch (e) {
       
       // Error is already set in provider
       if (mounted) {

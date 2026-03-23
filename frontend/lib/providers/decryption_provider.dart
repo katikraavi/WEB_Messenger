@@ -49,7 +49,6 @@ Future<String> safeDecrypt(
     // Not encrypted, return as-is
     return text;
   } catch (e) {
-    print('[safeDecrypt] Failed to decrypt: $e');
     return '[Message could not be decrypted]';
   }
 }

@@ -14,22 +14,18 @@ final chatApiServiceProvider = Provider((ref) {
 /// Token should come from the old provider package's AuthProvider
 /// Watches cache invalidator to force refresh when needed (e.g., on tab switch)
 final chatsProvider = FutureProvider.family<List<Chat>, String>((ref, token) async {
-  print('[ChatsProvider] Called with token: ${token.isNotEmpty ? 'present' : 'EMPTY'}');
   
   // Watch cache invalidator to trigger refresh
   ref.watch(chatsCacheInvalidatorProvider);
   
   if (token.isEmpty) {
-    print('[ChatsProvider] ❌ No authentication token provided');
     throw Exception('No authentication token');
   }
 
   final apiService = ref.watch(chatApiServiceProvider);
   
   try {
-    print('[ChatsProvider] 📡 Fetching chats from API...');
     final chats = await apiService.fetchChats(token: token);
-    print('[ChatsProvider] ✅ Successfully fetched ${chats.length} chats');
     // Sort by lastMessageTimestamp descending
     final sortedChats = List<Chat>.from(chats)
       ..sort((a, b) {
@@ -39,7 +35,6 @@ final chatsProvider = FutureProvider.family<List<Chat>, String>((ref, token) asy
       });
     return sortedChats;
   } catch (e) {
-    print('[ChatsProvider] ❌ Error fetching chats: $e');
     rethrow;
   }
 });

@@ -79,7 +79,6 @@ class MediaPickerService {
         sizeBytes: bytes.length,
       );
     } catch (e) {
-      debugPrint('[MediaPickerService] Error picking image: $e');
       rethrow;
     }
   }
@@ -113,9 +112,6 @@ class MediaPickerService {
         );
       }
 
-      debugPrint(
-        '[MediaPickerService] Picked video: $fileName (${fileSizeBytes ~/ 1048576}MB)',
-      );
 
       // For videos, bytes is null - we'll stream during upload
       return PickedMediaFile(
@@ -126,7 +122,6 @@ class MediaPickerService {
         sizeBytes: fileSizeBytes,
       );
     } catch (e) {
-      debugPrint('[MediaPickerService] Error picking video: $e');
       rethrow;
     }
   }
@@ -159,7 +154,6 @@ class MediaPickerService {
         sizeBytes: bytes.length,
       );
     } catch (e) {
-      debugPrint('[MediaPickerService] Error picking media: $e');
       rethrow;
     }
   }

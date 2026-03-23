@@ -36,7 +36,6 @@ class ImagePickerService {
       
       return pickedFile;
     } catch (e) {
-      print('[ImagePickerService] Error picking from gallery: $e');
       rethrow;
     }
   }
@@ -71,7 +70,6 @@ class ImagePickerService {
       
       return pickedFile;
     } catch (e) {
-      print('[ImagePickerService] Error picking from camera: $e');
       rethrow;
     }
   }
@@ -101,7 +99,6 @@ class ImagePickerService {
       
       return error;
     } catch (e) {
-      print('[ImagePickerService] Error validating image: $e');
       return ValidationError.networkError;
     }
   }

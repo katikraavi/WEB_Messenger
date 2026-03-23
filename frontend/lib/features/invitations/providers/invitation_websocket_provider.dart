@@ -58,9 +58,6 @@ ChatInviteModel? _parseInviteFromEvent(WebSocketEvent event) {
 
     return ChatInviteModel.fromJson(data);
   } catch (e) {
-    print(
-      '[InvitationEvents] ❌ Error parsing invitation from WebSocket event: $e',
-    );
     return null;
   }
 }

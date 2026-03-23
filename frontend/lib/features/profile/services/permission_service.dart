@@ -30,10 +30,8 @@ class PermissionService {
       return status.isGranted;
     } on MissingPluginException catch (e) {
       // Permission handler plugin not available, let image_picker handle it
-      print('[PermissionService] Permission handler not available: $e. Allowing image_picker to handle permissions.');
       return true;
     } catch (e) {
-      print('[PermissionService] Error with camera permission: $e');
       return false;
     }
   }
@@ -53,10 +51,8 @@ class PermissionService {
       return status.isGranted;
     } on MissingPluginException catch (e) {
       // Permission handler plugin not available, let image_picker handle it
-      print('[PermissionService] Permission handler not available: $e. Allowing image_picker to handle permissions.');
       return true;
     } catch (e) {
-      print('[PermissionService] Error with photo library permission: $e');
       return false;
     }
   }
@@ -73,7 +69,6 @@ class PermissionService {
       // Permission handler plugin not available, assume permission exists
       return true;
     } catch (e) {
-      print('[PermissionService] Error checking camera permission: $e');
       return false;
     }
   }
@@ -90,7 +85,6 @@ class PermissionService {
       // Permission handler plugin not available, assume permission exists
       return true;
     } catch (e) {
-      print('[PermissionService] Error checking photo library permission: $e');
       return false;
     }
   }
@@ -100,7 +94,6 @@ class PermissionService {
   /// Used when image_picker returns null (user denied permission)
   /// Logs the denial; UI layer responsibility to show snackbar/dialog to user
   static void showPermissionDeniedMessage(String what) {
-    print('[PermissionService] $what permission denied by user');
     // UI layer should display appropriate message when image_picker returns null
   }
 }

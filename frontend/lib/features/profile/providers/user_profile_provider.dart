@@ -47,7 +47,6 @@ final userProfileProvider = FutureProvider.family<UserProfile, String>(
       final profile = await apiService.fetchProfile(userId, token: null);
       return profile;
     } catch (e) {
-      print('[userProfileProvider] Error fetching profile for $userId: $e');
       rethrow; // Rethrow so error is captured in AsyncValue
     }
   },
@@ -66,7 +65,6 @@ final userProfileWithTokenProvider =
       final profile = await apiService.fetchProfile(params.$1, token: params.$2);
       return profile;
     } catch (e) {
-      print('[userProfileWithTokenProvider] Error fetching profile for ${params.$1}: $e');
       rethrow;
     }
   },

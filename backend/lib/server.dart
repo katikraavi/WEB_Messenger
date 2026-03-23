@@ -3392,10 +3392,3 @@ Map<String, dynamic> _invitationRowToJson(List<dynamic> row) {
         : null, // canceled_at
   };
 }
-
-/// Unused - kept for reference
-/// Each endpoint handles its own JWT validation
-/// Pattern:
-///   final token = authHeader.substring('Bearer '.length);
-///   final payload = JwtService.validateToken(token);
-///   final userId = payload.userId;

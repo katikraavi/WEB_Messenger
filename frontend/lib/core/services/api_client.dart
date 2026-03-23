@@ -53,22 +53,18 @@ class ApiClient {
       try {
         final isServerHealthy = await isHealthy();
         if (isServerHealthy) {
-          debugPrint('[API Client] Backend connected successfully on attempt ${attempt + 1}');
           return true;
         }
       } catch (e) {
-        debugPrint('[API Client] Connection attempt ${attempt + 1} failed: $e');
       }
 
       // Wait before next retry (except after last attempt)
       if (attempt < maxRetries - 1) {
         final delay = delays[attempt];
-        debugPrint('[API Client] Retrying in ${delay}ms...');
         await Future.delayed(Duration(milliseconds: delay));
       }
     }
 
-    debugPrint('[API Client] Failed to connect to backend after $maxRetries attempts');
     return false;
   }
 
@@ -88,14 +84,11 @@ class ApiClient {
       if (response.statusCode == 200) {
         // Parse JSON response
         // Expected: {"status": "ok", "timestamp": "<ISO8601>", "uptime_ms": <number>}
-        debugPrint('[API Client] Backend health check passed');
         return true;
       } else {
-        debugPrint('[API Client] Health check failed with status ${response.statusCode}');
         return false;
       }
     } catch (e) {
-      debugPrint('[API Client] Health check error: $e');
       return false;
     }
   }

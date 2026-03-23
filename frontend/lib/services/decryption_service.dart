@@ -79,7 +79,6 @@ class DecryptionService {
         return encrypted;
       }
     } catch (e) {
-      print('[DecryptionService] Decryption failed: $e');
       throw Exception('Decryption failed: $e');
     }
   }

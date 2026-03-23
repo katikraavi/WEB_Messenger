@@ -112,7 +112,6 @@ class ImageValidator {
       
       return null; // Valid dimensions
     } catch (e) {
-      print('[ImageValidator] Error validating dimensions: $e');
       return null; // On error, allow the image (don't block)
     }
   }

@@ -27,8 +27,8 @@ class SecureStorageWrapper {
   /// Read a value from storage
   /// Tries secure storage first, falls back to memory on Linux keyring errors
   Future<String?> read({required String key}) async {
-    // Check memory cache first if using fallback
-    if (_useMemoryFallback && _memoryCache.containsKey(key)) {
+    // In fallback mode, never hit system keyring again.
+    if (_useMemoryFallback) {
       return _memoryCache[key];
     }
 

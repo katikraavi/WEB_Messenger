@@ -133,9 +133,7 @@ class ChatNotificationSettingsService {
         deviceToken: fcmToken,
         platform: platform.isEmpty ? 'android' : platform,
       );
-      print('[Notifications] Device token registered with backend');
     } catch (e) {
-      print('[Notifications] Could not register device token: $e');
     }
   }
 }
