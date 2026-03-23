@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:provider/provider.dart' as provider_pkg;
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:frontend/core/notifications/app_feedback_service.dart';
@@ -100,8 +101,9 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   List<String> _searchResultIds = [];
   int _searchResultIndex = 0;
   final TextEditingController _searchController = TextEditingController();
-  final MessageSearchService _messageSearchService =
-      MessageSearchService(baseUrl: _backendBaseUrl);
+  final MessageSearchService _messageSearchService = MessageSearchService(
+    baseUrl: _backendBaseUrl,
+  );
 
   @override
   void initState() {
@@ -140,7 +142,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       _webSocketNotifier.subscribeToChat(widget.chatId);
       await _reloadMessagesAfterReconnect();
       _clearHeaderError();
-
     } catch (e) {
       AppExceptionLogger.log(e, context: 'ChatDetailScreen._connectWebSocket');
       _showHeaderError(
@@ -236,6 +237,10 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     }
   }
 
+  bool _useWideWebLayout(BuildContext context) {
+    return kIsWeb && MediaQuery.sizeOf(context).width >= 1100;
+  }
+
   PreferredSizeWidget? _buildHeaderErrorBanner() {
     if (_headerErrorMessage == null) {
       return null;
@@ -307,7 +312,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   /// This is where we safely disable viewer mode
   @override
   void deactivate() {
-
     if (_viewerActiveEnabled) {
       try {
         if (_localMessagesNotifier != null) {
@@ -440,8 +444,13 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     // Watch typing indicator updates from WebSocket (T046)
     ref.watch(typingIndicatorUpdatesProvider);
 
+    final useWideWebLayout = _useWideWebLayout(context);
+
     return Scaffold(
+      backgroundColor: useWideWebLayout ? const Color(0xFFF5F8FE) : null,
       appBar: AppBar(
+        backgroundColor: useWideWebLayout ? Colors.white : null,
+        titleSpacing: useWideWebLayout ? 20 : null,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -452,7 +461,11 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                     ? CircleAvatar(
                         radius: 16,
                         backgroundColor: Colors.indigo.shade100,
-                        child: const Icon(Icons.group, color: Colors.indigo, size: 18),
+                        child: const Icon(
+                          Icons.group,
+                          color: Colors.indigo,
+                          size: 18,
+                        ),
                       )
                     : UserAvatarWidget(
                         imageUrl: widget.otherUserAvatarUrl,
@@ -539,149 +552,226 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         ],
         bottom: _buildHeaderErrorBanner(),
       ),
-      body: Column(
-        children: [
-          // Message search bar (T020 / GAP-003)
-          if (_searchActive)
-            MessageSearchBar(
-              controller: _searchController,
-              onQueryChanged: (query) async {
-                final trimmed = query.trim();
-                setState(() {
-                  _searchResultIndex = 0;
-                });
-                if (trimmed.length >= 2) {
-                  final results = await _messageSearchService.searchMessages(
-                    chatId: widget.chatId,
-                    query: trimmed,
-                    token: token,
-                  );
-                  if (mounted) {
-                    setState(() {
-                      _searchResultIds = results.map((r) => r.messageId).toList();
-                      _searchResultIndex = 0;
-                    });
-                  }
-                } else {
-                  setState(() {
-                    _searchResultIds = [];
-                    _searchResultIndex = 0;
-                  });
-                }
-              },
-              totalResults: _searchResultIds.length,
-              currentIndex: _searchResultIndex,
-              onNext: () {
-                if (_searchResultIds.isNotEmpty) {
-                  setState(() {
-                    _searchResultIndex =
-                        (_searchResultIndex + 1) % _searchResultIds.length;
-                  });
-                }
-              },
-              onPrevious: () {
-                if (_searchResultIds.isNotEmpty) {
-                  setState(() {
-                    _searchResultIndex =
-                        (_searchResultIndex - 1 + _searchResultIds.length) %
-                            _searchResultIds.length;
-                  });
-                }
-              },
-              onClose: () {
-                setState(() {
-                  _searchActive = false;
-                  _searchResultIds = [];
-                  _searchResultIndex = 0;
-                });
-                _searchController.clear();
-              },
+      body: Container(
+        decoration: useWideWebLayout
+            ? const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0xFFF5F8FE), Color(0xFFEDF4FF)],
+                ),
+              )
+            : null,
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: useWideWebLayout ? 1080 : double.infinity,
             ),
-          // Message history (T042, T025-T027)
-          // Message history (T042, T025-T027)
-          Expanded(
-            child: _buildMessagesView(context, messages, token, currentUserId),
+            child: Container(
+              margin: EdgeInsets.fromLTRB(
+                useWideWebLayout ? 16 : 0,
+                useWideWebLayout ? 16 : 0,
+                useWideWebLayout ? 16 : 0,
+                0,
+              ),
+              decoration: BoxDecoration(
+                color: useWideWebLayout
+                    ? Colors.white.withValues(alpha: 0.9)
+                    : null,
+                borderRadius: BorderRadius.circular(useWideWebLayout ? 24 : 0),
+                border: useWideWebLayout
+                    ? Border.all(color: const Color(0xFFE1EAF7))
+                    : null,
+                boxShadow: useWideWebLayout
+                    ? [
+                        BoxShadow(
+                          color: Colors.blueGrey.withValues(alpha: 0.06),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Column(
+                children: [
+                  // Message search bar (T020 / GAP-003)
+                  if (_searchActive)
+                    MessageSearchBar(
+                      controller: _searchController,
+                      onQueryChanged: (query) async {
+                        final trimmed = query.trim();
+                        setState(() {
+                          _searchResultIndex = 0;
+                        });
+                        if (trimmed.length >= 2) {
+                          final results = await _messageSearchService
+                              .searchMessages(
+                                chatId: widget.chatId,
+                                query: trimmed,
+                                token: token,
+                              );
+                          if (mounted) {
+                            setState(() {
+                              _searchResultIds = results
+                                  .map((r) => r.messageId)
+                                  .toList();
+                              _searchResultIndex = 0;
+                            });
+                          }
+                        } else {
+                          setState(() {
+                            _searchResultIds = [];
+                            _searchResultIndex = 0;
+                          });
+                        }
+                      },
+                      totalResults: _searchResultIds.length,
+                      currentIndex: _searchResultIndex,
+                      onNext: () {
+                        if (_searchResultIds.isNotEmpty) {
+                          setState(() {
+                            _searchResultIndex =
+                                (_searchResultIndex + 1) %
+                                _searchResultIds.length;
+                          });
+                        }
+                      },
+                      onPrevious: () {
+                        if (_searchResultIds.isNotEmpty) {
+                          setState(() {
+                            _searchResultIndex =
+                                (_searchResultIndex -
+                                    1 +
+                                    _searchResultIds.length) %
+                                _searchResultIds.length;
+                          });
+                        }
+                      },
+                      onClose: () {
+                        setState(() {
+                          _searchActive = false;
+                          _searchResultIds = [];
+                          _searchResultIndex = 0;
+                        });
+                        _searchController.clear();
+                      },
+                    ),
+                  // Message history (T042, T025-T027)
+                  // Message history (T042, T025-T027)
+                  Expanded(
+                    child: _buildMessagesView(
+                      context,
+                      messages,
+                      token,
+                      currentUserId,
+                    ),
+                  ),
+
+                  // Typing indicator (T045, T047)
+                  Consumer(
+                    builder: (context, ref, child) {
+                      // Get current user ID
+                      final currentUserId = authProvider.user?.userId;
+
+                      // Watch typing users for this chat
+                      final typingUsers = ref.watch(
+                        typingUsersForChatProvider(widget.chatId),
+                      );
+
+                      // Filter out current user and map to usernames
+                      final typingUsernames = typingUsers
+                          .where((user) => user.userId != currentUserId)
+                          .map((user) => user.username)
+                          .toList();
+
+                      return TypingIndicator(
+                        typingUsernames: typingUsernames,
+                        showIndicator: typingUsernames.isNotEmpty,
+                      );
+                    },
+                  ),
+
+                  // Message input box (T023, T024, T027, T044)
+                  Container(
+                    padding: EdgeInsets.fromLTRB(
+                      useWideWebLayout ? 12 : 0,
+                      useWideWebLayout ? 8 : 0,
+                      useWideWebLayout ? 12 : 0,
+                      useWideWebLayout ? 12 : 0,
+                    ),
+                    decoration: BoxDecoration(
+                      color: useWideWebLayout ? const Color(0xFFF9FBFF) : null,
+                      border: useWideWebLayout
+                          ? const Border(
+                              top: BorderSide(color: Color(0xFFE1EAF7)),
+                            )
+                          : null,
+                      borderRadius: BorderRadius.only(
+                        bottomLeft: Radius.circular(useWideWebLayout ? 24 : 0),
+                        bottomRight: Radius.circular(useWideWebLayout ? 24 : 0),
+                      ),
+                    ),
+                    child: MessageInputBox(
+                      onSend: (text) async {
+                        // Stop typing indicator when sending
+                        ref
+                            .read(messageWebSocketProvider.notifier)
+                            .stopTyping(widget.chatId);
+
+                        try {
+                          // Send message via provider (handles optimistic update automatically)
+                          await ref
+                              .read(sendMessageProvider.notifier)
+                              .sendMessage(
+                                chatId: widget.chatId,
+                                plaintext: text,
+                                token: token,
+                                currentUserId: currentUserId,
+                              );
+
+                          _scrollToBottom();
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Failed to send message: $e'),
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      isLoading: sendState.isLoading,
+                      // Typing event handlers (T044)
+                      onTypingStart: () {
+                        _sendTypingEvent('typing.start');
+                      },
+                      onTypingStop: () {
+                        _sendTypingEvent('typing.stop');
+                      },
+                      onTypingRefresh: () {
+                        _sendTypingEvent(
+                          'typing.start',
+                        ); // Refresh by sending start again
+                      },
+                      // Media attachment handlers (T078)
+                      onImageTap: () {
+                        _handleImageAttachment(token);
+                      },
+                      onVideoTap: () {
+                        _handleVideoAttachment(token);
+                      },
+                      onAudioTap: () {
+                        _handleAudioRecordingTap(token);
+                      },
+                      isRecordingAudio: _isRecordingAudio,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-
-          // Typing indicator (T045, T047)
-          Consumer(
-            builder: (context, ref, child) {
-              // Get current user ID
-              final currentUserId = authProvider.user?.userId;
-
-              // Watch typing users for this chat
-              final typingUsers = ref.watch(
-                typingUsersForChatProvider(widget.chatId),
-              );
-
-              // Filter out current user and map to usernames
-              final typingUsernames = typingUsers
-                  .where((user) => user.userId != currentUserId)
-                  .map((user) => user.username)
-                  .toList();
-
-              return TypingIndicator(
-                typingUsernames: typingUsernames,
-                showIndicator: typingUsernames.isNotEmpty,
-              );
-            },
-          ),
-
-          // Message input box (T023, T024, T027, T044)
-          MessageInputBox(
-            onSend: (text) async {
-              // Stop typing indicator when sending
-              ref
-                  .read(messageWebSocketProvider.notifier)
-                  .stopTyping(widget.chatId);
-
-              try {
-                // Send message via provider (handles optimistic update automatically)
-                await ref
-                    .read(sendMessageProvider.notifier)
-                    .sendMessage(
-                      chatId: widget.chatId,
-                      plaintext: text,
-                      token: token,
-                      currentUserId: currentUserId,
-                    );
-
-                _scrollToBottom();
-              } catch (e) {
-
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to send message: $e')),
-                  );
-                }
-              }
-            },
-            isLoading: sendState.isLoading,
-            // Typing event handlers (T044)
-            onTypingStart: () {
-              _sendTypingEvent('typing.start');
-            },
-            onTypingStop: () {
-              _sendTypingEvent('typing.stop');
-            },
-            onTypingRefresh: () {
-              _sendTypingEvent(
-                'typing.start',
-              ); // Refresh by sending start again
-            },
-            // Media attachment handlers (T078)
-            onImageTap: () {
-              _handleImageAttachment(token);
-            },
-            onVideoTap: () {
-              _handleVideoAttachment(token);
-            },
-            onAudioTap: () {
-              _handleAudioRecordingTap(token);
-            },
-            isRecordingAudio: _isRecordingAudio,
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -700,23 +790,38 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
 
     if (allMessages.isEmpty) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey[400]),
-            const SizedBox(height: 16),
-            Text(
-              'No messages yet',
-              style: Theme.of(context).textTheme.bodyLarge,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              widget.isGroup ? 'Start the group conversation!' : 'Start a conversation!',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
-            ),
-          ],
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF7FAFF),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: const Color(0xFFE1EAF7)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.chat_bubble_outline,
+                size: 64,
+                color: Colors.grey[400],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No messages yet',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                widget.isGroup
+                    ? 'Start the group conversation!'
+                    : 'Start a conversation!',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -728,6 +833,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
 
     return ListView.builder(
       controller: _scrollController,
+      padding: EdgeInsets.fromLTRB(kIsWeb ? 12 : 0, 12, kIsWeb ? 12 : 0, 16),
       itemCount: allMessages.length,
       itemBuilder: (context, index) {
         final message = allMessages[index];

@@ -46,10 +46,9 @@ class ChatListTileConsumer extends ConsumerWidget {
       return groupName;
     }
 
-    final participants =
-        (chat.participantNames ?? const <String>[])
-            .where((name) => name.trim().isNotEmpty)
-            .toList();
+    final participants = (chat.participantNames ?? const <String>[])
+        .where((name) => name.trim().isNotEmpty)
+        .toList();
     if (participants.isNotEmpty) {
       return participants.join(', ');
     }
@@ -57,48 +56,74 @@ class ChatListTileConsumer extends ConsumerWidget {
     return 'Group';
   }
 
+  Widget _wrapTile(BuildContext context, Widget child) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE4ECF7)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.blueGrey.withValues(alpha: 0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (chat.isGroup) {
       final groupTitle = _buildGroupTitle(chat);
-      return ListTile(
-        key: ValueKey('group-data-${chat.id}'),
-        leading: CircleAvatar(
-          radius: 24,
-          backgroundColor: Colors.indigo.shade100,
-          child: const Icon(Icons.group, color: Colors.indigo),
-        ),
-        title: Text(
-          groupTitle,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: Text(
-          chat.memberCount == null
-              ? (chat.lastMessagePreview ?? 'Group chat')
-              : '${chat.memberCount} member${chat.memberCount == 1 ? '' : 's'}',
-          style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-          overflow: TextOverflow.ellipsis,
-          maxLines: 1,
-        ),
-        trailing: Text(
-          chat.lastMessageTimestamp != null
-              ? _formatTimestamp(chat.lastMessageTimestamp!)
-              : _formatTimestamp(chat.updatedAt),
-          style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-        ),
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => ChatDetailScreen(
-                chatId: chat.id,
-                otherUserId: chat.id,
-                otherUserName: groupTitle,
-                isGroup: true,
+      return _wrapTile(
+        context,
+        ListTile(
+          key: ValueKey('group-data-${chat.id}'),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 8,
+          ),
+          leading: CircleAvatar(
+            radius: 24,
+            backgroundColor: Colors.indigo.shade100,
+            child: const Icon(Icons.group, color: Colors.indigo),
+          ),
+          title: Text(
+            groupTitle,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            overflow: TextOverflow.ellipsis,
+          ),
+          subtitle: Text(
+            chat.memberCount == null
+                ? (chat.lastMessagePreview ?? 'Group chat')
+                : '${chat.memberCount} member${chat.memberCount == 1 ? '' : 's'}',
+            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+          ),
+          trailing: Text(
+            chat.lastMessageTimestamp != null
+                ? _formatTimestamp(chat.lastMessageTimestamp!)
+                : _formatTimestamp(chat.updatedAt),
+            style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+          ),
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => ChatDetailScreen(
+                  chatId: chat.id,
+                  otherUserId: chat.id,
+                  otherUserName: groupTitle,
+                  isGroup: true,
+                ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       );
     }
 
@@ -106,98 +131,119 @@ class ChatListTileConsumer extends ConsumerWidget {
       userProfileProvider((otherUserId, token)),
     );
     return userProfileAsync.when(
-      loading: () => ListTile(
-        key: ValueKey('chat-loading-${chat.id}'),
-        leading: Stack(
-          alignment: Alignment.center,
-          children: [
-            const UserAvatarWidget(radius: 24),
-            const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          ],
+      loading: () => _wrapTile(
+        context,
+        ListTile(
+          key: ValueKey('chat-loading-${chat.id}'),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 8,
+          ),
+          leading: Stack(
+            alignment: Alignment.center,
+            children: [
+              const UserAvatarWidget(radius: 24),
+              const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ],
+          ),
+          title: const Text('Loading...'),
+          subtitle: const Text('Fetching profile...'),
         ),
-        title: const Text('Loading...'),
-        subtitle: const Text('Fetching profile...'),
       ),
-      error: (error, st) => ListTile(
-        key: ValueKey('chat-error-${chat.id}'),
-        leading: const UserAvatarWidget(radius: 24),
-        title: const Text('Error loading profile'),
-        subtitle: const Text('Tap to retry'),
-        onTap: () {
-          ref.invalidate(userProfileProvider((otherUserId, token)));
-        },
+      error: (error, st) => _wrapTile(
+        context,
+        ListTile(
+          key: ValueKey('chat-error-${chat.id}'),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 8,
+          ),
+          leading: const UserAvatarWidget(radius: 24),
+          title: const Text('Error loading profile'),
+          subtitle: const Text('Tap to retry'),
+          onTap: () {
+            ref.invalidate(userProfileProvider((otherUserId, token)));
+          },
+        ),
       ),
       data: (userProfile) {
         // No bold/unread logic, always normal style
 
-        return ListTile(
-          key: ValueKey('chat-data-${chat.id}'),
-          leading: UserAvatarWidget(
-            imageUrl: userProfile.profilePictureUrl,
-            radius: 24,
-            username: userProfile.username,
-          ),
-          title: Text(
-            userProfile.username,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            overflow: TextOverflow.ellipsis,
-          ),
-          subtitle: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  chat.lastMessagePreview == null ||
-                          chat.lastMessagePreview!.isEmpty
-                      ? 'No messages yet'
-                      : _truncatePreview(chat.lastMessagePreview!),
-                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
+        return _wrapTile(
+          context,
+          ListTile(
+            key: ValueKey('chat-data-${chat.id}'),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 8,
+            ),
+            leading: UserAvatarWidget(
+              imageUrl: userProfile.profilePictureUrl,
+              radius: 24,
+              username: userProfile.username,
+            ),
+            title: Text(
+              userProfile.username,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    chat.lastMessagePreview == null ||
+                            chat.lastMessagePreview!.isEmpty
+                        ? 'No messages yet'
+                        : _truncatePreview(chat.lastMessagePreview!),
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(left: 8.0),
-                child: Text(
-                  chat.lastMessageTimestamp != null
-                      ? _formatTimestamp(chat.lastMessageTimestamp!)
-                      : _formatTimestamp(chat.updatedAt),
-                  style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                Padding(
+                  padding: const EdgeInsets.only(left: 8.0),
+                  child: Text(
+                    chat.lastMessageTimestamp != null
+                        ? _formatTimestamp(chat.lastMessageTimestamp!)
+                        : _formatTimestamp(chat.updatedAt),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                  ),
                 ),
-              ),
-            ],
-          ),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.archive_outlined),
-                tooltip: 'Archive chat',
-                onPressed: onArchive,
-              ),
-              IconButton(
-                icon: const Icon(Icons.delete_outlined, color: Colors.red),
-                tooltip: 'Delete chat',
-                onPressed: onDelete,
-              ),
-            ],
-          ),
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => ChatDetailScreen(
-                  chatId: chat.id,
-                  otherUserId: otherUserId,
-                  otherUserName: userProfile.username,
-                  otherUserAvatarUrl: userProfile.profilePictureUrl,
+              ],
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.archive_outlined),
+                  tooltip: 'Archive chat',
+                  onPressed: onArchive,
                 ),
-              ),
-            );
-          },
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                  tooltip: 'Delete chat',
+                  onPressed: onDelete,
+                ),
+              ],
+            ),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => ChatDetailScreen(
+                    chatId: chat.id,
+                    otherUserId: otherUserId,
+                    otherUserName: userProfile.username,
+                    otherUserAvatarUrl: userProfile.profilePictureUrl,
+                  ),
+                ),
+              );
+            },
+          ),
         );
       },
     );

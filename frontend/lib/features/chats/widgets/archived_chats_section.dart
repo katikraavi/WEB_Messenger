@@ -9,7 +9,7 @@ import '../providers/user_profile_provider.dart';
 import 'user_avatar_widget.dart';
 
 /// Widget that displays the archived chats section
-/// 
+///
 /// Shows:
 /// - Toggle button to expand/collapse archived chats list
 /// - Count of archived chats
@@ -19,13 +19,14 @@ class ArchivedChatsSection extends ConsumerStatefulWidget {
   final String currentUserId;
 
   const ArchivedChatsSection({
-    Key? key,
+    super.key,
     required this.token,
     required this.currentUserId,
-  }) : super(key: key);
+  });
 
   @override
-  ConsumerState<ArchivedChatsSection> createState() => _ArchivedChatsSectionState();
+  ConsumerState<ArchivedChatsSection> createState() =>
+      _ArchivedChatsSectionState();
 }
 
 class _ArchivedChatsSectionState extends ConsumerState<ArchivedChatsSection> {
@@ -40,9 +41,7 @@ class _ArchivedChatsSectionState extends ConsumerState<ArchivedChatsSection> {
         padding: const EdgeInsets.all(8.0),
         child: SizedBox(
           height: 50,
-          child: Center(
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
+          child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
         ),
       ),
       error: (error, st) => Padding(
@@ -61,8 +60,13 @@ class _ArchivedChatsSectionState extends ConsumerState<ArchivedChatsSection> {
         return Column(
           children: [
             // Header with toggle button
-            Material(
-              color: Colors.grey[100],
+            Container(
+              margin: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3F6FB),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFE0E8F5)),
+              ),
               child: ListTile(
                 onTap: () {
                   setState(() {
@@ -81,7 +85,10 @@ class _ArchivedChatsSectionState extends ConsumerState<ArchivedChatsSection> {
                   ),
                 ),
                 trailing: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.grey[300],
                     borderRadius: BorderRadius.circular(12),
@@ -104,7 +111,8 @@ class _ArchivedChatsSectionState extends ConsumerState<ArchivedChatsSection> {
                 itemCount: archivedChats.length,
                 itemBuilder: (context, index) {
                   final chat = archivedChats[index];
-                  final otherUserId = chat.participant1Id == widget.currentUserId
+                  final otherUserId =
+                      chat.participant1Id == widget.currentUserId
                       ? chat.participant2Id
                       : chat.participant1Id;
 
@@ -138,58 +146,92 @@ class _ArchivedChatTile extends ConsumerWidget {
   final VoidCallback onUnarchived;
 
   const _ArchivedChatTile({
-    Key? key,
     required this.chat,
     required this.otherUserId,
     required this.currentUserId,
     required this.token,
     required this.onUnarchived,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final userProfileAsync = ref.watch(userProfileProvider((otherUserId, token)));
+    final userProfileAsync = ref.watch(
+      userProfileProvider((otherUserId, token)),
+    );
 
     return userProfileAsync.when(
-      loading: () => ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        tileColor: Colors.grey[50],
-        leading: const UserAvatarWidget(radius: 20),
-        title: const Text('Loading...'),
-        subtitle: Text(
-          'Archived on ${chat.updatedAt.toString().split('.')[0]}',
-          style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+      loading: () => Container(
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFE4ECF7)),
+        ),
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 8,
+          ),
+          leading: const UserAvatarWidget(radius: 20),
+          title: const Text('Loading...'),
+          subtitle: Text(
+            'Archived on ${chat.updatedAt.toString().split('.')[0]}',
+            style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+          ),
         ),
       ),
-      error: (error, st) => ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        tileColor: Colors.grey[50],
-        leading: const UserAvatarWidget(radius: 20),
-        title: const Text('Unknown user'),
-        subtitle: Text(
-          'Archived on ${chat.updatedAt.toString().split('.')[0]}',
-          style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+      error: (error, st) => Container(
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFE4ECF7)),
         ),
-        trailing: _buildUnarchiveButton(context),
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 8,
+          ),
+          leading: const UserAvatarWidget(radius: 20),
+          title: const Text('Unknown user'),
+          subtitle: Text(
+            'Archived on ${chat.updatedAt.toString().split('.')[0]}',
+            style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+          ),
+          trailing: _buildUnarchiveButton(context),
+        ),
       ),
-      data: (userProfile) => ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        tileColor: Colors.grey[50],
-        leading: UserAvatarWidget(
-          imageUrl: userProfile.profilePictureUrl,
-          radius: 20,
-          username: userProfile.username,
+      data: (userProfile) => Container(
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFE4ECF7)),
         ),
-        title: Text(
-          userProfile.username ?? 'Unknown user',
-          style: TextStyle(color: Colors.grey[700], fontWeight: FontWeight.w600),
-          overflow: TextOverflow.ellipsis,
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 8,
+          ),
+          leading: UserAvatarWidget(
+            imageUrl: userProfile.profilePictureUrl,
+            radius: 20,
+            username: userProfile.username,
+          ),
+          title: Text(
+            userProfile.username,
+            style: TextStyle(
+              color: Colors.grey[700],
+              fontWeight: FontWeight.w600,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+          subtitle: Text(
+            'Archived on ${chat.updatedAt.toString().split('.')[0]}',
+            style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+          ),
+          trailing: _buildUnarchiveButton(context),
         ),
-        subtitle: Text(
-          'Archived on ${chat.updatedAt.toString().split('.')[0]}',
-          style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-        ),
-        trailing: _buildUnarchiveButton(context),
       ),
     );
   }
@@ -198,20 +240,27 @@ class _ArchivedChatTile extends ConsumerWidget {
     return ElevatedButton.icon(
       onPressed: () async {
         try {
-          const baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://localhost:8081');
+          const baseUrl = String.fromEnvironment(
+            'API_BASE_URL',
+            defaultValue: 'http://localhost:8081',
+          );
           final chatService = ChatApiService(baseUrl: baseUrl);
 
-          await chatService.unarchiveChat(
-            token: token,
-            chatId: chat.id,
-          );
+          await chatService.unarchiveChat(token: token, chatId: chat.id);
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Chat unarchived')),
-          );
+          if (!context.mounted) {
+            return;
+          }
+
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Chat unarchived')));
 
           onUnarchived();
         } catch (e) {
+          if (!context.mounted) {
+            return;
+          }
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Failed to unarchive: $e'),

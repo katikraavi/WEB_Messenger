@@ -35,6 +35,46 @@ String _displayName(String? value) {
   return value[0].toUpperCase() + value.substring(1);
 }
 
+class _DevTestUser {
+  final String label;
+  final String email;
+  final String password;
+
+  const _DevTestUser({
+    required this.label,
+    required this.email,
+    required this.password,
+  });
+
+  LoginRequest get loginRequest =>
+      LoginRequest(email: email, password: password);
+}
+
+const List<_DevTestUser> _devTestUsers = [
+  _DevTestUser(
+    label: 'Alice',
+    email: 'alice@example.com',
+    password: 'alice123',
+  ),
+  _DevTestUser(label: 'Bob', email: 'bob@example.com', password: 'bob123'),
+  _DevTestUser(
+    label: 'Charlie',
+    email: 'charlie@example.com',
+    password: 'charlie123',
+  ),
+  _DevTestUser(label: 'Diane', email: 'diane@test.org', password: 'diane123'),
+  _DevTestUser(
+    label: 'TestUser1',
+    email: 'testuser1@example.com',
+    password: 'testuser1pass',
+  ),
+  _DevTestUser(
+    label: 'TestUser2',
+    email: 'testuser2@example.com',
+    password: 'testuser2pass',
+  ),
+];
+
 /// Root widget for Mobile Messenger application
 ///
 /// Responsible for:
@@ -106,7 +146,6 @@ class _MessengerAppState extends State<MessengerApp> {
       _isConnected = ApiClient.isConnected;
       _isInitializing = false;
     });
-
   }
 
   Future<void> _retryBackendConnection() async {
@@ -418,7 +457,6 @@ class _HomeScreenState extends riverpod.ConsumerState<_HomeScreen> {
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(
       builder: (context, authProvider, child) {
-
         if (!authProvider.isAuthenticated) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _disconnectRealtime();
@@ -466,6 +504,10 @@ class _AuthenticatedHomeScreenState
     extends riverpod.ConsumerState<_AuthenticatedHomeScreen> {
   int _selectedIndex = 1; // Start at Chats tab, skip Search page
 
+  bool _useWebSidebar(BuildContext context) {
+    return kIsWeb && MediaQuery.sizeOf(context).width >= 1100;
+  }
+
   String _pageTitle() {
     return _selectedIndex == 1
         ? 'Chats'
@@ -502,13 +544,315 @@ class _AuthenticatedHomeScreenState
     );
   }
 
+  void _selectTab(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+
+    if (index == 1) {
+      ref.read(chatsCacheInvalidatorProvider.notifier).state++;
+    }
+  }
+
+  Future<void> _logout() async {
+    await ref.read(messageWebSocketProvider.notifier).disconnect();
+    await widget.authProvider.logout();
+    ref.read(invitesCacheInvalidatorProvider.notifier).state++;
+  }
+
+  Future<void> _openCreateGroup(BuildContext context) async {
+    final createdGroupId = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const CreateGroupScreen()),
+    );
+
+    if (!context.mounted || createdGroupId == null) {
+      return;
+    }
+
+    final token = widget.authProvider.token;
+    if (token != null && token.isNotEmpty) {
+      ref.invalidate(chatsProvider(token));
+      ref.invalidate(activeChatListProvider(token));
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Group created: $createdGroupId'),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
+  Future<void> _switchToDevUser(_DevTestUser user) async {
+    try {
+      await ref.read(messageWebSocketProvider.notifier).disconnect();
+      await widget.authProvider.logout();
+      await widget.authProvider.login(user.loginRequest);
+      ref.read(invitesCacheInvalidatorProvider.notifier).state++;
+      ref.read(chatsCacheInvalidatorProvider.notifier).state++;
+      if (!mounted) {
+        return;
+      }
+      AppFeedbackService.showInfo('Switched to ${user.label}.');
+    } catch (e, st) {
+      AppExceptionLogger.log(
+        e,
+        stackTrace: st,
+        context: 'AuthenticatedHomeScreen._switchToDevUser',
+      );
+      if (!mounted) {
+        return;
+      }
+      AppFeedbackService.showError('Failed to switch to ${user.label}.');
+    }
+  }
+
+  Widget _buildSidebarNavItem({
+    required IconData icon,
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+    Widget? trailing,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFFE8F0FF) : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: selected ? const Color(0xFF1D4ED8) : Colors.blueGrey,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: selected ? const Color(0xFF1D4ED8) : Colors.blueGrey,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ),
+            if (trailing != null) trailing,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDevSwitcher() {
+    if (kReleaseMode) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7FAFF),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFD7E4FF)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.science_outlined,
+                size: 16,
+                color: Colors.blue.shade700,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'Dev Test Users',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.blue.shade800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _devTestUsers
+                .map(
+                  (user) => ActionChip(
+                    label: Text(user.label),
+                    onPressed: widget.authProvider.isLoading
+                        ? null
+                        : () => _switchToDevUser(user),
+                  ),
+                )
+                .toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWebSidebar(BuildContext context, int pendingCount) {
+    return Container(
+      width: 280,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: const Color(0xFFE1EAF7)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.blueGrey.withValues(alpha: 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF2563EB), Color(0xFF0EA5E9)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                child: const Icon(Icons.forum_rounded, color: Colors.white),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Messenger',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      _displayName(widget.user.username),
+                      style: TextStyle(color: Colors.grey.shade600),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          _buildSidebarNavItem(
+            icon: Icons.chat_bubble_outline,
+            label: 'Chats',
+            selected: _selectedIndex == 1,
+            onTap: () => _selectTab(1),
+          ),
+          _buildSidebarNavItem(
+            icon: Icons.mail_outline,
+            label: 'Invitations',
+            selected: _selectedIndex == 2,
+            onTap: () => _selectTab(2),
+            trailing: pendingCount > 0
+                ? Badge(label: Text(pendingCount.toString()))
+                : null,
+          ),
+          _buildSidebarNavItem(
+            icon: Icons.person_outline,
+            label: 'Profile',
+            selected: _selectedIndex == 3,
+            onTap: () => _selectTab(3),
+          ),
+          const SizedBox(height: 18),
+          OutlinedButton.icon(
+            onPressed: () {
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const SearchScreen()));
+            },
+            icon: const Icon(Icons.person_search_outlined),
+            label: const Text('Search Users'),
+          ),
+          const SizedBox(height: 10),
+          FilledButton.icon(
+            onPressed: () => _openCreateGroup(context),
+            icon: const Icon(Icons.group_add),
+            label: const Text('Create Group'),
+          ),
+          const SizedBox(height: 18),
+          _buildDevSwitcher(),
+          const Spacer(),
+          OutlinedButton.icon(
+            onPressed: widget.authProvider.isLoading ? null : _logout,
+            icon: const Icon(Icons.logout),
+            label: const Text('Logout'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWebSidebarLayout(BuildContext context, int pendingCount) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFFEAF2FF), Color(0xFFF8FBFF)],
+        ),
+      ),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1440),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildWebSidebar(context, pendingCount),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.72),
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(color: const Color(0xFFE1EAF7)),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(28),
+                      child: _buildBody(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Watch combined pending invites (direct + group) for badge.
     final pendingCount = ref.watch(totalPendingInviteCountProvider);
+    final useWebSidebar = _useWebSidebar(context);
 
     return Scaffold(
-      extendBody: kIsWeb,
+      extendBody: kIsWeb && !useWebSidebar,
       appBar: AppBar(
         titleSpacing: kIsWeb ? 24 : null,
         title: Row(
@@ -553,98 +897,71 @@ class _AuthenticatedHomeScreenState
         elevation: 0,
         backgroundColor: kIsWeb ? const Color(0xFFF8FBFF) : null,
         actions: [
-          if (_selectedIndex == 1)
+          if (!useWebSidebar && _selectedIndex == 1)
             IconButton(
               icon: const Icon(Icons.search),
               tooltip: 'Search Groups',
               onPressed: () {
                 Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const SearchGroupsScreen(),
-                  ),
+                  MaterialPageRoute(builder: (_) => const SearchGroupsScreen()),
                 );
               },
             ),
-          if (_selectedIndex == 1)
+          if (!useWebSidebar && _selectedIndex == 1)
             IconButton(
               icon: const Icon(Icons.group_add),
               tooltip: 'Create Group Chat',
-              onPressed: () async {
-                final createdGroupId = await Navigator.of(context).push<String>(
-                  MaterialPageRoute(
-                    builder: (_) => const CreateGroupScreen(),
-                  ),
-                );
-
-                if (!context.mounted || createdGroupId == null) {
-                  return;
-                }
-
-                final token = widget.authProvider.token;
-                if (token != null && token.isNotEmpty) {
-                  ref.invalidate(chatsProvider(token));
-                  ref.invalidate(activeChatListProvider(token));
-                }
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Group created: $createdGroupId'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-              },
+              onPressed: () => _openCreateGroup(context),
             ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await ref.read(messageWebSocketProvider.notifier).disconnect();
-              // Clear auth state first, then invalidate invite cache
-              await widget.authProvider.logout();
-              // After logout completes, increment cache invalidator to clear any remaining data
-              ref.read(invitesCacheInvalidatorProvider.notifier).state++;
-            },
-          ),
+          if (!useWebSidebar)
+            IconButton(icon: const Icon(Icons.logout), onPressed: _logout),
         ],
       ),
-      body: _buildShellBody(),
-      bottomNavigationBar: Padding(
-        padding: EdgeInsets.fromLTRB(kIsWeb ? 24 : 0, 0, kIsWeb ? 24 : 0, kIsWeb ? 18 : 0),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(kIsWeb ? 22 : 0),
-          child: BottomNavigationBar(
-            currentIndex: _selectedIndex - 1,
-            type: BottomNavigationBarType.fixed,
-            backgroundColor: kIsWeb ? Colors.white : null,
-            selectedItemColor: const Color(0xFF1D4ED8),
-            unselectedItemColor: Colors.blueGrey,
-            elevation: kIsWeb ? 10 : 8,
-            items: <BottomNavigationBarItem>[
-              const BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline), label: 'Chats'),
-              BottomNavigationBarItem(
-                icon: Badge(
-                  isLabelVisible: pendingCount > 0,
-                  label: Text(pendingCount.toString()),
-                  child: const Icon(Icons.mail_outline),
+      body: useWebSidebar
+          ? _buildWebSidebarLayout(context, pendingCount)
+          : _buildShellBody(),
+      bottomNavigationBar: useWebSidebar
+          ? null
+          : Padding(
+              padding: EdgeInsets.fromLTRB(
+                kIsWeb ? 24 : 0,
+                0,
+                kIsWeb ? 24 : 0,
+                kIsWeb ? 18 : 0,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(kIsWeb ? 22 : 0),
+                child: BottomNavigationBar(
+                  currentIndex: _selectedIndex - 1,
+                  type: BottomNavigationBarType.fixed,
+                  backgroundColor: kIsWeb ? Colors.white : null,
+                  selectedItemColor: const Color(0xFF1D4ED8),
+                  unselectedItemColor: Colors.blueGrey,
+                  elevation: kIsWeb ? 10 : 8,
+                  items: <BottomNavigationBarItem>[
+                    const BottomNavigationBarItem(
+                      icon: Icon(Icons.chat_bubble_outline),
+                      label: 'Chats',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: Badge(
+                        isLabelVisible: pendingCount > 0,
+                        label: Text(pendingCount.toString()),
+                        child: const Icon(Icons.mail_outline),
+                      ),
+                      label: 'Invitations',
+                    ),
+                    const BottomNavigationBarItem(
+                      icon: Icon(Icons.person_outline),
+                      label: 'Profile',
+                    ),
+                  ],
+                  onTap: (index) {
+                    _selectTab(index + 1);
+                  },
                 ),
-                label: 'Invitations',
               ),
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.person_outline),
-                label: 'Profile',
-              ),
-            ],
-            onTap: (index) {
-              setState(() {
-                _selectedIndex = index + 1;
-              });
-
-              if (index == 0) {
-                ref.read(chatsCacheInvalidatorProvider.notifier).state++;
-              }
-            },
-          ),
-        ),
-      ),
+            ),
     );
   }
 
@@ -718,7 +1035,7 @@ class _SearchTab extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.blue.withOpacity(0.3),
+                      color: Colors.blue.withValues(alpha: 0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 4),
                     ),
