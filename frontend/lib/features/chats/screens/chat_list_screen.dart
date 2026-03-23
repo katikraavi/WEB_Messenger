@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:provider/provider.dart' as provider_pkg;
 import '../providers/active_chats_provider.dart';
 import '../providers/chats_provider.dart';
+import '../providers/user_profile_provider.dart';
+import '../models/chat_model.dart';
 import '../services/chat_api_service.dart';
 import '../widgets/chat_list_tile_consumer.dart';
 import '../widgets/archived_chats_section.dart';
 import '../providers/archived_chats_provider.dart';
+import 'dual_chat_screen.dart';
+import '../../../core/config/web_layout_config.dart';
 import '../../auth/providers/auth_provider.dart' as auth;
 
 /// Screen for displaying the list of active chats
@@ -19,6 +24,121 @@ import '../../auth/providers/auth_provider.dart' as auth;
 /// - Empty state UI when no chats
 class ChatListScreen extends ConsumerWidget {
   const ChatListScreen({super.key});
+
+  Future<void> _openSideBySidePicker(
+    BuildContext context,
+    WidgetRef ref,
+    String token,
+    String currentUserId,
+    List<Chat> chats,
+  ) async {
+    if (chats.length < 2) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Need at least two chats to split view')),
+        );
+      }
+      return;
+    }
+
+    String? leftChatId;
+    String? rightChatId;
+
+    final selected = await showDialog<(String, String)>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return AlertDialog(
+              title: const Text('Open side by side'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String>(
+                    value: leftChatId,
+                    decoration: const InputDecoration(labelText: 'Left pane'),
+                    items: chats
+                        .map((chat) => DropdownMenuItem<String>(
+                              value: chat.id as String,
+                              child: Text('Chat ${chat.id.toString().substring(0, 8)}'),
+                            ))
+                        .toList(),
+                    onChanged: (value) {
+                      setDialogState(() => leftChatId = value);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: rightChatId,
+                    decoration: const InputDecoration(labelText: 'Right pane'),
+                    items: chats
+                        .map((chat) => DropdownMenuItem<String>(
+                              value: chat.id as String,
+                              child: Text('Chat ${chat.id.toString().substring(0, 8)}'),
+                            ))
+                        .toList(),
+                    onChanged: (value) {
+                      setDialogState(() => rightChatId = value);
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: (leftChatId == null ||
+                          rightChatId == null ||
+                          leftChatId == rightChatId)
+                      ? null
+                      : () => Navigator.of(dialogContext)
+                          .pop((leftChatId!, rightChatId!)),
+                  child: const Text('Open'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (selected == null || !context.mounted) return;
+
+    final left = chats.firstWhere((c) => c.id == selected.$1);
+    final right = chats.firstWhere((c) => c.id == selected.$2);
+    final leftOtherUserId = left.getOtherId(currentUserId) as String;
+    final rightOtherUserId = right.getOtherId(currentUserId) as String;
+
+    final leftProfile = await ref.read(
+      userProfileProvider((leftOtherUserId, token)).future,
+    );
+    final rightProfile = await ref.read(
+      userProfileProvider((rightOtherUserId, token)).future,
+    );
+
+    if (!context.mounted) return;
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => DualChatScreen(
+          leftPane: ChatPaneArgs(
+            chatId: left.id,
+            otherUserId: leftOtherUserId,
+            otherUserName: leftProfile.username,
+            otherUserAvatarUrl: leftProfile.profilePictureUrl,
+          ),
+          rightPane: ChatPaneArgs(
+            chatId: right.id,
+            otherUserId: rightOtherUserId,
+            otherUserName: rightProfile.username,
+            otherUserAvatarUrl: rightProfile.profilePictureUrl,
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -93,8 +213,32 @@ class ChatListScreen extends ConsumerWidget {
 
         // Success state
         data: (chats) {
+          final showDualPaneEntry =
+              kIsWeb &&
+              MediaQuery.of(context).size.width >=
+                  WebLayoutConfig.kDualPaneBreakpoint;
+
           return ListView(
             children: [
+              if (showDualPaneEntry)
+                Card(
+                  margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                  child: ListTile(
+                    leading: const Icon(Icons.splitscreen_outlined),
+                    title: const Text('Open side by side'),
+                    subtitle: const Text(
+                      'Compare two chats in a dual-pane layout',
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => _openSideBySidePicker(
+                      context,
+                      ref,
+                      token,
+                      currentUserId,
+                      chats,
+                    ),
+                  ),
+                ),
               ArchivedChatsSection(token: token, currentUserId: currentUserId),
               if (chats.isEmpty)
                 Padding(

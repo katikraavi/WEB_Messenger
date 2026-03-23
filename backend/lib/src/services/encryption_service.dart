@@ -33,6 +33,24 @@ class EncryptionService {
 
   /// Encrypts plaintext using AES-256-GCM for a specific user
   /// Returns base64(nonce)::base64(ciphertext) for storage
+  ///
+  /// Usage pattern for newly introduced entities:
+  /// - Group chat names (`group_chats.name`): encrypt before INSERT/UPDATE,
+  ///   decrypt when materializing API response.
+  /// - Poll question (`polls.question`): encrypt before persistence,
+  ///   decrypt before returning to clients.
+  /// - Poll option text (`poll_options.text`): encrypt each option before write,
+  ///   decrypt when assembling poll payloads.
+  ///
+  /// Recommended write path:
+  /// 1. Validate non-empty business value.
+  /// 2. `final encrypted = await encrypt(value, ownerUserId);`
+  /// 3. Persist encrypted value only.
+  ///
+  /// Recommended read path:
+  /// 1. Read encrypted DB value.
+  /// 2. If non-empty, `final value = await decrypt(encrypted, ownerUserId);`
+  /// 3. Return decrypted value in API response.
   Future<String> encrypt(String plaintext, String userId) async {
     try {
       if (plaintext.isEmpty) {

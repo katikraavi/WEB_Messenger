@@ -14,8 +14,10 @@ import 'src/services/auth_exception.dart';
 import 'src/services/password_reset_service.dart';
 import 'src/services/chat_service.dart';
 import 'src/services/encryption_service.dart';
+import 'src/services/group_invite_service.dart';
 import 'src/services/notification_service.dart';
 import 'src/services/service_config.dart';
+import 'src/services/search_service.dart';
 import 'src/endpoints/verification_handler.dart';
 import 'src/endpoints/password_reset_handler.dart';
 import 'src/services/verification_service.dart';
@@ -328,7 +330,7 @@ Handler _createHandler(
 
       // Auth endpoints (login - public)
       if (path == 'auth/login' && method == 'POST') {
-        return await _handleLogin(request, database);
+        return await _handleLogin(request, database, tokenService);
       }
 
       // Auth endpoints (validate session - protected)
@@ -338,7 +340,59 @@ Handler _createHandler(
 
       // Auth endpoints (logout - protected)
       if (path == 'auth/logout' && method == 'POST') {
-        return await _handleLogout(request);
+        return await _handleLogout(request, database, tokenService);
+      }
+
+      if (path == 'api/auth/sessions' && method == 'GET') {
+        return await _handleListDeviceSessions(request, database, tokenService);
+      }
+
+      if (path.startsWith('api/auth/sessions/') && method == 'DELETE') {
+        final deviceId = path.replaceFirst('api/auth/sessions/', '');
+        return await _handleRevokeDeviceSession(
+          request,
+          database,
+          tokenService,
+          deviceId,
+        );
+      }
+
+      if (path == 'api/groups' && method == 'POST') {
+        return await _handleCreateGroup(request, database, encryptionService);
+      }
+
+      if (path.startsWith('api/groups/') && path.endsWith('/invite') && method == 'POST') {
+        final groupId = path.replaceFirst('api/groups/', '').replaceFirst('/invite', '');
+        return await _handleSendGroupInvite(
+          request,
+          database,
+          encryptionService,
+          groupId,
+        );
+      }
+
+      if (path.startsWith('api/groups/invites/') && path.endsWith('/accept') && method == 'PATCH') {
+        final inviteId = path.replaceFirst('api/groups/invites/', '').replaceFirst('/accept', '');
+        return await _handleAcceptGroupInvite(
+          request,
+          database,
+          encryptionService,
+          inviteId,
+        );
+      }
+
+      if (path.startsWith('api/groups/invites/') && path.endsWith('/decline') && method == 'PATCH') {
+        final inviteId = path.replaceFirst('api/groups/invites/', '').replaceFirst('/decline', '');
+        return await _handleDeclineGroupInvite(
+          request,
+          database,
+          encryptionService,
+          inviteId,
+        );
+      }
+
+      if (path == 'api/groups/invites/pending' && method == 'GET') {
+        return await _handlePendingGroupInvites(request, database, encryptionService);
       }
 
       // Email verification endpoints (public)
@@ -416,6 +470,10 @@ Handler _createHandler(
             headers: {'Content-Type': 'application/json'},
           );
         }
+      }
+
+      if (path == 'api/messages/search' && method == 'GET') {
+        return await _handleMessageSearch(request, database);
       }
 
       // Invite endpoints - simple in-memory implementation for testing
@@ -2179,7 +2237,11 @@ Future<Response> _handleRegister(
 }
 
 /// Handle POST /auth/login
-Future<Response> _handleLogin(Request request, Connection database) async {
+Future<Response> _handleLogin(
+  Request request,
+  Connection database,
+  TokenService tokenService,
+) async {
   try {
     final body =
         jsonDecode(await request.readAsString()) as Map<String, dynamic>;
@@ -2249,12 +2311,23 @@ Future<Response> _handleLogin(Request request, Connection database) async {
     // Generate JWT token
     final userId = user['id'] as String;
     final jwtToken = JwtService.generateToken(userId, email);
+    final deviceId = await tokenService.extractOrGenerateDeviceId(request.headers);
+    final deviceName = tokenService.inferDeviceName(request.headers);
+
+    await tokenService.createDeviceSession(
+      connection: database,
+      userId: userId,
+      deviceId: deviceId,
+      deviceName: deviceName,
+      refreshToken: jwtToken,
+    );
 
     return Response.ok(
       jsonEncode({
         'user_id': userId,
         'email': email,
         'username': user['username'],
+        'device_id': deviceId,
         'token': jwtToken,
       }),
       headers: {'Content-Type': 'application/json'},
@@ -2337,7 +2410,11 @@ Future<Response> _handleValidateSession(
 }
 
 /// Handle POST /auth/logout (protected)
-Future<Response> _handleLogout(Request request) async {
+Future<Response> _handleLogout(
+  Request request,
+  Connection database,
+  TokenService tokenService,
+) async {
   try {
     final authHeader = request.headers['authorization'];
     if (authHeader == null || !authHeader.startsWith('Bearer ')) {
@@ -2347,6 +2424,14 @@ Future<Response> _handleLogout(Request request) async {
         headers: {'Content-Type': 'application/json'},
       );
     }
+
+    final token = authHeader.substring('Bearer '.length);
+    final payload = JwtService.validateToken(token);
+
+    await tokenService.revokeAllDeviceSessions(
+      connection: database,
+      userId: payload.userId,
+    );
 
     return Response.ok(
       jsonEncode({'message': 'Logged out successfully'}),
@@ -2358,6 +2443,320 @@ Future<Response> _handleLogout(Request request) async {
       body: jsonEncode({'error': 'Server error'}),
       headers: {'Content-Type': 'application/json'},
     );
+  }
+}
+
+Future<Response> _handleListDeviceSessions(
+  Request request,
+  Connection database,
+  TokenService tokenService,
+) async {
+  try {
+    final authHeader = request.headers['authorization'];
+    if (authHeader == null || !authHeader.startsWith('Bearer ')) {
+      return Response(
+        401,
+        body: jsonEncode({'error': 'Missing or invalid authorization header'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+
+    final token = authHeader.substring('Bearer '.length);
+    final payload = JwtService.validateToken(token);
+    final sessions = await tokenService.listDeviceSessions(
+      connection: database,
+      userId: payload.userId,
+    );
+
+    return Response.ok(
+      jsonEncode(
+        sessions
+            .map(
+              (session) => {
+                'deviceId': session.deviceId,
+                'deviceName': session.deviceName,
+                'createdAt': session.createdAt.toIso8601String(),
+                'lastSeenAt': session.lastSeenAt.toIso8601String(),
+              },
+            )
+            .toList(),
+      ),
+      headers: {'Content-Type': 'application/json'},
+    );
+  } catch (e) {
+    return Response(
+      500,
+      body: jsonEncode({'error': 'Server error'}),
+      headers: {'Content-Type': 'application/json'},
+    );
+  }
+}
+
+Future<Response> _handleRevokeDeviceSession(
+  Request request,
+  Connection database,
+  TokenService tokenService,
+  String deviceId,
+) async {
+  try {
+    final authHeader = request.headers['authorization'];
+    if (authHeader == null || !authHeader.startsWith('Bearer ')) {
+      return Response(
+        401,
+        body: jsonEncode({'error': 'Missing or invalid authorization header'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+
+    final token = authHeader.substring('Bearer '.length);
+    final payload = JwtService.validateToken(token);
+    final sessions = await tokenService.listDeviceSessions(
+      connection: database,
+      userId: payload.userId,
+    );
+
+    final ownsSession = sessions.any((session) => session.deviceId == deviceId);
+    if (!ownsSession) {
+      return Response(
+        403,
+        body: jsonEncode({'error': 'Forbidden'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+
+    await tokenService.revokeDeviceSession(
+      connection: database,
+      userId: payload.userId,
+      deviceId: deviceId,
+    );
+
+    return Response.ok(
+      jsonEncode({'message': 'Session revoked successfully'}),
+      headers: {'Content-Type': 'application/json'},
+    );
+  } catch (e) {
+    return Response(
+      500,
+      body: jsonEncode({'error': 'Server error'}),
+      headers: {'Content-Type': 'application/json'},
+    );
+  }
+}
+
+Future<Response> _handleCreateGroup(
+  Request request,
+  Connection database,
+  EncryptionService encryptionService,
+) async {
+  try {
+    final authHeader = request.headers['authorization'];
+    if (authHeader == null || !authHeader.startsWith('Bearer ')) {
+      return Response(401,
+          body: jsonEncode({'error': 'Missing or invalid authorization header'}),
+          headers: {'Content-Type': 'application/json'});
+    }
+
+    final token = authHeader.substring('Bearer '.length);
+    final payload = JwtService.validateToken(token);
+    final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
+    final name = (body['name'] as String?)?.trim() ?? '';
+    final isPublic = body['is_public'] as bool? ?? false;
+
+    final service = GroupInviteService(
+      connection: database,
+      encryptionService: encryptionService,
+    );
+    final group = await service.createGroup(
+      creatorUserId: payload.userId,
+      name: name,
+      isPublic: isPublic,
+    );
+
+    return Response.ok(
+      jsonEncode({
+        'id': group.id,
+        'name': name,
+        'created_by': group.createdBy,
+        'created_at': group.createdAt.toIso8601String(),
+        'is_public': group.isPublic,
+      }),
+      headers: {'Content-Type': 'application/json'},
+    );
+  } catch (e) {
+    return Response(500,
+        body: jsonEncode({'error': 'Server error'}),
+        headers: {'Content-Type': 'application/json'});
+  }
+}
+
+Future<Response> _handleSendGroupInvite(
+  Request request,
+  Connection database,
+  EncryptionService encryptionService,
+  String groupId,
+) async {
+  try {
+    final authHeader = request.headers['authorization'];
+    if (authHeader == null || !authHeader.startsWith('Bearer ')) {
+      return Response(401,
+          body: jsonEncode({'error': 'Missing or invalid authorization header'}),
+          headers: {'Content-Type': 'application/json'});
+    }
+
+    final token = authHeader.substring('Bearer '.length);
+    final payload = JwtService.validateToken(token);
+    final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
+    final receiverId = body['receiver_id'] as String?;
+    if (receiverId == null || receiverId.isEmpty) {
+      return Response(400,
+          body: jsonEncode({'error': 'receiver_id is required'}),
+          headers: {'Content-Type': 'application/json'});
+    }
+
+    final service = GroupInviteService(
+      connection: database,
+      encryptionService: encryptionService,
+    );
+    final invite = await service.sendGroupInvite(
+      groupId: groupId,
+      senderId: payload.userId,
+      receiverId: receiverId,
+    );
+
+    return Response.ok(
+      jsonEncode({
+        'id': invite.id,
+        'group_id': invite.groupId,
+        'sender_id': invite.senderId,
+        'receiver_id': invite.receiverId,
+        'status': invite.status,
+        'created_at': invite.createdAt.toIso8601String(),
+      }),
+      headers: {'Content-Type': 'application/json'},
+    );
+  } catch (e) {
+    return Response(500,
+        body: jsonEncode({'error': 'Server error'}),
+        headers: {'Content-Type': 'application/json'});
+  }
+}
+
+Future<Response> _handleAcceptGroupInvite(
+  Request request,
+  Connection database,
+  EncryptionService encryptionService,
+  String inviteId,
+) async {
+  try {
+    final authHeader = request.headers['authorization'];
+    if (authHeader == null || !authHeader.startsWith('Bearer ')) {
+      return Response(401,
+          body: jsonEncode({'error': 'Missing or invalid authorization header'}),
+          headers: {'Content-Type': 'application/json'});
+    }
+
+    final token = authHeader.substring('Bearer '.length);
+    final payload = JwtService.validateToken(token);
+    final service = GroupInviteService(
+      connection: database,
+      encryptionService: encryptionService,
+    );
+
+    await service.acceptGroupInvite(
+      inviteId: inviteId,
+      receiverId: payload.userId,
+    );
+
+    return Response.ok(
+      jsonEncode({'message': 'Group invite accepted'}),
+      headers: {'Content-Type': 'application/json'},
+    );
+  } catch (e) {
+    return Response(500,
+        body: jsonEncode({'error': 'Server error'}),
+        headers: {'Content-Type': 'application/json'});
+  }
+}
+
+Future<Response> _handleDeclineGroupInvite(
+  Request request,
+  Connection database,
+  EncryptionService encryptionService,
+  String inviteId,
+) async {
+  try {
+    final authHeader = request.headers['authorization'];
+    if (authHeader == null || !authHeader.startsWith('Bearer ')) {
+      return Response(401,
+          body: jsonEncode({'error': 'Missing or invalid authorization header'}),
+          headers: {'Content-Type': 'application/json'});
+    }
+
+    final token = authHeader.substring('Bearer '.length);
+    final payload = JwtService.validateToken(token);
+    final service = GroupInviteService(
+      connection: database,
+      encryptionService: encryptionService,
+    );
+
+    await service.declineGroupInvite(
+      inviteId: inviteId,
+      receiverId: payload.userId,
+    );
+
+    return Response.ok(
+      jsonEncode({'message': 'Group invite declined'}),
+      headers: {'Content-Type': 'application/json'},
+    );
+  } catch (e) {
+    return Response(500,
+        body: jsonEncode({'error': 'Server error'}),
+        headers: {'Content-Type': 'application/json'});
+  }
+}
+
+Future<Response> _handlePendingGroupInvites(
+  Request request,
+  Connection database,
+  EncryptionService encryptionService,
+) async {
+  try {
+    final authHeader = request.headers['authorization'];
+    if (authHeader == null || !authHeader.startsWith('Bearer ')) {
+      return Response(401,
+          body: jsonEncode({'error': 'Missing or invalid authorization header'}),
+          headers: {'Content-Type': 'application/json'});
+    }
+
+    final token = authHeader.substring('Bearer '.length);
+    final payload = JwtService.validateToken(token);
+    final service = GroupInviteService(
+      connection: database,
+      encryptionService: encryptionService,
+    );
+    final invites = await service.listPendingInvites(payload.userId);
+
+    return Response.ok(
+      jsonEncode(
+        invites
+            .map(
+              (invite) => {
+                'id': invite.id,
+                'group_id': invite.groupId,
+                'sender_id': invite.senderId,
+                'receiver_id': invite.receiverId,
+                'status': invite.status,
+                'created_at': invite.createdAt.toIso8601String(),
+              },
+            )
+            .toList(),
+      ),
+      headers: {'Content-Type': 'application/json'},
+    );
+  } catch (e) {
+    return Response(500,
+        body: jsonEncode({'error': 'Server error'}),
+        headers: {'Content-Type': 'application/json'});
   }
 }
 
@@ -2480,6 +2879,68 @@ Future<Response> _handleSearchByUsername(
     print('[ERROR] Search by username error: $e');
     return Response.internalServerError(
       body: jsonEncode({'error': 'Internal server error'}),
+      headers: {'Content-Type': 'application/json'},
+    );
+  }
+}
+
+Future<Response> _handleMessageSearch(
+  Request request,
+  Connection database,
+) async {
+  try {
+    final authHeader = request.headers['authorization'];
+    if (authHeader == null || !authHeader.startsWith('Bearer ')) {
+      return Response(
+        401,
+        body: jsonEncode({'error': 'Missing or invalid authorization header'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+
+    final token = authHeader.substring('Bearer '.length);
+    final payload = JwtService.validateToken(token);
+    final chatId = request.url.queryParameters['chatId'];
+    final query = request.url.queryParameters['q'];
+
+    if (chatId == null || chatId.isEmpty || query == null || query.trim().isEmpty) {
+      return Response(
+        400,
+        body: jsonEncode({'error': 'chatId and q are required'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+
+    final membership = await database.query(
+      '''SELECT 1 FROM chats
+         WHERE id = @chatId
+           AND (participant_1_id = @userId OR participant_2_id = @userId)
+         LIMIT 1''',
+      substitutionValues: {
+        'chatId': chatId,
+        'userId': payload.userId,
+      },
+    );
+
+    if (membership.isEmpty) {
+      return Response(
+        403,
+        body: jsonEncode({'error': 'Forbidden'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+
+    final searchService = SearchService(database);
+    final results = await searchService.searchMessageContent(chatId, query);
+
+    return Response.ok(
+      jsonEncode(results.map((result) => result.toMap()).toList()),
+      headers: {'Content-Type': 'application/json'},
+    );
+  } catch (e) {
+    return Response(
+      500,
+      body: jsonEncode({'error': 'Server error'}),
       headers: {'Content-Type': 'application/json'},
     );
   }

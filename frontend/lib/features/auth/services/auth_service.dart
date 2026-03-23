@@ -1,7 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:uuid/uuid.dart';
+
 import '../models/auth_models.dart';
+import '../../../utils/secure_storage_wrapper.dart';
 
 /// Custom exception for authentication errors
 class AuthException implements Exception {
@@ -21,6 +24,9 @@ class AuthService {
   // Using localhost to connect to Docker container (accessible via 127.0.0.1 on host)
   static const String _baseUrl = 'http://localhost:8081';
   static const bool _debugLogs = false;
+  static const String _deviceIdStorageKey = 'device_id';
+  static final SecureStorageWrapper _secureStorage = SecureStorageWrapper();
+  static const Uuid _uuid = Uuid();
 
   static void _log(String message) {
     if (_debugLogs) {
@@ -30,6 +36,17 @@ class AuthService {
 
   /// Get the base URL (can be overridden for testing)
   static String get baseUrl => _baseUrl;
+
+  static Future<String> _getOrCreateDeviceId() async {
+    final existing = await _secureStorage.read(key: _deviceIdStorageKey);
+    if (existing != null && existing.isNotEmpty) {
+      return existing;
+    }
+
+    final deviceId = _uuid.v4();
+    await _secureStorage.write(key: _deviceIdStorageKey, value: deviceId);
+    return deviceId;
+  }
 
   /// Register a new user
   /// 
@@ -94,9 +111,13 @@ class AuthService {
   /// Throws [AuthException] on error
   static Future<AuthResponse> login(LoginRequest request) async {
     try {
+      final deviceId = await _getOrCreateDeviceId();
       final response = await http.post(
         Uri.parse('$baseUrl/auth/login'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Device-ID': deviceId,
+        },
         body: jsonEncode(request.toJson()),
       ).timeout(
         const Duration(seconds: 10),

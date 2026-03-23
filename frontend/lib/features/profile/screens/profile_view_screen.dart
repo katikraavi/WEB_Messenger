@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart' as provider;
 import 'package:frontend/core/notifications/app_feedback_service.dart';
 import 'package:frontend/core/services/app_exception_logger.dart';
@@ -360,6 +362,12 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                 ),
               ),
 
+            // Active device sessions section (own profile only — GAP-005/T031)
+            if (widget.isOwnProfile && token != null) ...[
+              const SizedBox(height: 32),
+              _ActiveSessionsSection(token: token),
+            ],
+
             // Invite button (for other profiles)
             if (!widget.isOwnProfile)
               SizedBox(
@@ -425,3 +433,236 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
     ref.refresh(userProfileWithTokenProvider((widget.userId, token)));
   }
 }
+
+// ---------------------------------------------------------------------------
+// Active Sessions Section  (GAP-005 / T031)
+// ---------------------------------------------------------------------------
+
+class _DeviceSessionInfo {
+  final String id;
+  final String deviceId;
+  final String? userAgent;
+  final String? ipAddress;
+  final DateTime lastActiveAt;
+
+  _DeviceSessionInfo({
+    required this.id,
+    required this.deviceId,
+    this.userAgent,
+    this.ipAddress,
+    required this.lastActiveAt,
+  });
+
+  factory _DeviceSessionInfo.fromJson(Map<String, dynamic> json) {
+    return _DeviceSessionInfo(
+      id: json['id'] as String,
+      deviceId: json['deviceId'] as String,
+      userAgent: json['userAgent'] as String?,
+      ipAddress: json['ipAddress'] as String?,
+      lastActiveAt: DateTime.parse(json['lastActiveAt'] as String),
+    );
+  }
+}
+
+/// Shows the list of active device sessions for the current user and allows
+/// selective logout from individual sessions or all other sessions.
+class _ActiveSessionsSection extends StatefulWidget {
+  final String token;
+
+  const _ActiveSessionsSection({required this.token});
+
+  @override
+  State<_ActiveSessionsSection> createState() => _ActiveSessionsSectionState();
+}
+
+class _ActiveSessionsSectionState extends State<_ActiveSessionsSection> {
+  static const String _baseUrl = 'http://localhost:8081';
+
+  List<_DeviceSessionInfo> _sessions = [];
+  bool _isLoading = false;
+  bool _loaded = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    if (_isLoading) return;
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/api/auth/sessions'),
+        headers: {'Authorization': 'Bearer ${widget.token}'},
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        final list = jsonDecode(response.body) as List<dynamic>;
+        if (mounted) {
+          setState(() {
+            _sessions = list
+                .map((e) => _DeviceSessionInfo.fromJson(e as Map<String, dynamic>))
+                .toList();
+            _loaded = true;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() => _error = 'Failed to load sessions (${response.statusCode})');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error = 'Network error loading sessions');
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _revoke(String deviceId) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$_baseUrl/api/auth/sessions/$deviceId'),
+        headers: {'Authorization': 'Bearer ${widget.token}'},
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        if (mounted) {
+          AppFeedbackService.showInfo('Session revoked.');
+          _load();
+        }
+      } else {
+        if (mounted) {
+          AppFeedbackService.showError('Failed to revoke session.');
+        }
+      }
+    } catch (e) {
+      AppExceptionLogger.log(e, context: '_ActiveSessionsSection._revoke');
+      if (mounted) AppFeedbackService.showError('Network error.');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'Active Sessions',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const Spacer(),
+            if (_isLoading)
+              const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else
+              IconButton(
+                icon: const Icon(Icons.refresh, size: 20),
+                tooltip: 'Refresh sessions',
+                onPressed: _load,
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (_error != null)
+          Text(_error!, style: TextStyle(color: Colors.red[700], fontSize: 13))
+        else if (!_loaded && !_isLoading)
+          const SizedBox.shrink()
+        else if (_sessions.isEmpty)
+          Text(
+            'No active sessions found.',
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.copyWith(color: Colors.grey[600]),
+          )
+        else
+          ...(_sessions.map((session) => _SessionTile(
+                session: session,
+                onRevoke: () => _revoke(session.deviceId),
+              ))),
+      ],
+    );
+  }
+}
+
+class _SessionTile extends StatelessWidget {
+  final _DeviceSessionInfo session;
+  final VoidCallback onRevoke;
+
+  const _SessionTile({required this.session, required this.onRevoke});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 0,
+      color: Colors.grey[100],
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: ListTile(
+        leading: const Icon(Icons.devices, color: Colors.indigo),
+        title: Text(
+          session.userAgent ?? 'Unknown device',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Text(
+          [
+            if (session.ipAddress != null) session.ipAddress!,
+            'Last seen: ${_formatRelative(session.lastActiveAt)}',
+          ].join(' · '),
+          style: const TextStyle(fontSize: 12),
+        ),
+        trailing: IconButton(
+          icon: const Icon(Icons.logout, color: Colors.red),
+          tooltip: 'Sign out this session',
+          onPressed: () => showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Sign out session?'),
+              content: const Text(
+                'This will revoke access for the selected device.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text(
+                    'Sign out',
+                    style: TextStyle(color: Colors.red),
+                  ),
+                ),
+              ],
+            ),
+          ).then((confirmed) {
+            if (confirmed == true) onRevoke();
+          }),
+        ),
+      ),
+    );
+  }
+
+  String _formatRelative(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
+  }
+}
+

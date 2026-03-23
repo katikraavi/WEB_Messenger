@@ -2,6 +2,7 @@
 
 # Chat and conversation files
 .github/prompts/
+.github/agents/
 
 # Flutter and Dart ignores
 build/
@@ -121,6 +122,7 @@ database.sql
 
 # OS files
 Thumbs.db
+*:Zone.Identifier
 
 # IDE settings
 *.swp
@@ -157,5 +159,10 @@ Thumbs.db
 
 # Specs and planning documents
 .specs
-.github
 specs/
+
+# Speckit and local workspace artifacts
+.specify/
+web-messenger/
+Test_Pictures/
+backend/uploads/

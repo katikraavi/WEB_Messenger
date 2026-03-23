@@ -5,6 +5,7 @@ A full-stack mobile messaging application built with Flutter, Serverpod backend,
 ## Quick Start (5-10 minutes)
 
 See [quickstart.md](specs/001-messenger-init/quickstart.md) for detailed setup instructions.
+For production rollout guidance, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ### Prerequisites
 

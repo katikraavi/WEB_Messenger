@@ -23,7 +23,11 @@ import '../services/media_upload_service.dart';
 import '../services/message_encryption_service.dart';
 import '../services/audio_recording_service.dart';
 import '../services/chat_notification_settings_service.dart';
+import '../widgets/message_search_bar.dart';
+import '../services/message_search_service.dart';
 import '../../auth/providers/auth_provider.dart' as auth;
+import '../../polls/widgets/poll_widget.dart';
+import '../../polls/services/poll_service.dart';
 
 String _displayName(String? value) {
   if (value == null || value.isEmpty) {
@@ -32,6 +36,8 @@ String _displayName(String? value) {
 
   return value[0].toUpperCase() + value.substring(1);
 }
+
+const String _backendBaseUrl = 'http://localhost:8081';
 
 /// Screen for displaying a single chat conversation (T042-T043, T025-T027)
 ///
@@ -81,6 +87,15 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   String? _headerErrorMessage;
   bool _showReconnectAction = false;
   bool _isReconnectInProgress = false;
+
+  // Message search state (T020 / GAP-003)
+  bool _searchActive = false;
+  String _searchQuery = '';
+  List<String> _searchResultIds = [];
+  int _searchResultIndex = 0;
+  final TextEditingController _searchController = TextEditingController();
+  final MessageSearchService _messageSearchService =
+      MessageSearchService(baseUrl: _backendBaseUrl);
 
   @override
   void initState() {
@@ -272,6 +287,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   void dispose() {
     // Note: We disable viewer in deactivate() before dispose() since that's safer
     _scrollController.dispose();
+    _searchController.dispose();
 
     // Unsubscribe from chat and optionally disconnect
     try {
@@ -954,6 +970,22 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         centerTitle: false,
         elevation: 1,
         actions: [
+          // Search toggle (T020 / GAP-003)
+          IconButton(
+            icon: Icon(_searchActive ? Icons.search_off : Icons.search),
+            tooltip: _searchActive ? 'Close search' : 'Search messages',
+            onPressed: () {
+              setState(() {
+                _searchActive = !_searchActive;
+                if (!_searchActive) {
+                  _searchQuery = '';
+                  _searchResultIds = [];
+                  _searchResultIndex = 0;
+                    _searchController.clear();
+                }
+              });
+            },
+          ),
           PopupMenuButton<String>(
             onSelected: (value) {
               if (value == 'toggle_mute') {
@@ -986,6 +1018,65 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       ),
       body: Column(
         children: [
+          // Message search bar (T020 / GAP-003)
+          if (_searchActive)
+            MessageSearchBar(
+              controller: _searchController,
+              onQueryChanged: (query) async {
+                final trimmed = query.trim();
+                setState(() {
+                  _searchQuery = trimmed;
+                  _searchResultIndex = 0;
+                });
+                if (trimmed.length >= 2) {
+                  final results = await _messageSearchService.searchMessages(
+                    chatId: widget.chatId,
+                    query: trimmed,
+                    token: token,
+                  );
+                  if (mounted) {
+                    setState(() {
+                      _searchResultIds = results.map((r) => r.messageId).toList();
+                      _searchResultIndex = 0;
+                    });
+                  }
+                } else {
+                  setState(() {
+                    _searchResultIds = [];
+                    _searchResultIndex = 0;
+                  });
+                }
+              },
+              totalResults: _searchResultIds.length,
+              currentIndex: _searchResultIndex,
+              onNext: () {
+                if (_searchResultIds.isNotEmpty) {
+                  setState(() {
+                    _searchResultIndex =
+                        (_searchResultIndex + 1) % _searchResultIds.length;
+                  });
+                }
+              },
+              onPrevious: () {
+                if (_searchResultIds.isNotEmpty) {
+                  setState(() {
+                    _searchResultIndex =
+                        (_searchResultIndex - 1 + _searchResultIds.length) %
+                            _searchResultIds.length;
+                  });
+                }
+              },
+              onClose: () {
+                setState(() {
+                  _searchActive = false;
+                  _searchQuery = '';
+                  _searchResultIds = [];
+                  _searchResultIndex = 0;
+                });
+                _searchController.clear();
+              },
+            ),
+          // Message history (T042, T025-T027)
           // Message history (T042, T025-T027)
           Expanded(
             child: _buildMessagesView(context, messages, token, currentUserId),
@@ -1130,6 +1221,16 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         final isFirstFromSender =
             index == 0 || allMessages[index - 1].senderId != message.senderId;
 
+        // Poll messages get an inline interactive widget (T041)
+        if (message.mediaType == 'application/poll') {
+          return _PollMessageWidget(
+            key: ValueKey('poll_${message.id}'),
+            message: message,
+            token: token,
+            currentUserId: currentUserId,
+          );
+        }
+
         return MessageBubble(
           key: ValueKey('${message.id}_${message.status}'),
           message: message,
@@ -1147,6 +1248,122 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
               : null,
         );
       },
+    );
+  }
+}
+
+/// Renders a poll embedded in a chat message.
+///
+/// Expects [message.decryptedContent] to be JSON with at minimum
+/// `{"pollId": "<uuid>"}`.
+class _PollMessageWidget extends StatefulWidget {
+  final Message message;
+  final String token;
+  final String currentUserId;
+
+  const _PollMessageWidget({
+    super.key,
+    required this.message,
+    required this.token,
+    required this.currentUserId,
+  });
+
+  @override
+  State<_PollMessageWidget> createState() => _PollMessageWidgetState();
+}
+
+class _PollMessageWidgetState extends State<_PollMessageWidget> {
+  PollData? _pollData;
+  String? _error;
+  bool _loading = true;
+
+  late final PollServiceClient _pollService;
+
+  @override
+  void initState() {
+    super.initState();
+    _pollService = PollServiceClient(baseUrl: _backendBaseUrl);
+    _loadPoll();
+  }
+
+  Future<void> _loadPoll() async {
+    final content = widget.message.decryptedContent;
+    if (content == null) {
+      setState(() {
+        _loading = false;
+        _error = 'No poll data';
+      });
+      return;
+    }
+
+    try {
+      final jsonBody = jsonDecode(content) as Map<String, dynamic>;
+      final pollId = jsonBody['pollId'] as String?;
+      if (pollId == null) {
+        setState(() {
+          _loading = false;
+          _error = 'Missing pollId in message';
+        });
+        return;
+      }
+
+      final data = await _pollService.getPoll(
+        pollId: pollId,
+        token: widget.token,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _pollData = data;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _loading = false;
+        _error = e.toString();
+      });
+    }
+  }
+
+  Future<void> _handleVote(String optionId) async {
+    final pollId = _pollData?.id;
+    if (pollId == null) {
+      return;
+    }
+    await _pollService.vote(
+      token: widget.token,
+      pollId: pollId,
+      optionId: optionId,
+    );
+    await _loadPoll();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_error != null || _pollData == null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+        child: Text(
+          '(Poll unavailable)',
+          style: TextStyle(color: Colors.grey.shade600),
+        ),
+      );
+    }
+
+    return PollWidget(
+      poll: _pollData!,
+      onVote: _handleVote,
     );
   }
 }
