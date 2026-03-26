@@ -5,6 +5,7 @@ import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'dart:convert';
 import 'package:uuid/uuid.dart';
 import 'package:postgres/postgres.dart';
+import 'src/database/database_connection_config.dart';
 import 'src/services/token_service.dart';
 import 'src/services/email_service.dart';
 import 'src/services/rate_limit_service.dart';
@@ -55,13 +56,20 @@ void main() async {
   print('[INFO] Connecting to PostgreSQL database...');
   late Connection dbConnection;
   try {
+    final databaseConfig = DatabaseConnectionConfig.fromEnvironment(
+      Platform.environment,
+    );
+    print(
+      '[INFO] Database target: ${databaseConfig.maskedDescription} '
+      '(ssl: ${databaseConfig.requireSsl ? 'enabled' : 'disabled'})',
+    );
     dbConnection = PostgreSQLConnection(
-      Platform.environment['DATABASE_HOST'] ?? 'localhost',
-      int.parse(Platform.environment['DATABASE_PORT'] ?? '5432'),
-      Platform.environment['DATABASE_NAME'] ?? 'messenger_db',
-      username: Platform.environment['DATABASE_USER'] ?? 'messenger_user',
-      password:
-          Platform.environment['DATABASE_PASSWORD'] ?? 'messenger_password',
+      databaseConfig.host,
+      databaseConfig.port,
+      databaseConfig.database,
+      username: databaseConfig.username,
+      password: databaseConfig.password,
+      useSSL: databaseConfig.requireSsl,
     );
     await dbConnection.open();
     print('[✓] Connected to database successfully');
@@ -371,8 +379,11 @@ Handler _createHandler(
         return await _handleListGroups(request, database, encryptionService);
       }
 
-      if (path.startsWith('api/groups/') && path.endsWith('/invite') && method == 'POST') {
-        final groupId = path.replaceFirst('api/groups/', '').replaceFirst('/invite', '');
+      if (path.startsWith('api/groups/') &&
+          path.endsWith('/invite') &&
+          method == 'POST') {
+        final groupId =
+            path.replaceFirst('api/groups/', '').replaceFirst('/invite', '');
         return await _handleSendGroupInvite(
           request,
           database,
@@ -381,8 +392,11 @@ Handler _createHandler(
         );
       }
 
-      if (path.startsWith('api/groups/') && path.endsWith('/members') && method == 'GET') {
-        final groupId = path.replaceFirst('api/groups/', '').replaceFirst('/members', '');
+      if (path.startsWith('api/groups/') &&
+          path.endsWith('/members') &&
+          method == 'GET') {
+        final groupId =
+            path.replaceFirst('api/groups/', '').replaceFirst('/members', '');
         return await _handleListGroupMembers(
           request,
           database,
@@ -391,8 +405,11 @@ Handler _createHandler(
         );
       }
 
-      if (path.startsWith('api/groups/') && path.endsWith('/invites') && method == 'GET') {
-        final groupId = path.replaceFirst('api/groups/', '').replaceFirst('/invites', '');
+      if (path.startsWith('api/groups/') &&
+          path.endsWith('/invites') &&
+          method == 'GET') {
+        final groupId =
+            path.replaceFirst('api/groups/', '').replaceFirst('/invites', '');
         return await _handleListGroupSentInvites(
           request,
           database,
@@ -401,8 +418,11 @@ Handler _createHandler(
         );
       }
 
-      if (path.startsWith('api/groups/') && path.endsWith('/leave') && method == 'DELETE') {
-        final groupId = path.replaceFirst('api/groups/', '').replaceFirst('/leave', '');
+      if (path.startsWith('api/groups/') &&
+          path.endsWith('/leave') &&
+          method == 'DELETE') {
+        final groupId =
+            path.replaceFirst('api/groups/', '').replaceFirst('/leave', '');
         return await _handleLeaveGroup(
           request,
           database,
@@ -411,8 +431,12 @@ Handler _createHandler(
         );
       }
 
-      if (path.startsWith('api/groups/invites/') && path.endsWith('/accept') && method == 'PATCH') {
-        final inviteId = path.replaceFirst('api/groups/invites/', '').replaceFirst('/accept', '');
+      if (path.startsWith('api/groups/invites/') &&
+          path.endsWith('/accept') &&
+          method == 'PATCH') {
+        final inviteId = path
+            .replaceFirst('api/groups/invites/', '')
+            .replaceFirst('/accept', '');
         return await _handleAcceptGroupInvite(
           request,
           database,
@@ -421,8 +445,12 @@ Handler _createHandler(
         );
       }
 
-      if (path.startsWith('api/groups/invites/') && path.endsWith('/decline') && method == 'PATCH') {
-        final inviteId = path.replaceFirst('api/groups/invites/', '').replaceFirst('/decline', '');
+      if (path.startsWith('api/groups/invites/') &&
+          path.endsWith('/decline') &&
+          method == 'PATCH') {
+        final inviteId = path
+            .replaceFirst('api/groups/invites/', '')
+            .replaceFirst('/decline', '');
         return await _handleDeclineGroupInvite(
           request,
           database,
@@ -442,7 +470,8 @@ Handler _createHandler(
       }
 
       if (path == 'api/groups/invites/pending' && method == 'GET') {
-        return await _handlePendingGroupInvites(request, database, encryptionService);
+        return await _handlePendingGroupInvites(
+            request, database, encryptionService);
       }
 
       if (path.startsWith('api/groups/') && method == 'GET') {
@@ -1382,8 +1411,10 @@ Handler _createHandler(
           // Soft-delete: mark chat as archived for this user by setting the appropriate flag
           // Archive for the user (participant_1 or participant_2)
           final isParticipant1 = userId == participant1;
-          final archiveColumn = isParticipant1 ? 'is_participant_1_archived' : 'is_participant_2_archived';
-          
+          final archiveColumn = isParticipant1
+              ? 'is_participant_1_archived'
+              : 'is_participant_2_archived';
+
           await database.execute(
             'UPDATE chats SET $archiveColumn = true WHERE id = @chatId',
             substitutionValues: {'chatId': chatId},
@@ -1592,7 +1623,8 @@ Handler _createHandler(
           !path.endsWith('/status') &&
           method == 'PUT') {
         try {
-          print('[MessageHandler] ✏️ Edit route matched: method=$method path=$path');
+          print(
+              '[MessageHandler] ✏️ Edit route matched: method=$method path=$path');
           final parts = path.split('/');
           // Path format: api/chats/{chatId}/messages/{messageId}
           if (parts.length == 5 &&
@@ -1601,11 +1633,13 @@ Handler _createHandler(
               parts[3] == 'messages') {
             final chatId = parts[2];
             final messageId = parts[4];
-            print('[MessageHandler] ✏️ Dispatching edit: chatId=$chatId messageId=$messageId');
+            print(
+                '[MessageHandler] ✏️ Dispatching edit: chatId=$chatId messageId=$messageId');
             return await MessageHandlers.editMessage(
                 request, chatId, messageId, database);
           }
-          print('[MessageHandler] ⚠️ Edit route matched but path format was invalid: $path');
+          print(
+              '[MessageHandler] ⚠️ Edit route matched but path format was invalid: $path');
         } on AuthException catch (e) {
           return Response(
             401,
@@ -1628,7 +1662,8 @@ Handler _createHandler(
           !path.endsWith('/status') &&
           method == 'DELETE') {
         try {
-          print('[MessageHandler] 🗑️ Delete route matched: method=$method path=$path');
+          print(
+              '[MessageHandler] 🗑️ Delete route matched: method=$method path=$path');
           final parts = path.split('/');
           // Path format: api/chats/{chatId}/messages/{messageId}
           if (parts.length >= 5 &&
@@ -1637,7 +1672,8 @@ Handler _createHandler(
               parts[3] == 'messages') {
             final chatId = parts[2];
             final messageId = parts[4];
-            print('[MessageHandler] 🗑️ Dispatching delete: chatId=$chatId messageId=$messageId');
+            print(
+                '[MessageHandler] 🗑️ Dispatching delete: chatId=$chatId messageId=$messageId');
             return await MessageHandlers.deleteMessage(
                 request, chatId, messageId, database);
           }
@@ -2064,4 +2100,3 @@ Handler _createHandler(
     }
   };
 }
-

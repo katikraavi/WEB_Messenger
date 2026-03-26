@@ -81,13 +81,13 @@ Future<Response> sendVerificationEmail(
 
     // Generate token and send email
     final token = await verificationService.createVerificationToken(userId);
-    final appBaseUrl = Platform.environment['APP_BASE_URL'] ?? 'http://localhost:8081';
+    final frontendUrl = Platform.environment['FRONTEND_URL'] ?? 'http://localhost:5000';
     
     // Build verification email
     final emailMessage = emailService.buildVerificationEmail(
       recipientEmail: email,
       recipientName: email.split('@')[0],
-      verificationLink: '$appBaseUrl/auth/verify-email/confirm?token=$token',
+      verificationLink: '$frontendUrl/verify?token=$token',
       expiresIn: '24 hours',
     );
 
@@ -106,7 +106,7 @@ Future<Response> sendVerificationEmail(
     
     if (isDevelopment) {
       responseBody['token'] = token;
-      responseBody['verificationLink'] = '$appBaseUrl/auth/verify-email/confirm?token=$token';
+      responseBody['verificationLink'] = '$frontendUrl/verify?token=$token';
     }
 
     return Response.ok(

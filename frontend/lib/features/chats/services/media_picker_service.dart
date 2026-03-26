@@ -102,9 +102,18 @@ class MediaPickerService {
         throw Exception('Video type not supported: $mimeType');
       }
 
-      // Get file size without loading into memory
-      final file = File(video.path);
-      final fileSizeBytes = await file.length();
+      // On web, dart:io File is unavailable — read bytes directly.
+      // On native, keep memory-efficient path-only approach and stream during upload.
+      Uint8List? videoBytes;
+      int fileSizeBytes;
+
+      if (kIsWeb) {
+        videoBytes = await video.readAsBytes();
+        fileSizeBytes = videoBytes.length;
+      } else {
+        final file = File(video.path);
+        fileSizeBytes = await file.length();
+      }
 
       if (fileSizeBytes > maxFileSize) {
         throw Exception(
@@ -112,12 +121,10 @@ class MediaPickerService {
         );
       }
 
-
-      // For videos, bytes is null - we'll stream during upload
       return PickedMediaFile(
         name: fileName,
         path: video.path,
-        bytes: null,
+        bytes: videoBytes,
         mimeType: mimeType,
         sizeBytes: fileSizeBytes,
       );

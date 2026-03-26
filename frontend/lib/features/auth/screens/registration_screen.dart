@@ -320,7 +320,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       body: LayoutBuilder(
         builder: (context, constraints) {
           final isWide = constraints.maxWidth >= 860;
-          final cardWidth = isWide ? 620.0 : 760.0;
+          final cardWidth = kIsWeb ? 620.0 : (isWide ? 620.0 : 760.0);
 
           return Container(
             decoration: BoxDecoration(

@@ -123,6 +123,20 @@ class ChatListScreen extends ConsumerWidget {
     String? leftChatId;
     String? rightChatId;
 
+    // Pre-fetch usernames for all chats to display in dropdown
+    final chatUsernames = <String, String>{};
+    for (final chat in directChats) {
+      final otherUserId = chat.getOtherId(currentUserId);
+      try {
+        final profile = await ref.read(
+          userProfileProvider((otherUserId, token)).future,
+        );
+        chatUsernames[chat.id] = profile.username;
+      } catch (_) {
+        chatUsernames[chat.id] = 'Unknown User';
+      }
+    }
+
     final selected = await showDialog<(String, String)>(
       context: context,
       builder: (dialogContext) {
@@ -140,9 +154,7 @@ class ChatListScreen extends ConsumerWidget {
                         .map(
                           (chat) => DropdownMenuItem<String>(
                             value: chat.id,
-                            child: Text(
-                              'Chat ${chat.id.toString().substring(0, 8)}',
-                            ),
+                            child: Text(chatUsernames[chat.id] ?? 'Loading...'),
                           ),
                         )
                         .toList(),
@@ -158,9 +170,7 @@ class ChatListScreen extends ConsumerWidget {
                         .map(
                           (chat) => DropdownMenuItem<String>(
                             value: chat.id,
-                            child: Text(
-                              'Chat ${chat.id.toString().substring(0, 8)}',
-                            ),
+                            child: Text(chatUsernames[chat.id] ?? 'Loading...'),
                           ),
                         )
                         .toList(),

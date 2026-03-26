@@ -17,6 +17,7 @@ Create a root `.env` file (or secret manager entries) with these keys:
 ### Required backend and database keys
 
 - `DATABASE_URL`
+- `DATABASE_SSL`
 - `DATABASE_HOST`
 - `DATABASE_PORT`
 - `DATABASE_NAME`
@@ -77,29 +78,31 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
-    depends_on:
-      postgres:
-        condition: service_healthy
+```
 
-  postgres:
-    image: postgres:15
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      POSTGRES_DB: ${DATABASE_NAME}
-      POSTGRES_USER: ${DATABASE_USER}
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER} -d ${DATABASE_NAME}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+For Neon or any other managed PostgreSQL provider, do not run the bundled `postgres`
+service in production. Point the backend at the managed database instead.
 
-volumes:
-  postgres_data:
+## Neon Example
+
+Use the pooled connection string from Neon as `DATABASE_URL` and force SSL:
+
+```env
+DATABASE_URL=postgresql://<user>:<password>@<host>/<database>?sslmode=require
+DATABASE_SSL=true
+SERVERPOD_ENV=production
+SERVERPOD_PORT=8081
+```
+
+If your deploy platform does not inject `DATABASE_URL`, also set these individual keys
+to the same Neon values:
+
+```env
+DATABASE_HOST=<host>
+DATABASE_PORT=5432
+DATABASE_NAME=<database>
+DATABASE_USER=<user>
+DATABASE_PASSWORD=<password>
 ```
 
 ## Database Migration Steps (Production)
@@ -111,9 +114,10 @@ cd backend
 # Verify migrations in repository
 ls migrations/
 
-# Apply with your existing migration command/process
-# Example placeholder (adapt to your Serverpod migration workflow):
-# dart bin/main.dart --apply-migrations
+# Apply against the production DATABASE_URL
+DATABASE_URL="postgresql://<user>:<password>@<host>/<database>?sslmode=require" \
+DATABASE_SSL=true \
+dart run scripts/run_migrations.dart
 ```
 
 If you run migrations from inside a container, execute them against the same `DATABASE_URL` used by production runtime.
@@ -160,3 +164,4 @@ If the issue is migration-related:
 - Keep `.env` out of version control.
 - Store secrets in your deployment platform's secret manager.
 - Pin image tags (avoid `latest`) for predictable rollbacks.
+- Neon requires TLS. Set `DATABASE_SSL=true` or include `sslmode=require` in `DATABASE_URL`.

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Screen shown after successful email verification
@@ -16,10 +17,17 @@ class VerificationSuccessScreen extends ConsumerWidget {
       onWillPop: () async => false, // Prevent back navigation
       child: Scaffold(
         body: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final maxWidth = kIsWeb ? 620.0 : constraints.maxWidth;
+              final horizontalPadding = kIsWeb ? 20.0 : 24.0;
+
+              return Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: maxWidth),
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.all(horizontalPadding),
+                    child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   // Success icon with animation
@@ -126,7 +134,10 @@ class VerificationSuccessScreen extends ConsumerWidget {
                   ),
                 ],
               ),
-            ),
+                  ),
+                ),
+              );
+            },
           ),
         ),
       ),

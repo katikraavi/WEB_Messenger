@@ -259,7 +259,7 @@ class _LoginScreenState extends State<LoginScreen> {
       body: LayoutBuilder(
         builder: (context, constraints) {
           final isWide = constraints.maxWidth >= 860;
-          final cardWidth = isWide ? 540.0 : 700.0;
+          final cardWidth = kIsWeb ? 560.0 : (isWide ? 540.0 : 700.0);
 
           return Container(
             decoration: BoxDecoration(

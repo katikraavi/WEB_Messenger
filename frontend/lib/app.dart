@@ -26,6 +26,7 @@ import 'package:frontend/features/chats/providers/websocket_provider.dart';
 import 'package:frontend/features/chats/services/message_websocket_service.dart';
 import 'package:frontend/features/chats/services/chat_notification_settings_service.dart';
 import 'package:flutter/foundation.dart';
+import 'package:frontend/features/email_verification/screens/email_verify_link_screen.dart';
 
 String _displayName(String? value) {
   if (value == null || value.isEmpty) {
@@ -94,12 +95,26 @@ class _MessengerAppState extends State<MessengerApp> {
   bool _isConnected = false;
   bool _isInitializing = true;
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  String? _deepLinkVerifyToken;
 
   @override
   void initState() {
     super.initState();
+    _detectVerifyToken();
     _initializeBackendConnection();
     _initializePushNotifications();
+  }
+
+  void _detectVerifyToken() {
+    if (kIsWeb) {
+      final uri = Uri.base;
+      if (uri.path.contains('/verify')) {
+        final token = uri.queryParameters['token'];
+        if (token != null && token.isNotEmpty) {
+          _deepLinkVerifyToken = token;
+        }
+      }
+    }
   }
 
   /// Initialize local and remote notification handling.
@@ -212,6 +227,13 @@ class _MessengerAppState extends State<MessengerApp> {
 
     if (!_isConnected) {
       return _ConnectionErrorScreen(onRetry: _retryBackendConnection);
+    }
+
+    if (_deepLinkVerifyToken != null) {
+      return EmailVerifyLinkScreen(
+        token: _deepLinkVerifyToken!,
+        onDone: () => setState(() => _deepLinkVerifyToken = null),
+      );
     }
 
     return const _HomeScreen();

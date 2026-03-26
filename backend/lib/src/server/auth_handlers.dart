@@ -122,9 +122,8 @@ Future<Response> _handleRegister(
                 ),
               );
       final appBaseUrl =
-          Platform.environment['APP_BASE_URL'] ?? 'http://localhost:8081';
-      final verificationLink =
-          '$appBaseUrl/auth/verify-email/confirm?token=$token';
+            Platform.environment['FRONTEND_URL'] ?? 'http://localhost:5000';
+          final verificationLink = '$appBaseUrl/verify?token=$token';
       final emailMsg = emailService.buildVerificationEmail(
         recipientEmail: email,
         recipientName: username!,

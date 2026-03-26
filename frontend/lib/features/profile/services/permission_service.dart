@@ -11,6 +11,7 @@
 /// - iOS: Requires NSPhotoLibraryUsageDescription and NSCameraUsageDescription in Info.plist
 /// - image_picker package handles permission requests on most platforms
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -23,8 +24,13 @@ class PermissionService {
   /// Platform-specific handling:
   /// - iOS: Shows system permission dialog on first request
   /// - Android: Shows system permission dialog on first request
-  /// - Web: No permissions needed
+  /// - Web: No permissions needed (browser handles file access)
   static Future<bool> requestCameraPermission() async {
+    // Web doesn't need permission handling (handled by browser)
+    if (kIsWeb) {
+      return true;
+    }
+
     try {
       final status = await Permission.camera.request();
       return status.isGranted;
@@ -45,7 +51,13 @@ class PermissionService {
   /// - iOS: Shows system permission dialog on first request
   /// - Android (API 33+): Requests READ_MEDIA_IMAGES permission
   /// - Android (API < 33): Requests READ_EXTERNAL_STORAGE permission
+  /// - Web: No permissions needed (browser handles file access)
   static Future<bool> requestPhotoLibraryPermission() async {
+    // Web doesn't need permission handling (browser file picker handles access)
+    if (kIsWeb) {
+      return true;
+    }
+
     try {
       final status = await Permission.photos.request();
       return status.isGranted;
@@ -61,7 +73,12 @@ class PermissionService {
   /// 
   /// Returns: true if permission already granted, false otherwise
   /// Gracefully handles MissingPluginException by returning true
+  /// Web always returns true (browser handles permissions)
   static Future<bool> hasCameraPermission() async {
+    if (kIsWeb) {
+      return true;
+    }
+
     try {
       final status = await Permission.camera.status;
       return status.isGranted;
@@ -77,7 +94,12 @@ class PermissionService {
   /// 
   /// Returns: true if permission already granted, false otherwise
   /// Gracefully handles MissingPluginException by returning true
+  /// Web always returns true (browser handles permissions)
   static Future<bool> hasPhotoLibraryPermission() async {
+    if (kIsWeb) {
+      return true;
+    }
+
     try {
       final status = await Permission.photos.status;
       return status.isGranted;
