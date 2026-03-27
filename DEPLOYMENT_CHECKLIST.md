@@ -102,12 +102,12 @@ APP_BASE_URL = (Render will give you this URL after first deploy)
    - **Name**: `messenger-frontend`
    - **Build Command**: 
      ```
-     cd frontend && flutter build web --release
+     cd frontend && flutter build web --release --dart-define=BACKEND_URL=https://messenger-backend-XXXXX.onrender.com
      ```
    - **Publish Directory**: `frontend/build/web`
 4. Set Environment Variable:
    ```
-   BACKEND_URL = https://messenger-backend-XXXXX.onrender.com
+   BACKEND_URL=https://messenger-backend-XXXXX.onrender.com
    ```
 5. Click **"Create Static Site"**
 6. Wait for deployment (~5 minutes)

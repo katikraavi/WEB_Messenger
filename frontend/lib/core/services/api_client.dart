@@ -8,6 +8,7 @@ import 'dart:async';
 /// - Exponential backoff retry logic (5 attempts: 100ms, 500ms, 2s, 5s, 10s)
 /// - Health check endpoint verification
 /// - Base URL configuration for Android/iOS emulator differences
+/// - Dynamic backend URL for web deployments (from environment variables)
 
 class ApiClient {
   static late String _baseUrl;
@@ -17,20 +18,27 @@ class ApiClient {
   /// Initialize API client with backend URL
   ///
   /// Automatically detects platform and sets appropriate backend URL:
+  /// - Web (deployed): Uses BACKEND_URL from environment (Render sets this)
+  /// - Web (local dev): http://localhost:8081
   /// - Android emulator: http://172.31.195.26:8081 (WSL2 host IP for Docker backend)
   /// - iOS simulator: http://localhost:8081
-  /// - Linux/Web: http://localhost:8081
+  /// - Linux/macOS/Windows: http://localhost:8081
   /// - Physical device: http://localhost:8081 (configure for your network)
   static Future<void> initialize() async {
     _httpClient = http.Client();
 
     // Set base URL based on platform
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+    if (kIsWeb) {
+      // For web builds, use environment variable BACKEND_URL (set at build time)
+      // Fallback to localhost for local development
+      const String envBackendUrl = String.fromEnvironment('BACKEND_URL', defaultValue: 'http://localhost:8081');
+      _baseUrl = envBackendUrl;
+    } else if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
       // Android emulator needs to reach WSL2 host where Docker backend is running
       // Using WSL2 host IP: 172.31.195.26
       _baseUrl = 'http://172.31.195.26:8081';
     } else {
-      // For iOS, Linux, macOS, Windows, Web: use localhost
+      // For iOS, Linux, macOS, Windows: use localhost
       // Docker containers are accessible via localhost:8081 on the host
       _baseUrl = 'http://localhost:8081';
     }
