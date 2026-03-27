@@ -18,7 +18,6 @@ class MessageInputBox extends StatefulWidget {
   final VoidCallback? onImageTap; // Callback for image attachment (T078)
   final VoidCallback? onVideoTap; // Callback for video attachment (T078)
   final VoidCallback? onAudioTap;
-  final VoidCallback? onPollTap; // Callback for poll creation
   final bool isRecordingAudio;
   final int maxLength;
   final TextEditingController? controller;
@@ -40,7 +39,6 @@ class MessageInputBox extends StatefulWidget {
     this.onImageTap,
     this.onVideoTap,
     this.onAudioTap,
-    this.onPollTap,
     this.isRecordingAudio = false,
     this.maxLength = 5000,
     this.controller,
@@ -194,14 +192,6 @@ class _MessageInputBoxState extends State<MessageInputBox> {
               ),
               onPressed: widget.isLoading ? null : widget.onAudioTap,
               tooltip: widget.isRecordingAudio ? 'Stop recording' : 'Record audio',
-            ),
-
-          // Poll button (for group chats)
-          if (widget.onPollTap != null)
-            IconButton(
-              icon: const Icon(Icons.poll),
-              onPressed: widget.isLoading ? null : widget.onPollTap,
-              tooltip: 'Create poll',
             ),
 
           // Message input field

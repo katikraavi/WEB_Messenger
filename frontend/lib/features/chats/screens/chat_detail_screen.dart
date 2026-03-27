@@ -765,50 +765,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                       onAudioTap: () {
                         _handleAudioRecordingTap(token);
                       },
-                      // Poll creation handler (for group chats)
-                      onPollTap: widget.isGroup ? () async {
-                        final pollId = await Navigator.of(context).push<String>(
-                          MaterialPageRoute(
-                            builder: (_) => CreatePollScreen(
-                              groupId: widget.chatId,
-                              token: token,
-                              baseUrl: _backendBaseUrl,
-                            ),
-                          ),
-                        );
-
-                        if (pollId != null && mounted) {
-                          // Poll created successfully - send as message
-                          try {
-                            final apiService = ChatApiService(baseUrl: _backendBaseUrl);
-                            final pollMessage = jsonEncode({'pollId': pollId});
-                            
-                            // Encrypt the poll message
-                            final encryptedContent = 
-                                await MessageEncryptionService.encryptMessage(pollMessage, currentUserId);
-                            
-                            // Send the poll as a message with mediaType='application/poll'
-                            await apiService.sendMessage(
-                              token: token,
-                              chatId: widget.chatId,
-                              encryptedContent: encryptedContent,
-                              mediaType: 'application/poll',
-                            );
-                            
-                            if (mounted) {
-                              _scrollToBottom();
-                            }
-                          } catch (e) {
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Failed to share poll: $e'),
-                                ),
-                              );
-                            }
-                          }
-                        }
-                      } : null,
                       isRecordingAudio: _isRecordingAudio,
                     ),
                   ),
