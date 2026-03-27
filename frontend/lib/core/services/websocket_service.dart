@@ -41,7 +41,6 @@ class WebSocketService {
     String url = 'ws://localhost:8081/ws/messages',
   }) async {
     if (_isConnecting || _isConnected) {
-      debugPrint('[WebSocketService] Already connected or connecting');
       return;
     }
 
@@ -49,7 +48,6 @@ class WebSocketService {
     _userId = userId;
 
     try {
-      debugPrint('[WebSocketService] Connecting to $url');
 
       _channel = WebSocketChannel.connect(
         Uri.parse('$url?token=$token'),
@@ -65,12 +63,10 @@ class WebSocketService {
       _isConnected = true;
       _isConnecting = false;
 
-      debugPrint('[WebSocketService] ✓ Connected');
 
       // Send initial handshake/ping
       _sendPing();
     } catch (e) {
-      debugPrint('[WebSocketService] ❌ Connection failed: $e');
       _isConnecting = false;
       _isConnected = false;
       rethrow;
@@ -79,7 +75,6 @@ class WebSocketService {
 
   /// Disconnect from WebSocket
   Future<void> disconnect() async {
-    debugPrint('[WebSocketService] Disconnecting');
     _isConnected = false;
     await _channel?.sink.close();
     _channel = null;
@@ -97,7 +92,6 @@ class WebSocketService {
     required Map<String, dynamic> data,
   }) {
     if (!_isConnected) {
-      debugPrint('[WebSocketService] Not connected, cannot send event');
       return;
     }
 
@@ -109,9 +103,7 @@ class WebSocketService {
       };
 
       _channel!.sink.add(jsonEncode(message));
-      debugPrint('[WebSocketService] Event sent: $eventType in $chatId');
     } catch (e) {
-      debugPrint('[WebSocketService] ❌ Error sending event: $e');
     }
   }
 
@@ -121,37 +113,31 @@ class WebSocketService {
       if (message is String) {
         // Check for ping/pong
         if (message == 'ping') {
-          debugPrint('[WebSocketService] Ping received, sending pong');
           _sendPong();
           return;
         }
 
         if (message == 'pong') {
-          debugPrint('[WebSocketService] Pong received');
           return;
         }
 
         // Parse JSON event
         final event = jsonDecode(message) as Map<String, dynamic>;
-        debugPrint('[WebSocketService] Event received: ${event['type']}');
 
         // Broadcast event to listeners
         _eventController.add(event);
       }
     } catch (e) {
-      debugPrint('[WebSocketService] ❌ Error handling message: $e');
     }
   }
 
   /// Handle WebSocket error
   void _handleError(error) {
-    debugPrint('[WebSocketService] ❌ Error: $error');
     _isConnected = false;
   }
 
   /// Handle WebSocket done
   void _handleDone() {
-    debugPrint('[WebSocketService] ✓ Connection closed');
     _isConnected = false;
   }
 
@@ -160,7 +146,6 @@ class WebSocketService {
     try {
       _channel?.sink.add('ping');
     } catch (e) {
-      debugPrint('[WebSocketService] ❌ Error sending ping: $e');
     }
   }
 
@@ -169,7 +154,6 @@ class WebSocketService {
     try {
       _channel?.sink.add('pong');
     } catch (e) {
-      debugPrint('[WebSocketService] ❌ Error sending pong: $e');
     }
   }
 

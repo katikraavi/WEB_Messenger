@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -12,13 +13,20 @@ import '../utils/profile_logger.dart';
 /// - Handle permission denials elegantly
 /// - Display actionable error messages to users
 /// - Guide users to app settings for permission changes
+/// - Skip permission handling on web (browser handles file access)
 
 class ImagePickerPermissionsHandler {
   /// Request camera permission for taking photos
   /// 
   /// Returns true if permission granted, false otherwise
   /// Handles denied/permanently denied cases with appropriate messaging
+  /// On web: skips permission handling (browser handles it)
   static Future<bool> requestCameraPermission(BuildContext context) async {
+    // Web browsers handle camera access internally — no app-level permission needed
+    if (kIsWeb) {
+      return true;
+    }
+
     try {
       ProfileLogger.logStateChange('permissions', 'Requesting camera permission');
 
@@ -73,7 +81,13 @@ class ImagePickerPermissionsHandler {
   /// 
   /// Returns true if permission granted, false otherwise
   /// Handles denied/permanently denied cases with appropriate messaging
+  /// On web: skips permission handling (browser file picker handles it)
   static Future<bool> requestGalleryPermission(BuildContext context) async {
+    // Web browsers handle file picker access internally — no app-level permission needed
+    if (kIsWeb) {
+      return true;
+    }
+
     try {
       ProfileLogger.logStateChange('permissions', 'Requesting photo library permission');
 

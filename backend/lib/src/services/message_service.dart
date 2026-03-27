@@ -44,9 +44,21 @@ class MessageService {
     String? mediaUrl,
     String? mediaType,
   }) async {
-    // Validate encrypted content format (should be Base64)
+    // Validate encrypted content format
+    // Supports both:
+    // - New format: base64(nonce)::base64(ciphertext)::base64(mac)
+    // - Old format (legacy): valid base64 string
     try {
-      base64Decode(encryptedContent);
+      final parts = encryptedContent.split('::');
+      if (parts.length == 3) {
+        // New format: validate each part is base64
+        for (final part in parts) {
+          base64Decode(part);
+        }
+      } else {
+        // Old format: validate entire string is base64
+        base64Decode(encryptedContent);
+      }
     } catch (e) {
       throw ArgumentError(
         'Invalid encrypted content: must be valid Base64 encoding. Error: $e',
@@ -54,31 +66,48 @@ class MessageService {
     }
 
     try {
-      // Verify sender is a participant of the chat
-      final chatResult = await connection.query(
+      final directChatResult = await connection.query(
         'SELECT participant_1_id, participant_2_id FROM chats WHERE id = @chatId',
         substitutionValues: {'chatId': chatId},
       );
 
-      if (chatResult.isEmpty) {
-        throw ArgumentError('Chat not found: $chatId');
-      }
+      String? recipientId;
+      List<String> trackedRecipientIds = const [];
+      final isDirectChat = directChatResult.isNotEmpty;
 
-      final participant1 = chatResult.first[0] as String;
-      final participant2 = chatResult.first[1] as String;
+      if (isDirectChat) {
+        final participant1 = directChatResult.first[0] as String;
+        final participant2 = directChatResult.first[1] as String;
 
-      if (senderId != participant1 && senderId != participant2) {
-        throw ArgumentError(
-          'Sender $senderId is not a participant in chat $chatId',
+        if (senderId != participant1 && senderId != participant2) {
+          throw ArgumentError(
+            'Sender $senderId is not a participant in chat $chatId',
+          );
+        }
+
+        recipientId = senderId == participant1 ? participant2 : participant1;
+        trackedRecipientIds = [recipientId];
+      } else {
+        final groupResult = await connection.query(
+          '''SELECT 1
+             FROM group_members
+             WHERE group_id = @chatId AND user_id = @senderId
+             LIMIT 1''',
+          substitutionValues: {
+            'chatId': chatId,
+            'senderId': senderId,
+          },
         );
-      }
 
-      // Determine recipient (the other participant)
-      final recipientId = senderId == participant1 ? participant2 : participant1;
+        if (groupResult.isEmpty) {
+          throw ArgumentError('Chat not found: $chatId');
+        }
+
+        trackedRecipientIds = await _listOtherGroupMemberIds(chatId, senderId);
+      }
 
       // Create and store the message
       final messageId = _uuid.v4();
-      final statusId = _uuid.v4();
       final now = DateTime.now();
 
       await connection.execute(
@@ -98,25 +127,27 @@ class MessageService {
         },
       );
 
-      // Create message_delivery_status entry with 'sent' status (T020)
-      await connection.execute(
-        '''
-        INSERT INTO message_delivery_status (id, message_id, recipient_id, status, updated_at)
-        VALUES (@statusId, @messageId, @recipientId, 'sent', @now)
-        ''',
-        substitutionValues: {
-          'statusId': statusId,
-          'messageId': messageId,
-          'recipientId': recipientId,
-          'now': now,
-        },
-      );
+      for (final trackedRecipientId in trackedRecipientIds) {
+        await connection.execute(
+          '''
+          INSERT INTO message_delivery_status (id, message_id, recipient_id, status, updated_at)
+          VALUES (@statusId, @messageId, @recipientId, 'sent', @now)
+          ''',
+          substitutionValues: {
+            'statusId': _uuid.v4(),
+            'messageId': messageId,
+            'recipientId': trackedRecipientId,
+            'now': now,
+          },
+        );
+      }
 
-      // Update chat's updated_at timestamp to reflect latest message
-      await connection.execute(
-        'UPDATE chats SET updated_at = NOW() WHERE id = @chatId',
-        substitutionValues: {'chatId': chatId},
-      );
+      if (recipientId != null) {
+        await connection.execute(
+          'UPDATE chats SET updated_at = NOW() WHERE id = @chatId',
+          substitutionValues: {'chatId': chatId},
+        );
+      }
 
       return Message(
         id: messageId,
@@ -128,6 +159,9 @@ class MessageService {
         createdAt: now,
         mediaUrl: mediaUrl,
         mediaType: mediaType,
+        recipientCount: trackedRecipientIds.length,
+        deliveredCount: 0,
+        readCount: 0,
       );
     } catch (e) {
       throw Exception(
@@ -188,6 +222,108 @@ class MessageService {
     } catch (e) {
       throw Exception('Failed to validate receiver: $e');
     }
+  }
+
+  Future<bool> isGroupMessage(String messageId) async {
+    try {
+      final result = await connection.query(
+        '''SELECT recipient_id
+           FROM $_tableName
+           WHERE id = @messageId
+           LIMIT 1''',
+        substitutionValues: {'messageId': messageId},
+      );
+
+      if (result.isEmpty) {
+        return false;
+      }
+
+      return result.first[0] == null;
+    } catch (e) {
+      throw Exception('Failed to check message type: $e');
+    }
+  }
+
+  Future<Map<String, int>> getMessageReceiptCounts(String messageId) async {
+    try {
+      final result = await connection.query(
+        '''SELECT COUNT(*)::int AS recipient_count,
+                  COUNT(CASE WHEN status IN ('delivered', 'read') THEN 1 END)::int AS delivered_count,
+                  COUNT(CASE WHEN status = 'read' THEN 1 END)::int AS read_count
+           FROM message_delivery_status
+           WHERE message_id = @messageId''',
+        substitutionValues: {'messageId': messageId},
+      );
+
+      if (result.isEmpty) {
+        return {
+          'recipient_count': 0,
+          'delivered_count': 0,
+          'read_count': 0,
+        };
+      }
+
+      return {
+        'recipient_count': result.first[0] as int? ?? 0,
+        'delivered_count': result.first[1] as int? ?? 0,
+        'read_count': result.first[2] as int? ?? 0,
+      };
+    } catch (e) {
+      throw Exception('Failed to get receipt counts: $e');
+    }
+  }
+
+  Future<String> getAggregateMessageStatus(String messageId) async {
+    try {
+      final counts = await getMessageReceiptCounts(messageId);
+      final recipientCount = counts['recipient_count'] ?? 0;
+      final deliveredCount = counts['delivered_count'] ?? 0;
+      final readCount = counts['read_count'] ?? 0;
+
+      if (recipientCount == 0) {
+        final message = await getMessageById(messageId);
+        return message?.status ?? 'sent';
+      }
+
+      if (readCount == recipientCount) {
+        return 'read';
+      }
+
+      if (deliveredCount > 0) {
+        return 'delivered';
+      }
+
+      return 'sent';
+    } catch (e) {
+      throw Exception('Failed to get aggregate status: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> getReceiptSummary(String messageId) async {
+    final counts = await getMessageReceiptCounts(messageId);
+    final aggregateStatus = await getAggregateMessageStatus(messageId);
+
+    return {
+      ...counts,
+      'aggregate_status': aggregateStatus,
+    };
+  }
+
+  Future<List<String>> _listOtherGroupMemberIds(
+    String groupId,
+    String senderId,
+  ) async {
+    final result = await connection.query(
+      '''SELECT user_id
+         FROM group_members
+         WHERE group_id = @groupId AND user_id != @senderId''',
+      substitutionValues: {
+        'groupId': groupId,
+        'senderId': senderId,
+      },
+    );
+
+    return result.map((row) => row[0] as String).toList();
   }
 
   /// Encrypt plaintext message content (MVP: Base64 encoding)
@@ -251,7 +387,9 @@ class MessageService {
     try {
       final result = await connection.query(
         '''
-        SELECT id, chat_id, sender_id, encrypted_content, created_at
+        SELECT id, chat_id, sender_id, recipient_id, encrypted_content,
+               status, created_at, edited_at, deleted_at, is_deleted,
+               media_url, media_type
         FROM $_tableName
         WHERE id = @messageId
         ''',
@@ -264,8 +402,15 @@ class MessageService {
         id: result.first[0] as String,
         chatId: result.first[1] as String,
         senderId: result.first[2] as String,
-        encryptedContent: result.first[3] as String,
-        createdAt: result.first[4] as DateTime,
+        recipientId: result.first[3] as String?,
+        encryptedContent: result.first[4] as String,
+        status: result.first[5] as String? ?? 'sent',
+        createdAt: result.first[6] as DateTime,
+        editedAt: result.first[7] as DateTime?,
+        deletedAt: result.first[8] as DateTime?,
+        isDeleted: result.first[9] as bool? ?? false,
+        mediaUrl: result.first[10] as String?,
+        mediaType: result.first[11] as String?,
       );
 
       // Decrypt if key provided
@@ -308,7 +453,7 @@ class MessageService {
         SELECT id, chat_id, sender_id, recipient_id, encrypted_content, 
                status, created_at, edited_at, deleted_at, is_deleted
         FROM $_tableName
-        WHERE chat_id = @chatId AND is_deleted = FALSE
+        WHERE chat_id = @chatId
         ORDER BY created_at DESC
         LIMIT @limit OFFSET @offset
         ''',
@@ -437,21 +582,22 @@ class MessageService {
         throw ArgumentError('Invalid encrypted content: must be valid Base64');
       }
 
-      // Fetch current message
-      final results = await connection.query(
-        'SELECT * FROM $_tableName WHERE id = @messageId',
-        substitutionValues: {'messageId': messageId},
-      );
-
-      if (results.isEmpty) {
+      final message = await getMessageById(messageId);
+      if (message == null) {
         throw ArgumentError('Message not found: $messageId');
       }
-
-      final message = Message.fromPostgres(results.first);
 
       // Validate only sender can edit
       if (message.senderId != editedByUserId) {
         throw ArgumentError('Only the message sender can edit a message');
+      }
+
+      if (message.isDeleted) {
+        throw ArgumentError('Deleted messages cannot be edited');
+      }
+
+      if (message.encryptedContent == newEncryptedContent) {
+        throw ArgumentError('Edited content must be different from the current message');
       }
 
       // Get current edit count to generate next edit number
@@ -471,8 +617,15 @@ class MessageService {
       // Store previous content in message_edits table
       await connection.execute(
         '''
-        INSERT INTO message_edits (id, message_id, edit_number, previous_content, edited_at)
-        VALUES (@editId, @messageId, @editNumber, @previousContent, @now)
+        INSERT INTO message_edits (
+          id,
+          message_id,
+          edit_number,
+          previous_content,
+          edited_at,
+          edited_by
+        )
+        VALUES (@editId, @messageId, @editNumber, @previousContent, @now, @editedBy)
         ''',
         substitutionValues: {
           'editId': _uuid.v4(),
@@ -480,6 +633,7 @@ class MessageService {
           'editNumber': nextEditNumber,
           'previousContent': message.encryptedContent,
           'now': DateTime.now(),
+          'editedBy': editedByUserId,
         },
       );
 
@@ -496,13 +650,14 @@ class MessageService {
         },
       );
 
-      // Fetch updated message
-      final updatedResults = await connection.query(
-        'SELECT * FROM $_tableName WHERE id = @messageId',
-        substitutionValues: {'messageId': messageId},
-      );
+      final updated = await getMessageById(messageId);
+      if (updated == null) {
+        throw Exception('Message not found after edit');
+      }
 
-      return Message.fromPostgres(updatedResults.first);
+      return updated;
+    } on ArgumentError {
+      rethrow;
     } catch (e) {
       throw Exception('Failed to edit message: $e');
     }
@@ -527,6 +682,10 @@ class MessageService {
         throw ArgumentError('Only the message sender can delete a message');
       }
 
+      if (message.isDeleted) {
+        throw ArgumentError('Message is already deleted');
+      }
+
       // Soft-delete by marking is_deleted = true and setting deleted_at
       await connection.execute(
         '''
@@ -544,6 +703,8 @@ class MessageService {
       }
 
       return updated;
+    } on ArgumentError {
+      rethrow;
     } catch (e) {
       throw Exception('Failed to delete message: $e');
     }

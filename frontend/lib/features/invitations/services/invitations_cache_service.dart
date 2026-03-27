@@ -1,4 +1,4 @@
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../../../utils/secure_storage_wrapper.dart';
 
 /// Local cache storage for offline support
 /// 
@@ -11,10 +11,10 @@ class InvitationsCacheService {
   static const String _pendingInvitesKey = 'pending_invites_cache';
   static const String _sentInvitesKey = 'sent_invites_cache';
   
-  final FlutterSecureStorage _secureStorage;
+  final SecureStorageWrapper _secureStorage;
   
-  InvitationsCacheService({FlutterSecureStorage? secureStorage})
-    : _secureStorage = secureStorage ?? const FlutterSecureStorage();
+  InvitationsCacheService({SecureStorageWrapper? secureStorage})
+    : _secureStorage = secureStorage ?? SecureStorageWrapper();
 
   /// Cache pending invitations locally
   /// 
@@ -38,10 +38,8 @@ class InvitationsCacheService {
         value: DateTime.now().toIso8601String(),
       );
       
-      print('[Cache] Pending invites cached successfully');
       return true;
     } catch (e) {
-      print('[Cache Error] Failed to cache pending invites: $e');
       return false;
     }
   }
@@ -64,10 +62,8 @@ class InvitationsCacheService {
         value: DateTime.now().toIso8601String(),
       );
       
-      print('[Cache] Sent invites cached successfully');
       return true;
     } catch (e) {
-      print('[Cache Error] Failed to cache sent invites: $e');
       return false;
     }
   }
@@ -91,13 +87,11 @@ class InvitationsCacheService {
         final cacheTime = DateTime.parse(timestamp);
         final age = DateTime.now().difference(cacheTime);
         if (age.inHours > 1) {
-          print('[Cache] Pending invites cache is stale (${age.inHours}h old)');
         }
       }
       
       return data;
     } catch (e) {
-      print('[Cache Error] Failed to retrieve cached pending invites: $e');
       return null;
     }
   }
@@ -109,7 +103,6 @@ class InvitationsCacheService {
     try {
       return await _secureStorage.read(key: _sentInvitesKey);
     } catch (e) {
-      print('[Cache Error] Failed to retrieve cached sent invites: $e');
       return null;
     }
   }
@@ -126,10 +119,8 @@ class InvitationsCacheService {
       await _secureStorage.delete(key: _sentInvitesKey);
       await _secureStorage.delete(key: '${_sentInvitesKey}_timestamp');
       
-      print('[Cache] All invitation caches cleared');
       return true;
     } catch (e) {
-      print('[Cache Error] Failed to clear caches: $e');
       return false;
     }
   }
@@ -180,7 +171,6 @@ class InvitationsCacheService {
           : null,
       };
     } catch (e) {
-      print('[Cache Error] Failed to get metadata: $e');
       return {};
     }
   }

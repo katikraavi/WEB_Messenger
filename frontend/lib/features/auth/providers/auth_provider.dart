@@ -16,7 +16,6 @@ class AuthProvider extends ChangeNotifier {
 
   static void _log(String message) {
     if (_debugLogs) {
-      debugPrint(message);
     }
   }
 

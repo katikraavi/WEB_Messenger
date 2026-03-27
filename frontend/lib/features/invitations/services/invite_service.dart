@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:frontend/core/services/api_client.dart';
 import 'resilient_http_client.dart';
 
 class User {
@@ -58,7 +59,6 @@ class Invite {
 }
 
 class InviteService {
-  static const String baseUrl = 'http://localhost:8081';
   static const Duration defaultTimeout = Duration(seconds: 30);
   static const int maxRetries = 3;
   
@@ -72,6 +72,8 @@ class InviteService {
           timeout: timeout ?? defaultTimeout,
           maxRetryAttempts: maxRetries ?? 3,
         );
+
+  static String get baseUrl => ApiClient.getBaseUrl();
   
   /// Search for users by username or email
   Future<List<User>> searchUsers(String query) async {
@@ -94,7 +96,6 @@ class InviteService {
         throw Exception('Failed to search users: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error searching users: $e');
       rethrow;
     }
   }
@@ -121,7 +122,6 @@ class InviteService {
         throw Exception('Failed to send invite: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error sending invite: $e');
       rethrow;
     }
   }
@@ -136,7 +136,6 @@ class InviteService {
       }
       return invites;
     } catch (e) {
-      print('Error sending bulk invites: $e');
       rethrow;
     }
   }
@@ -160,7 +159,6 @@ class InviteService {
         throw Exception('Failed to get pending invites: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error getting pending invites: $e');
       rethrow;
     }
   }
@@ -180,7 +178,6 @@ class InviteService {
         throw Exception('Failed to get invite count: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error getting invite count: $e');
       rethrow;
     }
   }
@@ -200,7 +197,6 @@ class InviteService {
         throw Exception('Failed to get sent invites: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error getting sent invites: $e');
       rethrow;
     }
   }
@@ -225,7 +221,6 @@ class InviteService {
         }
       }
     } catch (e) {
-      print('Error accepting invite: $e');
       rethrow;
     }
   }
@@ -250,7 +245,6 @@ class InviteService {
         }
       }
     } catch (e) {
-      print('Error declining invite: $e');
       rethrow;
     }
   }
@@ -268,7 +262,6 @@ class InviteService {
         throw Exception('Failed to cancel invite: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error canceling invite: $e');
       rethrow;
     }
   }

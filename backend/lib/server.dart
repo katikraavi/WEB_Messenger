@@ -5,6 +5,7 @@ import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'dart:convert';
 import 'package:uuid/uuid.dart';
 import 'package:postgres/postgres.dart';
+import 'src/database/database_connection_config.dart';
 import 'src/services/token_service.dart';
 import 'src/services/email_service.dart';
 import 'src/services/rate_limit_service.dart';
@@ -14,8 +15,10 @@ import 'src/services/auth_exception.dart';
 import 'src/services/password_reset_service.dart';
 import 'src/services/chat_service.dart';
 import 'src/services/encryption_service.dart';
+import 'src/services/group_invite_service.dart';
 import 'src/services/notification_service.dart';
 import 'src/services/service_config.dart';
+import 'src/services/search_service.dart';
 import 'src/endpoints/verification_handler.dart';
 import 'src/endpoints/password_reset_handler.dart';
 import 'src/services/verification_service.dart';
@@ -27,6 +30,12 @@ import 'src/handlers/message_handlers.dart';
 import 'src/handlers/media_handlers.dart';
 import 'src/handlers/websocket_handler.dart';
 import 'src/services/websocket_service.dart';
+
+part 'src/server/middleware.dart';
+part 'src/server/auth_handlers.dart';
+part 'src/server/group_handlers.dart';
+part 'src/server/search_handlers.dart';
+part 'src/server/server_utils.dart';
 
 // Alias for cleaner code
 typedef Connection = PostgreSQLConnection;
@@ -47,13 +56,20 @@ void main() async {
   print('[INFO] Connecting to PostgreSQL database...');
   late Connection dbConnection;
   try {
+    final databaseConfig = DatabaseConnectionConfig.fromEnvironment(
+      Platform.environment,
+    );
+    print(
+      '[INFO] Database target: ${databaseConfig.maskedDescription} '
+      '(ssl: ${databaseConfig.requireSsl ? 'enabled' : 'disabled'})',
+    );
     dbConnection = PostgreSQLConnection(
-      Platform.environment['DATABASE_HOST'] ?? 'localhost',
-      int.parse(Platform.environment['DATABASE_PORT'] ?? '5432'),
-      Platform.environment['DATABASE_NAME'] ?? 'messenger_db',
-      username: Platform.environment['DATABASE_USER'] ?? 'messenger_user',
-      password:
-          Platform.environment['DATABASE_PASSWORD'] ?? 'messenger_password',
+      databaseConfig.host,
+      databaseConfig.port,
+      databaseConfig.database,
+      username: databaseConfig.username,
+      password: databaseConfig.password,
+      useSSL: databaseConfig.requireSsl,
     );
     await dbConnection.open();
     print('[✓] Connected to database successfully');
@@ -159,9 +175,9 @@ void main() async {
 
   print('╔═══════════════════════════════════════════════════════╗');
   print('║ 🚀 Messenger Backend Started                          ║');
-  print('║ Port: ${server.port}                                         ║');
-  print('║ Health: http://localhost:${server.port}/health              ║');
-  print('║ Schema: http://localhost:${server.port}/schema              ║');
+  print('║ Port: ${server.port}                                  ║');
+  print('║ Health: http://localhost:${server.port}/health        ║');
+  print('║ Schema: http://localhost:${server.port}/schema        ║');
   print('║                                                       ║');
   print('║ ✓ Services initialized                                ║');
   print('║ ✓ Email verification & password recovery enabled      ║');
@@ -328,7 +344,7 @@ Handler _createHandler(
 
       // Auth endpoints (login - public)
       if (path == 'auth/login' && method == 'POST') {
-        return await _handleLogin(request, database);
+        return await _handleLogin(request, database, tokenService);
       }
 
       // Auth endpoints (validate session - protected)
@@ -338,7 +354,134 @@ Handler _createHandler(
 
       // Auth endpoints (logout - protected)
       if (path == 'auth/logout' && method == 'POST') {
-        return await _handleLogout(request);
+        return await _handleLogout(request, database, tokenService);
+      }
+
+      if (path == 'api/auth/sessions' && method == 'GET') {
+        return await _handleListDeviceSessions(request, database, tokenService);
+      }
+
+      if (path.startsWith('api/auth/sessions/') && method == 'DELETE') {
+        final deviceId = path.replaceFirst('api/auth/sessions/', '');
+        return await _handleRevokeDeviceSession(
+          request,
+          database,
+          tokenService,
+          deviceId,
+        );
+      }
+
+      if (path == 'api/groups' && method == 'POST') {
+        return await _handleCreateGroup(request, database, encryptionService);
+      }
+
+      if (path == 'api/groups' && method == 'GET') {
+        return await _handleListGroups(request, database, encryptionService);
+      }
+
+      if (path.startsWith('api/groups/') &&
+          path.endsWith('/invite') &&
+          method == 'POST') {
+        final groupId =
+            path.replaceFirst('api/groups/', '').replaceFirst('/invite', '');
+        return await _handleSendGroupInvite(
+          request,
+          database,
+          encryptionService,
+          groupId,
+        );
+      }
+
+      if (path.startsWith('api/groups/') &&
+          path.endsWith('/members') &&
+          method == 'GET') {
+        final groupId =
+            path.replaceFirst('api/groups/', '').replaceFirst('/members', '');
+        return await _handleListGroupMembers(
+          request,
+          database,
+          encryptionService,
+          groupId,
+        );
+      }
+
+      if (path.startsWith('api/groups/') &&
+          path.endsWith('/invites') &&
+          method == 'GET') {
+        final groupId =
+            path.replaceFirst('api/groups/', '').replaceFirst('/invites', '');
+        return await _handleListGroupSentInvites(
+          request,
+          database,
+          encryptionService,
+          groupId,
+        );
+      }
+
+      if (path.startsWith('api/groups/') &&
+          path.endsWith('/leave') &&
+          method == 'DELETE') {
+        final groupId =
+            path.replaceFirst('api/groups/', '').replaceFirst('/leave', '');
+        return await _handleLeaveGroup(
+          request,
+          database,
+          encryptionService,
+          groupId,
+        );
+      }
+
+      if (path.startsWith('api/groups/invites/') &&
+          path.endsWith('/accept') &&
+          method == 'PATCH') {
+        final inviteId = path
+            .replaceFirst('api/groups/invites/', '')
+            .replaceFirst('/accept', '');
+        return await _handleAcceptGroupInvite(
+          request,
+          database,
+          encryptionService,
+          inviteId,
+        );
+      }
+
+      if (path.startsWith('api/groups/invites/') &&
+          path.endsWith('/decline') &&
+          method == 'PATCH') {
+        final inviteId = path
+            .replaceFirst('api/groups/invites/', '')
+            .replaceFirst('/decline', '');
+        return await _handleDeclineGroupInvite(
+          request,
+          database,
+          encryptionService,
+          inviteId,
+        );
+      }
+
+      if (path.startsWith('api/groups/invites/') && method == 'DELETE') {
+        final inviteId = path.replaceFirst('api/groups/invites/', '');
+        return await _handleDeleteGroupInvite(
+          request,
+          database,
+          encryptionService,
+          inviteId,
+        );
+      }
+
+      if (path == 'api/groups/invites/pending' && method == 'GET') {
+        return await _handlePendingGroupInvites(
+            request, database, encryptionService);
+      }
+
+      if (path.startsWith('api/groups/') && method == 'GET') {
+        final groupId = path.replaceFirst('api/groups/', '');
+        return await _handleGetGroupDetails(
+          request,
+          database,
+          encryptionService,
+          groupId,
+        );
       }
 
       // Email verification endpoints (public)
@@ -416,6 +559,10 @@ Handler _createHandler(
             headers: {'Content-Type': 'application/json'},
           );
         }
+      }
+
+      if (path == 'api/messages/search' && method == 'GET') {
+        return await _handleMessageSearch(request, database);
       }
 
       // Invite endpoints - simple in-memory implementation for testing
@@ -1264,8 +1411,10 @@ Handler _createHandler(
           // Soft-delete: mark chat as archived for this user by setting the appropriate flag
           // Archive for the user (participant_1 or participant_2)
           final isParticipant1 = userId == participant1;
-          final archiveColumn = isParticipant1 ? 'is_participant_1_archived' : 'is_participant_2_archived';
-          
+          final archiveColumn = isParticipant1
+              ? 'is_participant_1_archived'
+              : 'is_participant_2_archived';
+
           await database.execute(
             'UPDATE chats SET $archiveColumn = true WHERE id = @chatId',
             substitutionValues: {'chatId': chatId},
@@ -1324,7 +1473,7 @@ Handler _createHandler(
           final userId = payload.userId;
 
           // Import ChatHandlers to use
-          final chatHandlers = ChatHandlers(database);
+          final chatHandlers = ChatHandlers(database, encryptionService);
 
           // Add userId to request context
           final requestWithContext = request.change(
@@ -1418,7 +1567,7 @@ Handler _createHandler(
               path.replaceFirst('api/chats/', '').replaceFirst('/messages', '');
 
           // Import ChatHandlers to use
-          final chatHandlers = ChatHandlers(database);
+          final chatHandlers = ChatHandlers(database, encryptionService);
 
           // Add userId to request context
           final requestWithContext = request.change(
@@ -1472,21 +1621,25 @@ Handler _createHandler(
       if (path.startsWith('api/chats/') &&
           path.contains('/messages/') &&
           !path.endsWith('/status') &&
-          !path.contains('/messages/') &&
-          path != path.replaceAll(RegExp(r'/messages/[^/]+$'), '/messages/X') &&
           method == 'PUT') {
         try {
+          print(
+              '[MessageHandler] ✏️ Edit route matched: method=$method path=$path');
           final parts = path.split('/');
           // Path format: api/chats/{chatId}/messages/{messageId}
-          if (parts.length >= 5 &&
+          if (parts.length == 5 &&
               parts[0] == 'api' &&
               parts[1] == 'chats' &&
               parts[3] == 'messages') {
             final chatId = parts[2];
             final messageId = parts[4];
+            print(
+                '[MessageHandler] ✏️ Dispatching edit: chatId=$chatId messageId=$messageId');
             return await MessageHandlers.editMessage(
                 request, chatId, messageId, database);
           }
+          print(
+              '[MessageHandler] ⚠️ Edit route matched but path format was invalid: $path');
         } on AuthException catch (e) {
           return Response(
             401,
@@ -1509,6 +1662,8 @@ Handler _createHandler(
           !path.endsWith('/status') &&
           method == 'DELETE') {
         try {
+          print(
+              '[MessageHandler] 🗑️ Delete route matched: method=$method path=$path');
           final parts = path.split('/');
           // Path format: api/chats/{chatId}/messages/{messageId}
           if (parts.length >= 5 &&
@@ -1517,6 +1672,8 @@ Handler _createHandler(
               parts[3] == 'messages') {
             final chatId = parts[2];
             final messageId = parts[4];
+            print(
+                '[MessageHandler] 🗑️ Dispatching delete: chatId=$chatId messageId=$messageId');
             return await MessageHandlers.deleteMessage(
                 request, chatId, messageId, database);
           }
@@ -1943,995 +2100,3 @@ Handler _createHandler(
     }
   };
 }
-
-/// Logging middleware that skips health checks to reduce log noise
-Middleware _logRequestsExceptHealth() {
-  return (Handler innerHandler) {
-    return (Request request) async {
-      final path = request.url.path;
-      // Skip logging for health checks
-      if (path == '/health' || path == 'health') {
-        return await innerHandler(request);
-      }
-      // Log other requests
-      return await logRequests()(innerHandler)(request);
-    };
-  };
-}
-
-/// CORS middleware
-Middleware _corsMiddleware() {
-  return (Handler innerHandler) {
-    return (Request request) async {
-      if (request.method == 'OPTIONS') {
-        return Response.ok(
-          '',
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-          },
-        );
-      }
-
-      final response = await innerHandler(request);
-      return response.change(
-        headers: {
-          ...response.headers,
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        },
-      );
-    };
-  };
-}
-
-/// Handle POST /auth/register
-Future<Response> _handleRegister(
-  Request request,
-  Connection database,
-  TokenService tokenService,
-  EmailService emailService,
-  VerificationService verificationService,
-) async {
-  // Validate required fields
-  final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
-  final email = (body['email'] as String?).toString().toLowerCase();
-  final username = body['username'] as String?;
-  final password = body['password'] as String?;
-  print(
-      '[Register] Incoming registration request: email=$email, username=$username');
-  try {
-    // ...existing code...
-
-    // Validate required fields
-    if (email.isEmpty) {
-      return Response(
-        400,
-        body: jsonEncode({
-          'error': 'Validation failed',
-          'details': ['Email is required']
-        }),
-        headers: {'Content-Type': 'application/json'},
-      );
-    }
-    if (username?.isEmpty ?? true) {
-      return Response(
-        400,
-        body: jsonEncode({
-          'error': 'Validation failed',
-          'details': ['Username is required']
-        }),
-        headers: {'Content-Type': 'application/json'},
-      );
-    }
-    if (password?.isEmpty ?? true) {
-      return Response(
-        400,
-        body: jsonEncode({
-          'error': 'Validation failed',
-          'details': ['Password is required']
-        }),
-        headers: {'Content-Type': 'application/json'},
-      );
-    }
-
-    // Validate password strength
-    final passwordErrors = _validatePasswordStrength(password!);
-    if (passwordErrors.isNotEmpty) {
-      return Response(
-        400,
-        body: jsonEncode(
-            {'error': 'Password validation failed', 'details': passwordErrors}),
-        headers: {'Content-Type': 'application/json'},
-      );
-    }
-
-    // Check for duplicate email in database
-    final emailCheck = await database.query(
-      'SELECT email FROM "users" WHERE email = @email',
-      substitutionValues: {'email': email},
-    );
-    print(
-        '[Register] Email check results: ${emailCheck.map((row) => row.toColumnMap()).toList()}');
-    if (emailCheck.isNotEmpty) {
-      print('[Register] Email already registered: $email');
-      return Response(
-        409,
-        body: jsonEncode({'error': 'Email already registered'}),
-        headers: {'Content-Type': 'application/json'},
-      );
-    }
-    // Check for duplicate username in database
-    final usernameCheck = await database.query(
-      'SELECT username FROM "users" WHERE username = @username',
-      substitutionValues: {'username': username},
-    );
-    print(
-        '[Register] Username check results: ${usernameCheck.map((row) => row.toColumnMap()).toList()}');
-    if (usernameCheck.isNotEmpty) {
-      print('[Register] Username already taken: $username');
-      return Response(
-        409,
-        body: jsonEncode({'error': 'Username already taken'}),
-        headers: {'Content-Type': 'application/json'},
-      );
-    }
-    final passwordHash = _hashPassword(password!);
-    final userId = const Uuid().v4(); // Just UUID, no prefix
-    print(
-        '[Register] Creating new user: email=$email, username=$username, userId=$userId');
-
-    // Insert user into database
-    await database.execute(
-      '''INSERT INTO "users" (id, email, username, password_hash, email_verified, created_at)
-         VALUES (@id, @email, @username, @password_hash, @email_verified, @created_at)''',
-      substitutionValues: {
-        'id': userId,
-        'email': email,
-        'username': username,
-        'password_hash': passwordHash,
-        'email_verified': false,
-        'created_at': DateTime.now().toUtc(),
-      },
-    );
-
-    print('[Register] Registration successful: userId=$userId');
-
-    // Auto-send verification email
-    String? devToken;
-    try {
-      final token =
-          await verificationService.createVerificationToken(userId).timeout(
-                const Duration(seconds: 3),
-                onTimeout: () => throw TimeoutException(
-                  'Verification token creation timed out',
-                ),
-              );
-      final appBaseUrl =
-          Platform.environment['APP_BASE_URL'] ?? 'http://localhost:8081';
-      final verificationLink =
-          '$appBaseUrl/auth/verify-email/confirm?token=$token';
-      final emailMsg = emailService.buildVerificationEmail(
-        recipientEmail: email,
-        recipientName: username!,
-        verificationLink: verificationLink,
-        expiresIn: '24 hours',
-        registeredAt: DateTime.now()
-                .toUtc()
-                .toString()
-                .substring(0, 19)
-                .replaceAll('T', ' ') +
-            ' UTC',
-      );
-      devToken = token; // kept for dev response
-      await emailService.sendEmail(emailMsg);
-      print('[Register] Verification email dispatched to $email');
-    } catch (emailErr) {
-      print('[Register][WARNING] Could not send verification email: $emailErr');
-      // Ensure account is not left behind when verification cannot be delivered.
-      try {
-        await database.execute(
-          'DELETE FROM "users" WHERE id = @id',
-          substitutionValues: {'id': userId},
-        );
-      } catch (cleanupErr) {
-        print(
-            '[Register][WARNING] Failed to rollback user after email failure: $cleanupErr');
-      }
-      return Response(
-        502,
-        body: jsonEncode({
-          'error':
-              'Account created, but verification email failed to send. Check SMTP sender configuration and retry.',
-        }),
-        headers: {'Content-Type': 'application/json'},
-      );
-    }
-
-    final bool isDev = !bool.fromEnvironment('dart.vm.product');
-    final responseBody = <String, dynamic>{
-      'user_id': userId,
-      'email': email,
-      'username': username,
-    };
-    if (isDev && devToken != null) {
-      responseBody['dev_verification_token'] = devToken;
-      responseBody['dev_note'] =
-          'Development mode: use this token with POST /auth/verify-email/confirm {"token":"..."}';
-    }
-
-    return Response(
-      201,
-      body: jsonEncode(responseBody),
-      headers: {'Content-Type': 'application/json'},
-    );
-  } catch (e, st) {
-    print('[ERROR] Registration error: $e');
-    print('[ERROR] Stack: $st');
-    return Response(
-      500,
-      body: jsonEncode({'error': 'Server error - please try again later'}),
-      headers: {'Content-Type': 'application/json'},
-    );
-  }
-}
-
-/// Handle POST /auth/login
-Future<Response> _handleLogin(Request request, Connection database) async {
-  try {
-    final body =
-        jsonDecode(await request.readAsString()) as Map<String, dynamic>;
-
-    final email = (body['email'] as String?).toString().toLowerCase();
-    final password = body['password'] as String?;
-
-    if (email.isEmpty) {
-      return Response(
-        400,
-        body: jsonEncode({
-          'error': 'Validation failed',
-          'details': ['Email is required']
-        }),
-        headers: {'Content-Type': 'application/json'},
-      );
-    }
-    if (password?.isEmpty ?? true) {
-      return Response(
-        400,
-        body: jsonEncode({
-          'error': 'Validation failed',
-          'details': ['Password is required']
-        }),
-        headers: {'Content-Type': 'application/json'},
-      );
-    }
-
-    // Query database for user by email
-    final result = await database.query(
-      'SELECT id, email, username, password_hash, email_verified FROM "users" WHERE email = @email',
-      substitutionValues: {'email': email},
-    );
-
-    if (result.isEmpty) {
-      return Response(
-        401,
-        body: jsonEncode({'error': 'Invalid email or password'}),
-        headers: {'Content-Type': 'application/json'},
-      );
-    }
-
-    final user = result.first.toColumnMap();
-    final storedHash = user['password_hash'] as String;
-
-    // Verify password
-    if (!_verifyPassword(password!, storedHash)) {
-      return Response(
-        401,
-        body: jsonEncode({'error': 'Invalid email or password'}),
-        headers: {'Content-Type': 'application/json'},
-      );
-    }
-
-    final emailVerified = user['email_verified'] as bool? ?? false;
-    if (!emailVerified) {
-      return Response(
-        403,
-        body: jsonEncode({
-          'error':
-              'Email not verified. Please verify your email before logging in.'
-        }),
-        headers: {'Content-Type': 'application/json'},
-      );
-    }
-
-    // Generate JWT token
-    final userId = user['id'] as String;
-    final jwtToken = JwtService.generateToken(userId, email);
-
-    return Response.ok(
-      jsonEncode({
-        'user_id': userId,
-        'email': email,
-        'username': user['username'],
-        'token': jwtToken,
-      }),
-      headers: {'Content-Type': 'application/json'},
-    );
-  } catch (e, st) {
-    print('[ERROR] Login error: $e');
-    print('[ERROR] Stack: $st');
-    return Response(
-      500,
-      body: jsonEncode({'error': 'Server error - please try again later'}),
-      headers: {'Content-Type': 'application/json'},
-    );
-  }
-}
-
-/// Handle GET /auth/me (protected)
-Future<Response> _handleValidateSession(
-    Request request, Connection database) async {
-  try {
-    final authHeader = request.headers['authorization'];
-    if (authHeader == null || !authHeader.startsWith('Bearer ')) {
-      return Response(
-        401,
-        body: jsonEncode({'error': 'Missing or invalid authorization header'}),
-        headers: {'Content-Type': 'application/json'},
-      );
-    }
-
-    // Validate JWT token
-    try {
-      final token = authHeader.substring('Bearer '.length);
-      final payload = JwtService.validateToken(token);
-
-      final result = await database.query(
-        'SELECT email_verified FROM "users" WHERE id = @id',
-        substitutionValues: {'id': payload.userId},
-      );
-
-      if (result.isEmpty) {
-        return Response(
-          401,
-          body: jsonEncode({'error': 'Invalid token'}),
-          headers: {'Content-Type': 'application/json'},
-        );
-      }
-
-      final userRow = result.first.toColumnMap();
-      final emailVerified = userRow['email_verified'] as bool? ?? false;
-      if (!emailVerified) {
-        return Response(
-          401,
-          body: jsonEncode({'error': 'Email not verified'}),
-          headers: {'Content-Type': 'application/json'},
-        );
-      }
-
-      return Response.ok(
-        jsonEncode({
-          'is_authenticated': true,
-          'user_id': payload.userId,
-          'email': payload.email,
-        }),
-        headers: {'Content-Type': 'application/json'},
-      );
-    } on AuthException catch (e) {
-      return Response(
-        401,
-        body: jsonEncode({'error': 'Invalid token'}),
-        headers: {'Content-Type': 'application/json'},
-      );
-    }
-  } catch (e) {
-    print('[ERROR] Session validation error: $e');
-    return Response(
-      500,
-      body: jsonEncode({'error': 'Server error'}),
-      headers: {'Content-Type': 'application/json'},
-    );
-  }
-}
-
-/// Handle POST /auth/logout (protected)
-Future<Response> _handleLogout(Request request) async {
-  try {
-    final authHeader = request.headers['authorization'];
-    if (authHeader == null || !authHeader.startsWith('Bearer ')) {
-      return Response(
-        401,
-        body: jsonEncode({'error': 'Not authenticated'}),
-        headers: {'Content-Type': 'application/json'},
-      );
-    }
-
-    return Response.ok(
-      jsonEncode({'message': 'Logged out successfully'}),
-      headers: {'Content-Type': 'application/json'},
-    );
-  } catch (e) {
-    return Response(
-      500,
-      body: jsonEncode({'error': 'Server error'}),
-      headers: {'Content-Type': 'application/json'},
-    );
-  }
-}
-
-/// Validate password strength
-List<String> _validatePasswordStrength(String password) {
-  final errors = <String>[];
-
-  if (password.length < 8) errors.add('Password must be at least 8 characters');
-  if (!password.contains(RegExp(r'[a-z]')))
-    errors.add('Password must contain a lowercase letter');
-  if (!password.contains(RegExp(r'[A-Z]')))
-    errors.add('Password must contain an uppercase letter');
-  if (!password.contains(RegExp(r'[0-9]')))
-    errors.add('Password must contain a digit');
-  if (!password.contains(RegExp(r'[!@#\$%^&*(),.?":{}|<>]')))
-    errors.add('Password must contain a special character');
-
-  return errors;
-}
-
-/// Handle search by username (mock implementation)
-/// Handle search by username (real database query)
-Future<Response> _handleSearchByUsername(
-    Request request, Connection database) async {
-  try {
-    // Check authentication and validate JWT token
-    final authHeader = request.headers['authorization'];
-    if (authHeader == null || !authHeader.startsWith('Bearer ')) {
-      return Response.forbidden(
-        jsonEncode({'error': 'Missing or invalid authorization header'}),
-        headers: {'Content-Type': 'application/json'},
-      );
-    }
-
-    // Validate JWT token
-    try {
-      final token = authHeader.substring('Bearer '.length);
-      JwtService.validateToken(token);
-    } on AuthException catch (e) {
-      return Response.unauthorized(
-        jsonEncode({'error': 'Invalid token'}),
-        headers: {'Content-Type': 'application/json'},
-      );
-    }
-
-    // Get query parameter
-    final query = request.url.queryParameters['q'];
-    if (query == null || query.isEmpty) {
-      return Response.badRequest(
-        body: jsonEncode({'error': 'Missing required query parameter: q'}),
-        headers: {'Content-Type': 'application/json'},
-      );
-    }
-
-    // Get optional limit parameter
-    int limit = 10;
-    if (request.url.queryParameters['limit'] != null) {
-      try {
-        limit = int.parse(request.url.queryParameters['limit']!);
-      } catch (e) {
-        return Response.badRequest(
-          body: jsonEncode(
-              {'error': 'Invalid limit parameter: must be an integer'}),
-          headers: {'Content-Type': 'application/json'},
-        );
-      }
-    }
-
-    // Validate query
-    final trimmed = query.trim();
-    if (trimmed.isEmpty) {
-      return Response.badRequest(
-        body: jsonEncode({'error': 'Search query cannot be empty'}),
-        headers: {'Content-Type': 'application/json'},
-      );
-    }
-    if (trimmed.length > 100) {
-      return Response.badRequest(
-        body:
-            jsonEncode({'error': 'Search query cannot exceed 100 characters'}),
-        headers: {'Content-Type': 'application/json'},
-      );
-    }
-
-    // Search database for users by username (case-insensitive partial match)
-    final searchPattern = '%${trimmed.toLowerCase()}%';
-    final results = await database.query(
-      '''SELECT id, username, email FROM "users" 
-         WHERE LOWER(username) LIKE @pattern 
-         ORDER BY username ASC 
-         LIMIT @limit''',
-      substitutionValues: {
-        'pattern': searchPattern,
-        'limit': limit,
-      },
-    );
-
-    // Convert results to response format
-    final data = results.map((row) {
-      final map = row.toColumnMap();
-      return {
-        'userId': map['id'] as String,
-        'username': map['username'] as String,
-        'email': map['email'] as String,
-        'profilePictureUrl': null,
-        'isPrivateProfile': false,
-      };
-    }).toList();
-
-    return Response.ok(
-      jsonEncode({
-        'data': data,
-        'count': data.length,
-        'query': query,
-        'type': 'username',
-      }),
-      headers: {'Content-Type': 'application/json'},
-    );
-  } catch (e) {
-    print('[ERROR] Search by username error: $e');
-    return Response.internalServerError(
-      body: jsonEncode({'error': 'Internal server error'}),
-      headers: {'Content-Type': 'application/json'},
-    );
-  }
-}
-
-/// Handle search by email (real database query)
-Future<Response> _handleSearchByEmail(
-    Request request, Connection database) async {
-  try {
-    // Check authentication and validate JWT token
-    final authHeader = request.headers['authorization'];
-    if (authHeader == null || !authHeader.startsWith('Bearer ')) {
-      return Response.forbidden(
-        jsonEncode({'error': 'Missing or invalid authorization header'}),
-        headers: {'Content-Type': 'application/json'},
-      );
-    }
-
-    // Validate JWT token
-    try {
-      final token = authHeader.substring('Bearer '.length);
-      JwtService.validateToken(token);
-    } on AuthException catch (e) {
-      return Response.unauthorized(
-        jsonEncode({'error': 'Invalid token'}),
-        headers: {'Content-Type': 'application/json'},
-      );
-    }
-
-    // Get query parameter
-    final query = request.url.queryParameters['q'];
-    if (query == null || query.isEmpty) {
-      return Response.badRequest(
-        body: jsonEncode({'error': 'Missing required query parameter: q'}),
-        headers: {'Content-Type': 'application/json'},
-      );
-    }
-
-    // Get optional limit parameter
-    int limit = 10;
-    if (request.url.queryParameters['limit'] != null) {
-      try {
-        limit = int.parse(request.url.queryParameters['limit']!);
-      } catch (e) {
-        return Response.badRequest(
-          body: jsonEncode(
-              {'error': 'Invalid limit parameter: must be an integer'}),
-          headers: {'Content-Type': 'application/json'},
-        );
-      }
-    }
-
-    // Validate query
-    final trimmed = query.trim();
-    if (trimmed.length < 2) {
-      return Response.badRequest(
-        body:
-            jsonEncode({'error': 'Search query must be at least 2 characters'}),
-        headers: {'Content-Type': 'application/json'},
-      );
-    }
-    // Allow partial email searches - just need @ or . (e.g., "alice.", "alice@", "alice.smith")
-    if (!trimmed.contains('@') && !trimmed.contains('.')) {
-      return Response.badRequest(
-        body: jsonEncode({
-          'error': 'Email search must contain @ or . for email-like queries'
-        }),
-        headers: {'Content-Type': 'application/json'},
-      );
-    }
-    if (trimmed.length > 100) {
-      return Response.badRequest(
-        body:
-            jsonEncode({'error': 'Search query cannot exceed 100 characters'}),
-        headers: {'Content-Type': 'application/json'},
-      );
-    }
-
-    // Search database for users by email (case-insensitive partial match)
-    final searchPattern = '%${trimmed.toLowerCase()}%';
-    final results = await database.query(
-      '''SELECT id, username, email FROM "users" 
-         WHERE LOWER(email) LIKE @pattern 
-         ORDER BY email ASC 
-         LIMIT @limit''',
-      substitutionValues: {
-        'pattern': searchPattern,
-        'limit': limit,
-      },
-    );
-
-    // Convert results to response format
-    final data = results.map((row) {
-      final map = row.toColumnMap();
-      return {
-        'userId': map['id'] as String,
-        'username': map['username'] as String,
-        'email': map['email'] as String,
-        'profilePictureUrl': null,
-        'isPrivateProfile': false,
-      };
-    }).toList();
-
-    return Response.ok(
-      jsonEncode({
-        'data': data,
-        'count': data.length,
-        'query': query,
-        'type': 'email',
-      }),
-      headers: {'Content-Type': 'application/json'},
-    );
-  } catch (e) {
-    print('[ERROR] Search by email error: $e');
-    return Response.internalServerError(
-      body: jsonEncode({'error': 'Internal server error'}),
-      headers: {'Content-Type': 'application/json'},
-    );
-  }
-}
-
-/// Hash password using simple algorithm (in production, use bcrypt)
-String _hashPassword(String password) {
-  // Simple hash for demo (in production use bcrypt package)
-  return password.hashCode.toRadixString(36);
-}
-
-/// Verify password against hash
-bool _verifyPassword(String password, String hash) {
-  return _hashPassword(password) == hash;
-}
-
-/// Serve static files from the uploads directory
-Response _serveStaticFile(Request request, String path) {
-  try {
-    // Security: prevent directory traversal attacks
-    if (path.contains('..') || path.startsWith('/')) {
-      return Response.forbidden(
-        jsonEncode({'error': 'Access denied'}),
-        headers: {'Content-Type': 'application/json'},
-      );
-    }
-
-    // Construct file path
-    final file = File(path);
-
-    print('[StaticFileServer] Attempting to serve: $path');
-    print('[StaticFileServer] Absolute path: ${file.absolute.path}');
-
-    // Check if file exists
-    if (!file.existsSync()) {
-      print('[StaticFileServer] ❌ File not found: $path');
-      // List directory contents for debugging
-      final dir = Directory('uploads/profile_pictures');
-      if (dir.existsSync()) {
-        try {
-          final files = dir.listSync();
-          print(
-              '[StaticFileServer] Files in uploads/profile_pictures: ${files.map((f) => f.path).toList()}');
-        } catch (e) {
-          print('[StaticFileServer] Error listing directory: $e');
-        }
-      }
-
-      return Response.notFound(
-        jsonEncode({'error': 'File not found', 'path': path}),
-        headers: {'Content-Type': 'application/json'},
-      );
-    }
-
-    // Check if it's actually a file (not a directory)
-    if (file.statSync().type == FileSystemEntityType.directory) {
-      return Response.forbidden(
-        jsonEncode({'error': 'Access denied'}),
-        headers: {'Content-Type': 'application/json'},
-      );
-    }
-
-    final stat = file.statSync();
-    final totalLength = stat.size;
-
-    // Determine content type based on file extension
-    final ext = path.split('.').last.toLowerCase();
-    String contentType = 'application/octet-stream';
-
-    switch (ext) {
-      case 'jpg':
-      case 'jpeg':
-        contentType = 'image/jpeg';
-        break;
-      case 'png':
-        contentType = 'image/png';
-        break;
-      case 'gif':
-        contentType = 'image/gif';
-        break;
-      case 'webp':
-        contentType = 'image/webp';
-        break;
-      case 'mp4':
-        contentType = 'video/mp4';
-        break;
-      case 'mov':
-        contentType = 'video/quicktime';
-        break;
-      case 'avi':
-        contentType = 'video/x-msvideo';
-        break;
-      case 'wav':
-        contentType = 'audio/wav';
-        break;
-      case 'mp3':
-        contentType = 'audio/mpeg';
-        break;
-      case 'm4a':
-        contentType = 'audio/x-m4a';
-        break;
-      case 'aac':
-        contentType = 'audio/aac';
-        break;
-      default:
-        contentType = 'application/octet-stream';
-    }
-
-    final rangeHeader = request.headers['range'];
-    final commonHeaders = {
-      'Content-Type': contentType,
-      'Cache-Control': 'public, max-age=31536000',
-      'Accept-Ranges': 'bytes',
-    };
-
-    if (rangeHeader != null && rangeHeader.startsWith('bytes=')) {
-      final match = RegExp(r'^bytes=(\d*)-(\d*)$').firstMatch(rangeHeader);
-      if (match == null) {
-        return Response(
-          416,
-          headers: {
-            ...commonHeaders,
-            'Content-Range': 'bytes */$totalLength',
-          },
-        );
-      }
-
-      final startGroup = match.group(1);
-      final endGroup = match.group(2);
-
-      int start;
-      int end;
-
-      if ((startGroup == null || startGroup.isEmpty) &&
-          (endGroup == null || endGroup.isEmpty)) {
-        return Response(
-          416,
-          headers: {
-            ...commonHeaders,
-            'Content-Range': 'bytes */$totalLength',
-          },
-        );
-      }
-
-      if (startGroup == null || startGroup.isEmpty) {
-        final suffixLength = int.parse(endGroup!);
-        start = (totalLength - suffixLength).clamp(0, totalLength - 1);
-        end = totalLength - 1;
-      } else {
-        start = int.parse(startGroup);
-        end = endGroup == null || endGroup.isEmpty
-            ? totalLength - 1
-            : int.parse(endGroup);
-      }
-
-      if (start < 0 || start >= totalLength || end < start) {
-        return Response(
-          416,
-          headers: {
-            ...commonHeaders,
-            'Content-Range': 'bytes */$totalLength',
-          },
-        );
-      }
-
-      if (end >= totalLength) {
-        end = totalLength - 1;
-      }
-
-      final stream = file.openRead(start, end + 1);
-      final chunkLength = end - start + 1;
-
-      print('[✓] Serving range: $path ($start-$end/$totalLength)');
-
-      return Response(
-        206,
-        body: stream,
-        headers: {
-          ...commonHeaders,
-          'Content-Length': '$chunkLength',
-          'Content-Range': 'bytes $start-$end/$totalLength',
-        },
-      );
-    }
-
-    if (request.method == 'HEAD') {
-      return Response.ok(
-        null,
-        headers: {
-          ...commonHeaders,
-          'Content-Length': '$totalLength',
-        },
-      );
-    }
-
-    // Read file bytes
-    final bytes = file.readAsBytesSync();
-
-    print('[✓] Serving: $path (${bytes.length} bytes)');
-
-    return Response.ok(
-      bytes,
-      headers: commonHeaders,
-    );
-  } catch (e) {
-    print('[StaticFileServer] Error serving file: $e');
-    return Response.internalServerError(
-      body: jsonEncode({
-        'error': 'Failed to serve file',
-        'message': e.toString(),
-      }),
-      headers: {'Content-Type': 'application/json'},
-    );
-  }
-}
-
-/// Generate a random ID
-String _generateId() {
-  return const Uuid().v4();
-}
-
-/// Seed test users in the database for development
-Future<void> _seedTestUsers(PostgreSQLConnection database) async {
-  try {
-    final testUsers = [
-      {
-        'username': 'alice',
-        'email': 'alice@example.com',
-        'password': 'alice123'
-      },
-      {'username': 'bob', 'email': 'bob@example.com', 'password': 'bob123'},
-      {
-        'username': 'charlie',
-        'email': 'charlie@example.com',
-        'password': 'charlie123'
-      },
-      {'username': 'diane', 'email': 'diane@test.org', 'password': 'diane123'},
-    ];
-
-    int created = 0;
-    int updated = 0;
-    for (final user in testUsers) {
-      final username = user['username'] as String;
-      final email = user['email'] as String;
-      final password = user['password'] as String;
-      final normalizedEmail = email.toLowerCase();
-      final passwordHash = _hashPassword(password);
-
-      // Check if user already exists
-      final existing = await database.query(
-        'SELECT id FROM "users" WHERE email = @email OR username = @username',
-        substitutionValues: {'email': normalizedEmail, 'username': username},
-      );
-
-      if (existing.isNotEmpty) {
-        final userId = existing.first[0] as String;
-        await database.execute(
-          '''UPDATE "users"
-             SET email = @email,
-                 username = @username,
-                 password_hash = @password_hash,
-                 email_verified = @email_verified
-             WHERE id = @id''',
-          substitutionValues: {
-            'id': userId,
-            'email': normalizedEmail,
-            'username': username,
-            'password_hash': passwordHash,
-            'email_verified': true,
-          },
-        );
-        print('[TestUsers] ↻ Synced @$username ($email)');
-        updated++;
-        continue;
-      }
-
-      try {
-        final userId = const Uuid().v4();
-
-        await database.execute(
-          '''INSERT INTO "users" (id, email, username, password_hash, email_verified, created_at)
-             VALUES (@id, @email, @username, @password_hash, @email_verified, @created_at)''',
-          substitutionValues: {
-            'id': userId,
-            'email': normalizedEmail,
-            'username': username,
-            'password_hash': passwordHash,
-            'email_verified': true,
-            'created_at': DateTime.now().toUtc(),
-          },
-        );
-        print('[TestUsers] ✓ Created @$username ($email)');
-        created++;
-      } catch (e) {
-        print('[TestUsers] ✗ Failed to create @$username: $e');
-      }
-    }
-
-    if (created > 0) {
-      print('[TestUsers] Created $created test users');
-    }
-    if (updated > 0) {
-      print('[TestUsers] Synced $updated existing test users');
-    }
-    if (created == 0 && updated == 0) {
-      print('[TestUsers] All test users already exist');
-    }
-  } catch (e) {
-    print('[TestUsers] ✗ Error seeding test users: $e');
-  }
-}
-
-/// Helper: Convert database row to invitation JSON DTO
-Map<String, dynamic> _invitationRowToJson(List<dynamic> row) {
-  return {
-    'id': row[0], // id
-    'senderId': row[1], // sender_id
-    'senderName': row[2], // sender_name
-    'senderAvatarUrl': row[3], // sender_avatar
-    'recipientId': row[4], // receiver_id
-    'recipientName': row[5], // receiver_name
-    'recipientAvatarUrl': row[6], // receiver_avatar
-    'status': row[7], // status
-    'createdAt': (row[8] as DateTime).toIso8601String(), // created_at
-    'respondedAt': row[9] != null
-        ? (row[9] as DateTime).toIso8601String()
-        : null, // responded_at
-    'canceledAt': row[10] != null
-        ? (row[10] as DateTime).toIso8601String()
-        : null, // canceled_at
-  };
-}
-
-/// Unused - kept for reference
-/// Each endpoint handles its own JWT validation
-/// Pattern:
-///   final token = authHeader.substring('Bearer '.length);
-///   final payload = JwtService.validateToken(token);
-///   final userId = payload.userId;

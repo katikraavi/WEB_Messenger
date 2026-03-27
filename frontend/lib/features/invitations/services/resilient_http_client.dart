@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert' show Encoding;
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 /// Enhanced HTTP client with timeout, retry, and error recovery support
@@ -14,7 +15,7 @@ class ResilientHttpClient {
   final http.Client _innerClient;
   final Duration timeout;
   final int maxRetryAttempts;
-  
+
   ResilientHttpClient({
     http.Client? client,
     this.timeout = defaultTimeout,
@@ -44,7 +45,12 @@ class ResilientHttpClient {
     bool retryOn401 = false,
   }) async {
     return _makeRequestWithRetry(
-      () => _innerClient.post(uri, headers: headers, body: body, encoding: encoding),
+      () => _innerClient.post(
+        uri,
+        headers: headers,
+        body: body,
+        encoding: encoding,
+      ),
       'POST',
       uri.toString(),
       retryOn401: retryOn401,
@@ -60,7 +66,12 @@ class ResilientHttpClient {
     bool retryOn401 = false,
   }) async {
     return _makeRequestWithRetry(
-      () => _innerClient.delete(uri, headers: headers, body: body, encoding: encoding),
+      () => _innerClient.delete(
+        uri,
+        headers: headers,
+        body: body,
+        encoding: encoding,
+      ),
       'DELETE',
       uri.toString(),
       retryOn401: retryOn401,
@@ -71,17 +82,16 @@ class ResilientHttpClient {
   Future<http.Response> _makeRequestWithRetry(
     Future<http.Response> Function() request,
     String method,
-    String url,
-    {bool retryOn401 = false}
-  ) async {
+    String url, {
+    bool retryOn401 = false,
+  }) async {
     int attempt = 0;
     Duration delay = initialRetryDelay;
-    
+
     while (attempt <= maxRetryAttempts) {
       try {
         attempt++;
-        print('[ResilientHttpClient] $method $url (attempt $attempt/$maxRetryAttempts)');
-        
+
         // Execute request with timeout
         final response = await request().timeout(
           timeout,
@@ -94,7 +104,6 @@ class ResilientHttpClient {
         // Check if we should retry based on status code
         if (_shouldRetry(response.statusCode, retryOn401)) {
           if (attempt <= maxRetryAttempts) {
-            print('[ResilientHttpClient] Status ${response.statusCode} - retrying after ${delay.inMilliseconds}ms');
             await Future.delayed(delay);
             delay *= retryBackoffMultiplier;
             continue;
@@ -105,7 +114,6 @@ class ResilientHttpClient {
         return response;
       } on TimeoutException catch (e) {
         if (attempt <= maxRetryAttempts) {
-          print('[ResilientHttpClient] Timeout on attempt $attempt - retrying after ${delay.inMilliseconds}ms');
           await Future.delayed(delay);
           delay *= retryBackoffMultiplier;
           continue;
@@ -114,7 +122,6 @@ class ResilientHttpClient {
         }
       } on SocketException catch (e) {
         if (attempt <= maxRetryAttempts && _isRetryableSocketError(e)) {
-          print('[ResilientHttpClient] Socket error on attempt $attempt - retrying after ${delay.inMilliseconds}ms');
           await Future.delayed(delay);
           delay *= retryBackoffMultiplier;
           continue;
@@ -176,14 +183,14 @@ class ResilientHttpClient {
 
 /// Network state listener for offline detection
 class NetworkStateListener {
-  final StreamController<NetworkState> _stateController = 
-    StreamController<NetworkState>.broadcast();
-  
+  final StreamController<NetworkState> _stateController =
+      StreamController<NetworkState>.broadcast();
+
   late Timer _checkTimer;
   NetworkState _currentState = NetworkState.unknown;
-  
+
   Stream<NetworkState> get stateStream => _stateController.stream;
-  
+
   NetworkState get currentState => _currentState;
 
   /// Start monitoring network state
@@ -191,7 +198,7 @@ class NetworkStateListener {
     _checkTimer = Timer.periodic(checkInterval, (_) async {
       await _updateNetworkState();
     });
-    
+
     // Initial check
     _updateNetworkState();
   }
@@ -204,11 +211,17 @@ class NetworkStateListener {
 
   /// Check current network state by attempting a simple request
   Future<void> _updateNetworkState() async {
+    if (kIsWeb) {
+      // Avoid external IP probes in browser (blocked/slow in many environments).
+      _updateState(NetworkState.online);
+      return;
+    }
+
     try {
       final client = http.Client();
-      await client.get(Uri.parse('http://8.8.8.8')).timeout(
-        const Duration(seconds: 5),
-      );
+      await client
+          .get(Uri.parse('http://8.8.8.8'))
+          .timeout(const Duration(seconds: 5));
       _updateState(NetworkState.online);
       client.close();
     } on SocketException catch (e) {
@@ -229,17 +242,16 @@ class NetworkStateListener {
     if (_currentState != newState) {
       _currentState = newState;
       _stateController.add(newState);
-      print('[NetworkStateListener] Network state changed to: $newState');
     }
   }
 }
 
 /// Represents network connectivity state
 enum NetworkState {
-  online,    // Connected to internet
-  offline,   // No internet connection
-  degraded,  // Slow or unstable connection
-  unknown,   // Cannot determine state
+  online, // Connected to internet
+  offline, // No internet connection
+  degraded, // Slow or unstable connection
+  unknown, // Cannot determine state
 }
 
 /// Extension to provide user-friendly descriptions

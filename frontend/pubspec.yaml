@@ -61,8 +61,6 @@ dependencies:
 
   # Flutter's official video player (GStreamer on Linux — no PipeWire required)
   video_player: ^2.9.1
-  # Linux video player backend (MDK/FFmpeg - no PipeWire dependency)
-  fvp: ^0.23.0
 
   # Launch URLs in external browser/app (used for video fallback on Linux)
   url_launcher: ^6.3.1
@@ -79,6 +77,9 @@ dependencies:
   
   # Freezed code generation for immutable data classes
   freezed_annotation: ^3.1.0
+  
+  # Cryptography for AES-256-GCM encryption
+  cryptography: ^2.7.0
   
   # JSON serialization support
   json_annotation: ^4.11.0

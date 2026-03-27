@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:frontend/core/services/api_client.dart';
 
 class ChatNotificationSettingsService {
   ChatNotificationSettingsService._();
@@ -13,10 +14,7 @@ class ChatNotificationSettingsService {
   final http.Client _httpClient = http.Client();
   final Set<String> _mutedChatIds = <String>{};
 
-  String get _baseUrl => const String.fromEnvironment(
-        'API_BASE_URL',
-        defaultValue: 'http://localhost:8081',
-      );
+  String get _baseUrl => ApiClient.getBaseUrl();
 
   bool isMutedLocally(String chatId) => _mutedChatIds.contains(chatId);
 
@@ -133,9 +131,7 @@ class ChatNotificationSettingsService {
         deviceToken: fcmToken,
         platform: platform.isEmpty ? 'android' : platform,
       );
-      print('[Notifications] Device token registered with backend');
     } catch (e) {
-      print('[Notifications] Could not register device token: $e');
     }
   }
 }

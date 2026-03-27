@@ -5,34 +5,40 @@ A full-stack mobile messaging application built with Flutter, Serverpod backend,
 ## Quick Start (5-10 minutes)
 
 See [quickstart.md](specs/001-messenger-init/quickstart.md) for detailed setup instructions.
+For production rollout guidance, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ### Prerequisites
 
 - **Git**: Any recent version
-- **Docker Desktop**: v2.0+
-- **Flutter SDK**: 3.10.0+
-- **Android SDK** or **Xcode** (for mobile emulation)
+- **Docker Desktop**: v2.0+ (with Docker Compose v2)
 
-### Start Development Environment
+That's it — no Flutter SDK, Dart, or any other tooling needed.
+
+### Start Everything (one command)
 
 ```bash
 # Clone and navigate to project
 git clone <repository-url>
-cd mobile-messenger
+cd web-messenger
 
-# Start backend and database (Docker Compose)
-docker-compose up
-
-# In another terminal, start Flutter app
-cd frontend
-flutter pub get
-flutter run
+# Build and start all services
+docker compose up --build
 ```
 
-Expected result:
-- Backend running on `http://localhost:8081`
-- PostgreSQL running on `localhost:5432`
-- Flutter app connected and displaying UI
+Wait for all containers to become healthy (roughly 2–5 minutes on first build), then open:
+
+| Service | URL |
+|---|---|
+| **Web app** | http://localhost:5000 |
+| **Backend API** | http://localhost:8081 |
+| **Email catcher (MailHog)** | http://localhost:8025 |
+
+> `--build` is only required the first time or after code changes. Subsequent runs can use plain `docker compose up`.
+
+To stop all services:
+```bash
+docker compose down
+```
 
 ### Real Email Smoke Test
 
@@ -130,29 +136,29 @@ mobile-messenger/
 ### Docker Compose
 
 ```bash
-# Start services (background)
-docker-compose up -d
+# Build images and start all services (first run / after code changes)
+docker compose up --build
+
+# Start in the background
+docker compose up --build -d
 
 # View logs
-docker-compose logs -f
+docker compose logs -f
 
-# Stop services
-docker-compose down
+# Stop services (keeps data volumes)
+docker compose down
 
-# Clean data volumes
-docker-compose down -v
+# Stop and wipe all data (fresh start)
+docker compose down -v
 
-# Restart service
-docker-compose restart serverpod
+# Restart a single service
+docker compose restart serverpod
 
-# Start backend using local SMTP settings from .env
-docker compose up -d --build
-
-# Start backend with Gmail SMTP and run live email smoke test
+# Start with Gmail SMTP and run live email smoke test
 ./scripts/manual-tests/run_gmail_email_smoke_test.sh
 ```
 
-If your local ignored `.env` is configured for Gmail SMTP, plain `docker compose up` will send real emails. If `.env` is configured for MailHog, emails will be captured locally instead.
+If your local ignored `.env` is configured for Gmail SMTP, emails will be sent to real inboxes. If `.env` is configured for MailHog (the default), emails are captured at http://localhost:8025.
 
 ### Frontend Development
 

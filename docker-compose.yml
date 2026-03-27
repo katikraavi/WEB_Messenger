@@ -68,8 +68,7 @@ services:
         ipv4_address: 172.20.0.3
     restart: unless-stopped
     volumes:
-      - ./backend:/app/backend:ro
-      - uploads_data:/app/uploads
+      - uploads_data:/app/backend/uploads
 
   # ── Mailhog — local email catcher ──────────────────────────────────
   # All outgoing emails are caught here during development.

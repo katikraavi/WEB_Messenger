@@ -1,5 +1,5 @@
 import 'package:test/test.dart';
-import '../../lib/src/models/enums.dart';
+import 'package:messenger_server/src/models/enums.dart';
 
 void main() {
   group('Message Status Enum', () {

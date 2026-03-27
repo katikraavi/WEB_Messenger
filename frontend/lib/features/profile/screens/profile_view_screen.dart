@@ -1,8 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart' as provider;
 import 'package:frontend/core/notifications/app_feedback_service.dart';
 import 'package:frontend/core/services/app_exception_logger.dart';
+import 'package:frontend/core/services/api_client.dart';
 import '../models/user_profile.dart';
 import '../providers/user_profile_provider.dart';
 import '../widgets/profile_picture_widget.dart';
@@ -29,11 +32,12 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
   bool _isLoadingInvite = false;
   String? _inviteError;
   bool _missingAuthProviderWarningShown = false;
+  bool _isEditMode = false;
 
   @override
   void initState() {
     super.initState();
-    _inviteService = InviteApiService(baseUrl: 'http://localhost:8081');
+    _inviteService = InviteApiService(baseUrl: ApiClient.getBaseUrl());
   }
 
   Future<void> _sendInvite() async {
@@ -48,10 +52,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
         AppFeedbackService.showInfo('Invitation sent.');
       }
     } catch (e) {
-      AppExceptionLogger.log(
-        e,
-        context: 'ProfileViewScreen._sendInvite',
-      );
+      AppExceptionLogger.log(e, context: 'ProfileViewScreen._sendInvite');
       setState(() {
         _inviteError = e.toString();
       });
@@ -88,6 +89,65 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
             body: _buildErrorState(context, ref, error.toString(), token),
           ),
           data: (profile) {
+            final isWeb = MediaQuery.of(context).size.width > 900;
+            
+            // On web, show side-by-side layout if in edit mode
+            if (isWeb && _isEditMode) {
+              return Scaffold(
+                appBar: AppBar(
+                  title: const Text('Profile & Edit'),
+                ),
+                body: Row(
+                  children: [
+                    // Profile view on left (60% width)
+                    Expanded(
+                      flex: 60,
+                      child: _buildProfileContent(context, ref, profile, token),
+                    ),
+                    // Divider
+                    Container(
+                      width: 1,
+                      color: Colors.grey[300],
+                    ),
+                    // Edit form on right (40% width)
+                    Expanded(
+                      flex: 40,
+                      child: Container(
+                        color: Colors.grey[50],
+                        child: Stack(
+                          children: [
+                            // Close button in top-right
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: IconButton(
+                                icon: const Icon(Icons.close),
+                                onPressed: () {
+                                  setState(() {
+                                    _isEditMode = false;
+                                  });
+                                },
+                              ),
+                            ),
+                            // Edit form
+                            ProfileEditScreenContent(
+                              profile: profile,
+                              onSaveSuccess: () {
+                                setState(() {
+                                  _isEditMode = false;
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+            
+            // Default view (mobile or non-edit mode)
             return Scaffold(
               appBar: AppBar(
                 title: const Text('Profile'),
@@ -96,21 +156,24 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                     IconButton(
                       icon: const Icon(Icons.edit),
                       onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => ProfileEditScreen(profile: profile),
-                          ),
-                        );
+                        if (isWeb) {
+                          // On web, show edit panel on the right
+                          setState(() {
+                            _isEditMode = true;
+                          });
+                        } else {
+                          // On mobile, navigate to edit screen
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => ProfileEditScreen(profile: profile),
+                            ),
+                          );
+                        }
                       },
                     ),
                 ],
               ),
-              body: _buildProfileContent(
-                context,
-                ref,
-                profile,
-                token,
-              ),
+              body: _buildProfileContent(context, ref, profile, token),
             );
           },
         );
@@ -159,9 +222,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                 color: Colors.grey[300],
                 shape: BoxShape.circle,
               ),
-              child: const Center(
-                child: CircularProgressIndicator(),
-              ),
+              child: const Center(child: CircularProgressIndicator()),
             ),
             const SizedBox(height: 16),
 
@@ -222,11 +283,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.error_outline,
-                  size: 64,
-                  color: Colors.red[400],
-                ),
+                Icon(Icons.error_outline, size: 64, color: Colors.red[400]),
                 const SizedBox(height: 16),
                 Text(
                   'Unable to Load Profile',
@@ -271,29 +328,33 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
         await Future.delayed(const Duration(milliseconds: 500));
       },
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
         physics: const AlwaysScrollableScrollPhysics(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // T037: Profile Picture Widget (circular with network image)
-            ProfilePictureWidget(
-              imageUrl: profile.profilePictureUrl,
-              size: 120,
-              onTap: widget.isOwnProfile
-                  ? () {
-                      // Will implement picture upload in Phase 6
-                    }
-                  : null,
-            ),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 600),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // T037: Profile Picture Widget (circular with network image)
+                  ProfilePictureWidget(
+                    imageUrl: profile.profilePictureUrl,
+                    size: 120,
+                    onTap: widget.isOwnProfile
+                        ? () {
+                            // Will implement picture upload in Phase 6
+                          }
+                        : null,
+                  ),
             const SizedBox(height: 24),
 
             // Username display (read-only)
             Text(
               profile.username,
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
@@ -320,8 +381,8 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                     Text(
                       'Bio',
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -329,13 +390,13 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                           ? profile.aboutMe
                           : 'No bio added yet',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontStyle: profile.aboutMe.isEmpty
-                                ? FontStyle.italic
-                                : null,
-                            color: profile.aboutMe.isEmpty
-                                ? Colors.grey[600]
-                                : null,
-                          ),
+                        fontStyle: profile.aboutMe.isEmpty
+                            ? FontStyle.italic
+                            : null,
+                        color: profile.aboutMe.isEmpty
+                            ? Colors.grey[600]
+                            : null,
+                      ),
                     ),
                   ],
                 ),
@@ -343,22 +404,11 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Edit Profile button (for own profile)
-            if (widget.isOwnProfile)
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => ProfileEditScreen(profile: profile),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.edit),
-                  label: const Text('Edit Profile'),
-                ),
-              ),
+            // Active device sessions section (own profile only — GAP-005/T031)
+            if (widget.isOwnProfile && token != null) ...[
+              const SizedBox(height: 32),
+              _ActiveSessionsSection(token: token),
+            ],
 
             // Invite button (for other profiles)
             if (!widget.isOwnProfile)
@@ -408,7 +458,10 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                   ),
                 ),
               ),
-          ],
+            ],
+          ),
+            ),
+          ),
         ),
       ),
     );
@@ -423,5 +476,243 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
 
     // ignore: unused_result
     ref.refresh(userProfileWithTokenProvider((widget.userId, token)));
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Active Sessions Section  (GAP-005 / T031)
+// ---------------------------------------------------------------------------
+
+class _DeviceSessionInfo {
+  final String id;
+  final String deviceId;
+  final String? deviceName;
+  final DateTime lastActiveAt;
+
+  _DeviceSessionInfo({
+    required this.id,
+    required this.deviceId,
+    this.deviceName,
+    required this.lastActiveAt,
+  });
+
+  factory _DeviceSessionInfo.fromJson(Map<String, dynamic> json) {
+    final lastSeenRaw =
+        json['lastSeenAt'] ?? json['lastActiveAt'] ?? json['createdAt'];
+    return _DeviceSessionInfo(
+      id: (json['id'] ?? json['deviceId'] ?? '') as String,
+      deviceId: json['deviceId'] as String,
+      deviceName: (json['deviceName'] ?? json['userAgent']) as String?,
+      lastActiveAt: DateTime.parse(lastSeenRaw as String),
+    );
+  }
+}
+
+/// Shows the list of active device sessions for the current user and allows
+/// selective logout from individual sessions or all other sessions.
+class _ActiveSessionsSection extends StatefulWidget {
+  final String token;
+
+  const _ActiveSessionsSection({required this.token});
+
+  @override
+  State<_ActiveSessionsSection> createState() => _ActiveSessionsSectionState();
+}
+
+class _ActiveSessionsSectionState extends State<_ActiveSessionsSection> {
+  static String get _baseUrl => ApiClient.getBaseUrl();
+
+  List<_DeviceSessionInfo> _sessions = [];
+  bool _isLoading = false;
+  bool _loaded = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    if (_isLoading) return;
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final response = await http
+          .get(
+            Uri.parse('$_baseUrl/api/auth/sessions'),
+            headers: {'Authorization': 'Bearer ${widget.token}'},
+          )
+          .timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        final list = jsonDecode(response.body) as List<dynamic>;
+        if (mounted) {
+          setState(() {
+            _sessions = list
+                .map(
+                  (e) => _DeviceSessionInfo.fromJson(e as Map<String, dynamic>),
+                )
+                .toList();
+            _loaded = true;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(
+            () => _error = 'Failed to load sessions (${response.statusCode})',
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error = 'Network error loading sessions');
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _revoke(String deviceId) async {
+    try {
+      final response = await http
+          .delete(
+            Uri.parse('$_baseUrl/api/auth/sessions/$deviceId'),
+            headers: {'Authorization': 'Bearer ${widget.token}'},
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        if (mounted) {
+          AppFeedbackService.showInfo('Session revoked.');
+          _load();
+        }
+      } else {
+        if (mounted) {
+          AppFeedbackService.showError('Failed to revoke session.');
+        }
+      }
+    } catch (e) {
+      AppExceptionLogger.log(e, context: '_ActiveSessionsSection._revoke');
+      if (mounted) AppFeedbackService.showError('Network error.');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'Active Sessions',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const Spacer(),
+            if (_isLoading)
+              const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else
+              IconButton(
+                icon: const Icon(Icons.refresh, size: 20),
+                tooltip: 'Refresh sessions',
+                onPressed: _load,
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (_error != null)
+          Text(_error!, style: TextStyle(color: Colors.red[700], fontSize: 13))
+        else if (!_loaded && !_isLoading)
+          const SizedBox.shrink()
+        else if (_sessions.isEmpty)
+          Text(
+            'No active sessions found.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
+          )
+        else
+          ...(_sessions.map(
+            (session) => _SessionTile(
+              session: session,
+              onRevoke: () => _revoke(session.deviceId),
+            ),
+          )),
+      ],
+    );
+  }
+}
+
+class _SessionTile extends StatelessWidget {
+  final _DeviceSessionInfo session;
+  final VoidCallback onRevoke;
+
+  const _SessionTile({required this.session, required this.onRevoke});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 0,
+      color: Colors.grey[100],
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: ListTile(
+        leading: const Icon(Icons.devices, color: Colors.indigo),
+        title: Text(
+          session.deviceName ?? 'Unknown device',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Text(
+          'Last seen: ${_formatRelative(session.lastActiveAt)}',
+          style: const TextStyle(fontSize: 12),
+        ),
+        trailing: IconButton(
+          icon: const Icon(Icons.logout, color: Colors.red),
+          tooltip: 'Sign out this session',
+          onPressed: () =>
+              showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Sign out session?'),
+                  content: const Text(
+                    'This will revoke access for the selected device.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text(
+                        'Sign out',
+                        style: TextStyle(color: Colors.red),
+                      ),
+                    ),
+                  ],
+                ),
+              ).then((confirmed) {
+                if (confirmed == true) onRevoke();
+              }),
+        ),
+      ),
+    );
+  }
+
+  String _formatRelative(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
   }
 }

@@ -26,6 +26,9 @@ class Message {
   final String? decryptedContent;
   final String? mediaUrl; // URL to media file (T077)
   final String? mediaType; // MIME type of media (T077)
+  final int? recipientCount;
+  final int? deliveredCount;
+  final int? readCount;
   
   /// Whether message is currently being sent (optimistic update)
   final bool isSending;
@@ -52,6 +55,9 @@ class Message {
     this.isDeleted = false,
     this.mediaUrl,
     this.mediaType,
+    this.recipientCount,
+    this.deliveredCount,
+    this.readCount,
     this.isSending = false,
     this.error,
     this.decryptionError,
@@ -82,6 +88,9 @@ class Message {
       decryptedContent: (json['decrypted_content'] ?? json['decryptedContent']) as String?,
       mediaUrl: (json['media_url'] ?? json['mediaUrl']) as String?,
       mediaType: (json['media_type'] ?? json['mediaType']) as String?,
+      recipientCount: (json['recipient_count'] ?? json['recipientCount']) as int?,
+      deliveredCount: (json['delivered_count'] ?? json['deliveredCount']) as int?,
+      readCount: (json['read_count'] ?? json['readCount']) as int?,
       status: json['status'] as String? ?? 'sent',
       editedAt: json['edited_at'] != null 
         ? parseUtcTimestamp(json['edited_at'] as String)
@@ -111,6 +120,9 @@ class Message {
     'decrypted_content': decryptedContent,
     'media_url': mediaUrl,
     'media_type': mediaType,
+    'recipient_count': recipientCount,
+    'delivered_count': deliveredCount,
+    'read_count': readCount,
   };
 
   /// Create a copy with modified fields (for optimistic updates)
@@ -130,6 +142,9 @@ class Message {
     String? decryptedContent,
     String? mediaUrl,
     String? mediaType,
+    int? recipientCount,
+    int? deliveredCount,
+    int? readCount,
     bool? isSending,
     String? error,
     String? decryptionError,
@@ -150,6 +165,9 @@ class Message {
       decryptedContent: decryptedContent ?? this.decryptedContent,
       mediaUrl: mediaUrl ?? this.mediaUrl,
       mediaType: mediaType ?? this.mediaType,
+      recipientCount: recipientCount ?? this.recipientCount,
+      deliveredCount: deliveredCount ?? this.deliveredCount,
+      readCount: readCount ?? this.readCount,
       isSending: isSending ?? this.isSending,
       error: error ?? this.error,
       decryptionError: decryptionError ?? this.decryptionError,
@@ -192,6 +210,11 @@ class Message {
 
   /// Check if message display is loading (sending or decrypting)
   bool get isLoading => isSending;
+
+  bool get hasReceiptTracking =>
+      recipientId != null || (recipientCount != null && recipientCount! > 0);
+
+  bool get isGroupReceiptTracking => recipientId == null && (recipientCount ?? 0) > 0;
 
   /// Check if message display should show an error state
   bool get hasError => error != null || decryptionError != null;

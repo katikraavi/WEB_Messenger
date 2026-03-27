@@ -1,10 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter/foundation.dart';
 import '../models/chat_model.dart';
 import 'chats_provider.dart';
 import '../services/message_websocket_service.dart';
-import '../services/message_encryption_service.dart';
-import '../models/message_model.dart';
 import 'dart:convert';
 
 /// Provider for active (unarchived) chats
@@ -41,6 +38,10 @@ final activeChatListProvider = StreamProvider.family<List<Chat>, String>((ref, t
         lastMessageTimestamp: msg.createdAt,
         lastMessageSenderAvatarUrl: msg.senderId,
         lastMessageStatus: msg.status,
+        chatType: chat.chatType,
+        displayName: chat.displayName,
+        memberCount: chat.memberCount,
+        myRole: chat.myRole,
       );
     }
     return chat;
@@ -82,6 +83,10 @@ final activeChatListProvider = StreamProvider.family<List<Chat>, String>((ref, t
                 lastMessageTimestamp: msg.createdAt,
                 lastMessageSenderAvatarUrl: msg.senderId,
                 lastMessageStatus: msg.status,
+                chatType: chat.chatType,
+                displayName: chat.displayName,
+                memberCount: chat.memberCount,
+                myRole: chat.myRole,
               );
             }
             return chat;
@@ -96,7 +101,6 @@ final activeChatListProvider = StreamProvider.family<List<Chat>, String>((ref, t
         }
       } catch (e) {
         // Skip errors (e.g., 403 if user is not a participant in this chat)
-        debugPrint('[ActiveChatListProvider] Error fetching messages for chat $chatId: $e');
       }
     }
   }
@@ -104,8 +108,6 @@ final activeChatListProvider = StreamProvider.family<List<Chat>, String>((ref, t
 
 /// Provider for archived chats
 final archivedChatListProvider = FutureProvider.family<List<Chat>, String>((ref, token) async {
-  // Get all chats
-  final chats = await ref.watch(chatsProvider(token).future);
   // Filter to archived (would need to know current user ID from UI)
   return [];
 });

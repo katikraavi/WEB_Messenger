@@ -1,31 +1,35 @@
 #!/usr/bin/env dart
+
 import 'package:postgres/postgres.dart';
 import 'dart:io';
 import 'dart:async';
 
 // Import migration runner
+import '../lib/src/database/database_connection_config.dart';
 import '../lib/src/services/migration_runner.dart';
 
 void main() async {
-  final databaseUrl = Platform.environment['DATABASE_URL'] ??
-      'postgres://messenger_user:messenger_password@localhost:5432/messenger_db';
+  final databaseConfig = DatabaseConnectionConfig.fromEnvironment(
+    Platform.environment,
+  );
 
   print('[INFO] Running database migrations...');
-  print('[INFO] Database URL: ${_maskPassword(databaseUrl)}\n');
+  print('[INFO] Database target: ${databaseConfig.maskedDescription}');
+  print(
+    '[INFO] SSL mode: ${databaseConfig.requireSsl ? 'require' : 'disable'}\n',
+  );
 
   try {
-    // Parse database URL
-    final uri = Uri.parse(databaseUrl);
     final connection = await Connection.open(
       Endpoint(
-        host: uri.host,
-        port: uri.port,
-        database: uri.pathSegments.isNotEmpty ? uri.pathSegments.first : 'messenger_db',
-        username: uri.userInfo.split(':').first,
-        password: uri.userInfo.split(':').last,
+        host: databaseConfig.host,
+        port: databaseConfig.port,
+        database: databaseConfig.database,
+        username: databaseConfig.username,
+        password: databaseConfig.password,
       ),
       settings: ConnectionSettings(
-        sslMode: SslMode.disable,
+        sslMode: databaseConfig.requireSsl ? SslMode.require : SslMode.disable,
       ),
     );
 
@@ -59,15 +63,4 @@ void main() async {
     print('[ERROR] Migration failed: $e');
     exit(1);
   }
-}
-
-/// Mask password in database URL for logging
-String _maskPassword(String url) {
-  if (!url.contains('@')) return url;
-  final parts = url.split('@');
-  if (parts[0].contains(':')) {
-    final userpass = parts[0].split(':');
-    return '${userpass[0]}:***@${parts[1]}';
-  }
-  return url;
 }

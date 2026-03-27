@@ -14,6 +14,11 @@ class Chat {
   final DateTime? lastMessageTimestamp; // For ordering
   final String? lastMessageSenderAvatarUrl; // For avatar preview
   final String? lastMessageStatus; // For unread/bold logic
+  final String chatType;
+  final String? displayName;
+  final int? memberCount;
+  final List<String>? participantNames;
+  final String? myRole;
 
   const Chat({
     required this.id,
@@ -27,6 +32,11 @@ class Chat {
     this.lastMessageTimestamp,
     this.lastMessageSenderAvatarUrl,
     this.lastMessageStatus,
+    this.chatType = 'direct',
+    this.displayName,
+    this.memberCount,
+    this.participantNames,
+    this.myRole,
   });
 
   /// JSON deserialization factory
@@ -47,6 +57,15 @@ class Chat {
         : null,
       lastMessageSenderAvatarUrl: json['last_message_sender_avatar_url'] as String?,
       lastMessageStatus: json['last_message_status'] as String?,
+      chatType: json['chat_type'] as String? ?? 'direct',
+      displayName: json['display_name'] as String?,
+      memberCount: json['member_count'] as int?,
+      participantNames: (json['participant_names'] as List<dynamic>?)
+          ?.whereType<String>()
+          .map((name) => name.trim())
+          .where((name) => name.isNotEmpty)
+          .toList(),
+      myRole: json['my_role'] as String?,
     );
   }
 
@@ -63,10 +82,20 @@ class Chat {
     'last_message_timestamp': lastMessageTimestamp?.toIso8601String(),
     'last_message_sender_avatar_url': lastMessageSenderAvatarUrl,
     'last_message_status': lastMessageStatus,
+    'chat_type': chatType,
+    'display_name': displayName,
+    'member_count': memberCount,
+    'participant_names': participantNames,
+    'my_role': myRole,
   };
+
+  bool get isGroup => chatType == 'group';
 
   /// Get the other participant's ID for the current user
   String getOtherId(String currentUserId) {
+    if (isGroup) {
+      return participant2Id;
+    }
     if (currentUserId == participant1Id) return participant2Id;
     if (currentUserId == participant2Id) return participant1Id;
     throw ArgumentError('Current user $currentUserId is not in this chat');

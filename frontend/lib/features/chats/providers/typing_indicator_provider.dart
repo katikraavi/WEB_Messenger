@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import './websocket_provider.dart';
-import '../../auth/providers/auth_provider.dart';
 
 /// Typing indicator state provider (T046, US3)
 ///
@@ -165,31 +164,22 @@ final otherUsersTypingProvider = FutureProvider.family<List<TypingUser>, String>
 /// This connects real-time typing events from WebSocket to the typing indicator UI
 final typingIndicatorUpdatesProvider =
     StreamProvider.autoDispose<void>((ref) async* {
-  print('[TypingIndicatorUpdates] 📡 Started watching typing indicators stream');
   
   final webSocket = ref.watch(messageWebSocketProvider);
-  print('[TypingIndicatorUpdates] ✓ Got WebSocket service');
   
   await for (final typingEvent in webSocket.typingIndicators) {
-    print('[TypingIndicatorUpdates] 📨 Received typing event: $typingEvent');
     
-    final (:userId, :chatId, :isTyping) = typingEvent;
+    final (:userId, :username, :chatId, :isTyping) = typingEvent;
 
-    print(
-        '[TypingIndicatorUpdates] 🎹 ${isTyping ? 'Start' : 'Stop'} typing: $userId in chat $chatId');
 
     final notifier = ref.read(typingIndicatorProvider.notifier);
 
     if (isTyping) {
-      // For now, use userId as username since we don't have it in the event
-      // Backend should send username in the typing indicator data
-      notifier.handleTypingStart(chatId, userId, 'User $userId');
-      print('[TypingIndicatorUpdates] ✓ Added $userId to typing list for chat $chatId');
+      // Use username from backend typing event
+      notifier.handleTypingStart(chatId, userId, username);
     } else {
       notifier.handleTypingStop(chatId, userId);
-      print('[TypingIndicatorUpdates] ✓ Removed $userId from typing list for chat $chatId');
     }
   }
   
-  print('[TypingIndicatorUpdates] ⚠️  Typing indicators stream closed');
 });

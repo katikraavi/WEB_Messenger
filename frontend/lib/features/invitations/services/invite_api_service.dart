@@ -25,16 +25,12 @@ class InviteApiService {
   /// Get auth token (always read fresh from storage to handle auth switches)
   Future<String?> _getAuthToken() async {
     try {
-      print('[InviteApiService] Reading auth token from secure storage...');
       final token = await _secureStorage.read(key: 'auth_token');
       if (token != null) {
-        print('[InviteApiService] ✅ Auth token loaded successfully');
       } else {
-        print('[InviteApiService] ⚠️  No auth token found in secure storage');
       }
       return token;
     } catch (e) {
-      print('[InviteApiService] ❌ Error reading auth token: $e');
       return null;
     }
   }
@@ -42,16 +38,12 @@ class InviteApiService {
   /// Get user ID (always read fresh from storage to handle auth switches)
   Future<String?> _getUserId() async {
     try {
-      print('[InviteApiService] Reading user ID from secure storage...');
       final userId = await _secureStorage.read(key: 'user_id');
       if (userId != null) {
-        print('[InviteApiService] ✅ User ID loaded: $userId');
       } else {
-        print('[InviteApiService] ⚠️  No user ID found in secure storage');
       }
       return userId;
     } catch (e) {
-      print('[InviteApiService] ❌ Error reading user ID: $e');
       return null;
     }
   }
@@ -65,7 +57,6 @@ class InviteApiService {
     try {
       final token = await _getAuthToken();
       
-      print('[InviteApiService] Sending invite to recipient: $recipientId');
       
       // Try POST /api/invites first (generic endpoint) with timeout
       final response = await _makeRequest(
@@ -76,7 +67,6 @@ class InviteApiService {
         ),
       );
 
-      print('[InviteApiService] Send invite response: ${response.statusCode}');
 
       if (response.statusCode == 201) {
         final json = jsonDecode(response.body) as Map<String, dynamic>;
@@ -114,7 +104,6 @@ class InviteApiService {
       
       if (userId == null) {
         // Return empty list during logout/auth transitions
-        print('[InviteApiService] ⚠️  User ID not available, returning empty pending invites list');
         return [];
       }
       
@@ -122,35 +111,21 @@ class InviteApiService {
       final url = Uri.parse('$_baseUrl/api/users/$userId/invites/pending');
       final headers = _buildHeaders(token);
       
-      print('[InviteApiService] ===== PENDING INVITES REQUEST =====');
-      print('[InviteApiService] URL: $url');
-      print('[InviteApiService] User ID: $userId');
-      print('[InviteApiService] Token present: ${token != null}');
-      print('[InviteApiService] ====================================');
       
       final response = await _httpClient.get(url, headers: headers);
 
-      print('[InviteApiService] Response status: ${response.statusCode}');
       
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body) as List<dynamic>;
-        print('[InviteApiService] ✅ Parsed ${json.length} pending invites');
         return json.map((item) => _parseInvite(item as Map<String, dynamic>)).toList();
       } else if (response.statusCode == 401) {
-        print('[InviteApiService] ❌ 401 Unauthorized - invalid or missing token');
         throw HttpException('Unauthorized', response.statusCode);
       } else if (response.statusCode == 404) {
-        print('[InviteApiService] ❌ 404 Not Found');
-        print('[InviteApiService] Full URL attempted: $url');
-        print('[InviteApiService] Response body: ${response.body}');
         throw HttpException('Endpoint not found: /api/users/$userId/invites/pending', response.statusCode);
       } else {
-        print('[InviteApiService] ❌ Unexpected status: ${response.statusCode}');
-        print('[InviteApiService] Response body: ${response.body}');
         throw HttpException('Failed to fetch pending invites: ${response.statusCode}', response.statusCode);
       }
     } catch (e) {
-      print('[InviteApiService] ❌ Exception in fetchPendingInvites: $e');
       rethrow;
     }
   }
@@ -167,7 +142,6 @@ class InviteApiService {
       
       if (userId == null) {
         // Return empty list during logout/auth transitions
-        print('[InviteApiService] ⚠️  User ID not available, returning empty sent invites list');
         return [];
       }
       
@@ -184,7 +158,6 @@ class InviteApiService {
       } else if (response.statusCode == 401) {
         throw HttpException('Unauthorized', response.statusCode);
       } else if (response.statusCode == 404) {
-        print('[InviteApiService] ℹ️  /api/users/$userId/invites/sent endpoint returned 404');
         // Return empty list as fallback
         return [];
       } else {
@@ -204,14 +177,12 @@ class InviteApiService {
     try {
       final token = await _getAuthToken();
       
-      print('[InviteApiService] Accepting invite: $inviteId');
       
       final response = await _httpClient.post(
         Uri.parse('$_baseUrl/api/invites/$inviteId/accept'),
         headers: _buildHeaders(token),
       );
 
-      print('[InviteApiService] Accept response: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body) as Map<String, dynamic>;
@@ -237,14 +208,12 @@ class InviteApiService {
     try {
       final token = await _getAuthToken();
       
-      print('[InviteApiService] Declining invite: $inviteId');
       
       final response = await _httpClient.post(
         Uri.parse('$_baseUrl/api/invites/$inviteId/decline'),
         headers: _buildHeaders(token),
       );
 
-      print('[InviteApiService] Decline response: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body) as Map<String, dynamic>;
@@ -270,14 +239,12 @@ class InviteApiService {
     try {
       final token = await _getAuthToken();
       
-      print('[InviteApiService] Canceling invite: $inviteId');
       
       final response = await _httpClient.post(
         Uri.parse('$_baseUrl/api/invites/$inviteId/cancel'),
         headers: _buildHeaders(token),
       );
 
-      print('[InviteApiService] Cancel response: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body) as Map<String, dynamic>;
@@ -308,7 +275,6 @@ class InviteApiService {
       
       if (userId == null) {
         // Return 0 during logout/auth transitions
-        print('[InviteApiService] ⚠️  User ID not available, returning 0 for pending invite count');
         return 0;
       }
       
@@ -325,7 +291,6 @@ class InviteApiService {
       } else if (response.statusCode == 401) {
         throw HttpException('Unauthorized', response.statusCode);
       } else if (response.statusCode == 404) {
-        print('[InviteApiService] ℹ️  Pending count endpoint returned 404, falling back to fetching all pending invites');
         // Fallback to fetching all pending invites and returning length
         final invites = await fetchPendingInvites();
         return invites.length;

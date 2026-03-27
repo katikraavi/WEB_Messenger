@@ -23,7 +23,6 @@ class WebSocketNotifier extends StateNotifier<MessageWebSocketService> {
         baseUrl: 'ws://localhost:8081',
       );
     } catch (e) {
-      print('[WebSocketNotifier] Error connecting: $e');
       rethrow;
     }
   }
@@ -69,7 +68,7 @@ final messageEventStreamProvider =
 
 /// Stream of typing indicators
 final typingIndicatorsProvider =
-    StreamProvider.autoDispose<({String userId, String chatId, bool isTyping})>(
+    StreamProvider.autoDispose<({String userId, String username, String chatId, bool isTyping})>(
       (ref) {
   final webSocket = ref.watch(messageWebSocketProvider);
   return webSocket.typingIndicators;

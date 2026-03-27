@@ -1,10 +1,10 @@
 import 'dart:convert';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../../../utils/secure_storage_wrapper.dart';
 import '../models/user_profile.dart';
 
 /// Profile Cache Service for Offline Support [T131-T132]
 ///
-/// Provides local caching of profile data using flutter_secure_storage
+/// Provides local caching of profile data using secure storage with Linux fallback
 /// Enables offline access when network unavailable
 ///
 /// Cache keys:
@@ -16,11 +16,11 @@ class ProfileCacheService {
   static const String _cacheKeyPrefix = 'profile_';
   static const String _timestampKeySuffix = '_timestamp';
   static const int _cacheTTLHours = 24; // Cache valid for 24 hours
-  
-  late final FlutterSecureStorage _storage;
 
-  ProfileCacheService({FlutterSecureStorage? storage})
-      : _storage = storage ?? const FlutterSecureStorage();
+  late final SecureStorageWrapper _storage;
+
+  ProfileCacheService({SecureStorageWrapper? storage})
+      : _storage = storage ?? SecureStorageWrapper();
 
   /// Save profile to local cache [T131]
   /// 
@@ -31,8 +31,8 @@ class ProfileCacheService {
   /// Returns: true if successful, false otherwise
   Future<bool> cacheProfile(String userId, UserProfile profile) async {
     try {
-      final cacheKey = '${_cacheKeyPrefix}${userId}';
-      final timestampKey = '${_cacheKeyPrefix}${userId}${_timestampKeySuffix}';
+      final cacheKey = '$_cacheKeyPrefix$userId';
+      final timestampKey = '$_cacheKeyPrefix$userId$_timestampKeySuffix';
       
       // Serialize profile to JSON
       final jsonString = jsonEncode(profile.toJson());
@@ -48,7 +48,6 @@ class ProfileCacheService {
       
       return true;
     } catch (e) {
-      print('[ProfileCacheService] Error caching profile: $e');
       return false;
     }
   }
@@ -63,8 +62,8 @@ class ProfileCacheService {
   ///   - null if not found or expired
   Future<UserProfile?> getCachedProfile(String userId) async {
     try {
-      final cacheKey = '${_cacheKeyPrefix}${userId}';
-      final timestampKey = '${_cacheKeyPrefix}${userId}${_timestampKeySuffix}';
+      final cacheKey = '$_cacheKeyPrefix$userId';
+      final timestampKey = '$_cacheKeyPrefix$userId$_timestampKeySuffix';
       
       // Retrieve profile JSON
       final jsonString = await _storage.read(key: cacheKey);
@@ -90,7 +89,6 @@ class ProfileCacheService {
       final json = jsonDecode(jsonString) as Map<String, dynamic>;
       return UserProfile.fromJson(json);
     } catch (e) {
-      print('[ProfileCacheService] Error retrieving cached profile: $e');
       return null;
     }
   }
@@ -98,15 +96,15 @@ class ProfileCacheService {
   /// Clear cache for specific user
   Future<void> clearCache(String userId) async {
     try {
-      final cacheKey = '${_cacheKeyPrefix}${userId}';
-      final timestampKey = '${_cacheKeyPrefix}${userId}${_timestampKeySuffix}';
+      final cacheKey = '$_cacheKeyPrefix$userId';
+      final timestampKey = '$_cacheKeyPrefix$userId$_timestampKeySuffix';
       
       await Future.wait([
         _storage.delete(key: cacheKey),
         _storage.delete(key: timestampKey),
       ]);
-    } catch (e) {
-      print('[ProfileCacheService] Error clearing cache: $e');
+    } catch (_) {
+      // Ignore cache cleanup failures.
     }
   }
 
@@ -114,16 +112,16 @@ class ProfileCacheService {
   Future<void> clearAllCache() async {
     try {
       await _storage.deleteAll();
-    } catch (e) {
-      print('[ProfileCacheService] Error clearing all cache: $e');
+    } catch (_) {
+      // Ignore cache cleanup failures.
     }
   }
 
   /// Check if cache is valid and not expired
   Future<bool> isCacheValid(String userId) async {
     try {
-      final cacheKey = '${_cacheKeyPrefix}${userId}';
-      final timestampKey = '${_cacheKeyPrefix}${userId}${_timestampKeySuffix}';
+      final cacheKey = '$_cacheKeyPrefix$userId';
+      final timestampKey = '$_cacheKeyPrefix$userId$_timestampKeySuffix';
       
       // Check if profile exists
       final json = await _storage.read(key: cacheKey);

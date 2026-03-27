@@ -5,8 +5,6 @@ import 'package:postgres/postgres.dart';
 import '../services/message_service.dart';
 import '../services/notification_service.dart';
 import '../services/websocket_service.dart';
-import '../models/message_model.dart';
-import '../models/enums.dart';
 
 typedef Connection = PostgreSQLConnection;
 
@@ -148,6 +146,9 @@ class MessageHandlers {
           'created_at': message.createdAt.toIso8601String(),
           'media_url': message.mediaUrl,
           'media_type': message.mediaType,
+          'recipient_count': message.recipientCount,
+          'delivered_count': message.deliveredCount,
+          'read_count': message.readCount,
           'sender_username': senderUsername,
           'sender_avatar_url': senderAvatarUrl,
         };
@@ -173,6 +174,22 @@ class MessageHandlers {
               mediaType: mediaType,
             ),
           );
+        } else {
+          final groupRecipients = await _listOtherGroupMemberIds(
+            connection,
+            chatId,
+            userId,
+          );
+
+          for (final memberId in groupRecipients) {
+            _webSocketService.notifyUser(
+              memberId,
+              WebSocketEvent(
+                type: WebSocketEventType.messageCreated,
+                data: messagePayload,
+              ),
+            );
+          }
         }
 
         return Response(
@@ -268,29 +285,35 @@ class MessageHandlers {
     Connection connection,
   ) async {
     try {
+      print('[MessageHandlers] ✏️ editMessage start: chatId=$chatId messageId=$messageId');
       // Get JWT token
-      final authHeader = request.headers['Authorization'];
+      final authHeader = request.headers['authorization'];
       final token = authHeader?.replaceFirst('Bearer ', '');
       if (token == null || token.isEmpty) {
+        print('[MessageHandlers] ✏️ Missing token for edit');
         return Response(401, body: jsonEncode({'error': 'Missing token'}));
       }
 
       // Extract user ID from token
       final userId = _extractUserIdFromToken(token);
       if (userId == null) {
+        print('[MessageHandlers] ✏️ Invalid token for edit');
         return Response(401, body: jsonEncode({'error': 'Invalid token'}));
       }
+      print('[MessageHandlers] ✏️ Authenticated edit user: $userId');
 
       // Check user is in chat
       final isParticipant =
           await _isUserChatParticipant(connection, chatId, userId);
       if (!isParticipant) {
+        print('[MessageHandlers] ✏️ User is not a participant in chat: chatId=$chatId userId=$userId');
         return Response(403,
             body: jsonEncode({'error': 'Not a participant in this chat'}));
       }
 
       // Parse request body
       final bodyString = await request.readAsString();
+      print('[MessageHandlers] ✏️ Edit request body: $bodyString');
       final bodyJson = jsonDecode(bodyString) as Map<String, dynamic>;
       final newContent = bodyJson['encrypted_content'] as String?;
 
@@ -308,6 +331,7 @@ class MessageHandlers {
         newEncryptedContent: newContent,
         editedByUserId: userId,
       );
+      print('[MessageHandlers] ✏️ Message edited successfully: $messageId');
 
       // Broadcast message.edited event via WebSocket (T050)
       final editedEvent = WebSocketEvent(
@@ -319,6 +343,19 @@ class MessageHandlers {
       return Response(200,
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode(editedMessage.toJson()));
+    } on ArgumentError catch (e) {
+      final message = e.message?.toString() ?? e.toString();
+      print('[MessageHandlers] ✏️ Edit validation error: $message');
+      final status = message.contains('not found')
+          ? 404
+          : message.contains('Only the message sender')
+              ? 403
+              : 400;
+      return Response(
+        status,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'error': message}),
+      );
     } catch (e) {
       print('[MessageHandlers] ❌ Edit message error: $e');
       return Response(500,
@@ -334,7 +371,7 @@ class MessageHandlers {
     String userId,
   ) async {
     try {
-      final result = await connection.query(
+      final directResult = await connection.query(
         r'SELECT EXISTS('
         r'  SELECT 1 FROM chats '
         r'  WHERE id = @chatId AND ('
@@ -344,9 +381,25 @@ class MessageHandlers {
         substitutionValues: {'chatId': chatId, 'userId': userId},
       );
 
-      if (result.isEmpty) return false;
+      if (directResult.isNotEmpty) {
+        final row = directResult.first.toColumnMap();
+        final isParticipant = row['is_participant'] as bool? ?? false;
+        if (isParticipant) {
+          return true;
+        }
+      }
 
-      final row = result.first.toColumnMap();
+      final groupResult = await connection.query(
+        r'SELECT EXISTS('
+        r'  SELECT 1 FROM group_members '
+        r'  WHERE group_id = @chatId AND user_id = @userId'
+        r') as is_participant',
+        substitutionValues: {'chatId': chatId, 'userId': userId},
+      );
+
+      if (groupResult.isEmpty) return false;
+
+      final row = groupResult.first.toColumnMap();
       return row['is_participant'] as bool? ?? false;
     } catch (e) {
 //       print('[MessageHandlers] Error checking participant: $e');
@@ -377,23 +430,28 @@ class MessageHandlers {
     Connection connection,
   ) async {
     try {
+      print('[MessageHandlers] 🗑️ deleteMessage start: chatId=$chatId messageId=$messageId');
       // Get JWT token
-      final authHeader = request.headers['Authorization'];
+      final authHeader = request.headers['authorization'];
       final token = authHeader?.replaceFirst('Bearer ', '');
       if (token == null || token.isEmpty) {
+        print('[MessageHandlers] 🗑️ Missing token for delete');
         return Response(401, body: jsonEncode({'error': 'Missing token'}));
       }
 
       // Extract user ID from token
       final userId = _extractUserIdFromToken(token);
       if (userId == null) {
+        print('[MessageHandlers] 🗑️ Invalid token for delete');
         return Response(401, body: jsonEncode({'error': 'Invalid token'}));
       }
+      print('[MessageHandlers] 🗑️ Authenticated delete user: $userId');
 
       // Check user is in chat
       final isParticipant =
           await _isUserChatParticipant(connection, chatId, userId);
       if (!isParticipant) {
+        print('[MessageHandlers] 🗑️ User is not a participant in chat: chatId=$chatId userId=$userId');
         return Response(403,
             body: jsonEncode({'error': 'Not a participant in this chat'}));
       }
@@ -406,6 +464,7 @@ class MessageHandlers {
         messageId,
         userId,
       );
+      print('[MessageHandlers] 🗑️ Message deleted successfully: $messageId');
 
       // Fetch updated message to broadcast
       final deletedMessage = await messageService.getMessageById(messageId);
@@ -421,6 +480,19 @@ class MessageHandlers {
       _webSocketService.broadcastToChat(chatId, deletedEvent);
 
       return Response(204);
+    } on ArgumentError catch (e) {
+      final message = e.message?.toString() ?? e.toString();
+      print('[MessageHandlers] 🗑️ Delete validation error: $message');
+      final status = message.contains('not found')
+          ? 404
+          : message.contains('Only the message sender')
+              ? 403
+              : 400;
+      return Response(
+        status,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'error': message}),
+      );
     } catch (e) {
       print('[MessageHandlers] ❌ Delete message error: $e');
       return Response(500,
@@ -506,12 +578,22 @@ class MessageHandlers {
         newStatus,
       );
 
+      final receiptSummary = await messageService.getReceiptSummary(messageId);
+      final aggregateStatus = receiptSummary['aggregate_status'] as String? ?? newStatus;
+      final recipientCount = receiptSummary['recipient_count'] as int? ?? 0;
+      final deliveredCount = receiptSummary['delivered_count'] as int? ?? 0;
+      final readCount = receiptSummary['read_count'] as int? ?? 0;
+
       // Broadcast status change via WebSocket so other user sees it immediately
       final statusEvent = WebSocketEvent(
         type: WebSocketEventType.messageStatusChanged,
         data: {
           'messageId': messageId,
           'newStatus': newStatus,
+          'aggregateStatus': aggregateStatus,
+          'recipientCount': recipientCount,
+          'deliveredCount': deliveredCount,
+          'readCount': readCount,
           'updatedBy': userId,
           'timestamp': DateTime.now().toIso8601String(),
         },
@@ -521,7 +603,10 @@ class MessageHandlers {
       return Response(200,
           body: jsonEncode({
             'messageId': messageId,
-            'status': newStatus,
+            'status': aggregateStatus,
+            'recipient_count': recipientCount,
+            'delivered_count': deliveredCount,
+            'read_count': readCount,
             'timestamp': DateTime.now().toIso8601String(),
           }),
           headers: {'Content-Type': 'application/json'});
@@ -531,5 +616,23 @@ class MessageHandlers {
           body: jsonEncode(
               {'error': 'Failed to update message status: ${e.toString()}'}));
     }
+  }
+
+  static Future<List<String>> _listOtherGroupMemberIds(
+    Connection connection,
+    String groupId,
+    String senderId,
+  ) async {
+    final result = await connection.query(
+      '''SELECT user_id
+         FROM group_members
+         WHERE group_id = @group_id AND user_id != @sender_id''',
+      substitutionValues: {
+        'group_id': groupId,
+        'sender_id': senderId,
+      },
+    );
+
+    return result.map((row) => row[0] as String).toList();
   }
 }

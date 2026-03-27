@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/core/services/api_client.dart';
 import 'package:frontend/core/notifications/app_feedback_service.dart';
 import '../models/message_model.dart';
 import '../services/chat_api_service.dart';
@@ -24,7 +25,7 @@ final messagesProvider =
       }
 
       // Get API service
-      final apiService = ChatApiService(baseUrl: 'http://localhost:8081');
+      final apiService = ChatApiService(baseUrl: ApiClient.getBaseUrl());
 
       // Fetch messages for this chat
       try {
@@ -35,7 +36,6 @@ final messagesProvider =
         );
         return messages;
       } catch (e) {
-        print('[MessagesProvider] Error fetching messages: $e');
         rethrow;
       }
     });
@@ -60,15 +60,9 @@ class LocalMessagesNotifier extends StateNotifier<List<Message>> {
   /// Set whether this chat is currently being viewed by the user
   void setChatBeingViewed(bool isActive) {
     _isViewerActive = isActive;
-    print(
-      '[LocalMessagesNotifier] 👁️ Chat $chatId viewer active: $_isViewerActive',
-    );
 
     // When viewer becomes active, mark all current unread messages as read
     if (isActive) {
-      print(
-        '[LocalMessagesNotifier] 📖 Viewer activated - marking all unread messages as read',
-      );
       markAllUnreadAsRead();
     }
   }
@@ -76,17 +70,17 @@ class LocalMessagesNotifier extends StateNotifier<List<Message>> {
   /// Mark all currently unread messages as read (called when chat becomes visible)
   Future<void> markAllUnreadAsRead() async {
     final unreadMessages = state
-        .where((m) => m.status != 'read' && m.senderId != currentUserId)
+        .where(
+          (m) =>
+              m.status != 'read' &&
+              m.senderId != currentUserId,
+        )
         .toList();
 
     if (unreadMessages.isEmpty) {
-      print('[LocalMessagesNotifier] ℹ️ No unread messages to mark');
       return;
     }
 
-    print(
-      '[LocalMessagesNotifier] 📋 Marking ${unreadMessages.length} unread messages as read',
-    );
 
     // Mark each unread message as read
     for (final message in unreadMessages) {
@@ -102,7 +96,6 @@ class LocalMessagesNotifier extends StateNotifier<List<Message>> {
     try {
       await loadMessagesFromServer();
     } catch (e) {
-      print('[LocalMessagesNotifier] ❌ Error during initialization: $e');
     }
   }
 
@@ -113,7 +106,6 @@ class LocalMessagesNotifier extends StateNotifier<List<Message>> {
         await _handleWebSocketEvent(event);
       },
       onError: (error) {
-        print('[LocalMessagesNotifier] ⚠️ WebSocket stream error: $error');
       },
       cancelOnError: false,
     );
@@ -124,55 +116,39 @@ class LocalMessagesNotifier extends StateNotifier<List<Message>> {
     try {
       // Only process messages for this chat
       if (event.chatId != chatId) {
-        print(
-          '[LocalMessagesNotifier] ⏭️ Ignoring event for different chat: ${event.chatId} != $chatId',
-        );
         return;
       }
 
       // Skip typing indicators FIRST - they come as messageCreated events but aren't real messages
       if (event.data.containsKey('type') &&
           event.data['type'] == 'typing_indicator') {
-        print('[LocalMessagesNotifier] ⏭️ Skipping typing indicator');
         return;
       }
 
-      print(
-        '[LocalMessagesNotifier] 📥 Received WebSocket event for chat $chatId (type: ${event.type})',
-      );
 
       // Handle new messages
       if (event.type == WebSocketEventType.messageCreated) {
         try {
           // Parse the message
           final message = Message.fromJson(event.data);
-          print('[LocalMessagesNotifier] ✅ Parsed message: ${message.id}');
 
           // Decrypt if encrypted (messages from WebSocket arrive encrypted)
+          // IMPORTANT: Use senderId (who encrypted it), not currentUserId (who's receiving it)
           if (!message.isDecrypted && message.encryptedContent.isNotEmpty) {
             try {
               final decryptedMessage =
-                  await MessageEncryptionService.decryptMessage(message);
-              print(
-                '[LocalMessagesNotifier] 🔓 Decrypted message: ${message.id}',
-              );
+                  await MessageEncryptionService.decryptMessage(
+                    message,
+                    userId: message.senderId,
+                  );
               addMessage(decryptedMessage);
 
               // AUTO-READ: If new message from other user AND chat is being viewed, mark as read
               if (decryptedMessage.senderId != currentUserId &&
                   _isViewerActive) {
-                print(
-                  '[LocalMessagesNotifier] 🔵 Incoming message from other user while chat active: ${decryptedMessage.senderId}',
-                );
-                print(
-                  '[LocalMessagesNotifier] 🟨 Auto-marking as read: ${decryptedMessage.id}',
-                );
                 markAsReadAndBroadcast(decryptedMessage.id, chatId);
               }
             } catch (decryptError) {
-              print(
-                '[LocalMessagesNotifier] ❌ Decryption failed: $decryptError',
-              );
               // Add message with decryption error
               addMessage(message);
             }
@@ -180,41 +156,50 @@ class LocalMessagesNotifier extends StateNotifier<List<Message>> {
             addMessage(message);
             // AUTO-READ: If new message from other user AND chat is being viewed, mark as read
             if (message.senderId != currentUserId && _isViewerActive) {
-              print(
-                '[LocalMessagesNotifier] 🔵 Incoming message from other user while chat active: ${message.senderId}',
-              );
-              print(
-                '[LocalMessagesNotifier] 🟨 Auto-marking as read: ${message.id}',
-              );
               markAsReadAndBroadcast(message.id, chatId);
             }
           }
         } catch (parseError) {
-          print('[LocalMessagesNotifier] ❌ Error parsing message: $parseError');
-          print('[LocalMessagesNotifier] Event data: ${event.data}');
         }
       }
       // Handle message status updates (sent, delivered, read)
       else if (event.type == WebSocketEventType.messageStatusChanged) {
         final messageId = event.data['messageId'] as String?;
         final newStatus = event.data['newStatus'] as String?;
+        final aggregateStatus = event.data['aggregateStatus'] as String?;
+        final recipientCount = event.data['recipientCount'] as int?;
+        final deliveredCount = event.data['deliveredCount'] as int?;
+        final readCount = event.data['readCount'] as int?;
 
         if (messageId != null && newStatus != null) {
-          print(
-            '[LocalMessagesNotifier] 📨 Status update: $messageId → $newStatus',
+          updateMessageStatus(
+            messageId,
+            newStatus,
+            aggregateStatus: aggregateStatus,
+            recipientCount: recipientCount,
+            deliveredCount: deliveredCount,
+            readCount: readCount,
           );
-          updateMessageStatus(messageId, newStatus);
         }
+      } else if (event.type == WebSocketEventType.messageEdited) {
+        final message = Message.fromJson(event.data);
+        final decryptedMessage = await MessageEncryptionService.decryptMessage(
+          message,
+          userId: currentUserId,
+        );
+        upsertMessage(decryptedMessage);
+      } else if (event.type == WebSocketEventType.messageDeleted) {
+        final message = Message.fromJson(event.data);
+        upsertMessage(message.copyWith(decryptedContent: '[Message deleted]'));
       }
     } catch (e) {
-      print('[LocalMessagesNotifier] ❌ Error handling WebSocket event: $e');
     }
   }
 
   /// Load messages from server
   Future<void> loadMessagesFromServer() async {
     try {
-      final apiService = ChatApiService(baseUrl: 'http://localhost:8081');
+      final apiService = ChatApiService(baseUrl: ApiClient.getBaseUrl());
 
       final messages = await apiService.fetchMessages(
         token: token,
@@ -222,13 +207,11 @@ class LocalMessagesNotifier extends StateNotifier<List<Message>> {
         limit: 50,
       );
 
-      print(
-        '[LocalMessagesNotifier] 📥 Fetched ${messages.length} messages from server',
-      );
 
-      // Decrypt messages
+      // Decrypt messages using AES-256-GCM with user-specific key
       final decryptedMessages = await MessageEncryptionService.decryptMessages(
         messages,
+        userId: currentUserId,
       );
 
       // Sort by time (oldest first)
@@ -237,9 +220,6 @@ class LocalMessagesNotifier extends StateNotifier<List<Message>> {
       // Only set state if we haven't already added any WebSocket messages
       if (state.isEmpty) {
         state = decryptedMessages;
-        print(
-          '[LocalMessagesNotifier] ✅ Set initial ${decryptedMessages.length} messages',
-        );
       } else {
         // Merge: add server messages that aren't already in state (from WebSocket)
         for (final msg in decryptedMessages) {
@@ -247,21 +227,14 @@ class LocalMessagesNotifier extends StateNotifier<List<Message>> {
             addMessage(msg);
           }
         }
-        print(
-          '[LocalMessagesNotifier] ✅ Merged ${decryptedMessages.length} messages (${state.length} total)',
-        );
       }
 
       // If the user is currently viewing this chat, ensure any unread incoming
       // messages loaded from server are immediately marked as read.
       if (_isViewerActive) {
-        print(
-          '[LocalMessagesNotifier] 👁️ Viewer active after load - marking unread messages as read',
-        );
         await markAllUnreadAsRead();
       }
     } catch (e) {
-      print('[LocalMessagesNotifier] ❌ Error loading messages: $e');
       AppFeedbackService.showWarning(
         state.isEmpty
             ? 'Could not load messages. Pull to retry.'
@@ -285,21 +258,7 @@ class LocalMessagesNotifier extends StateNotifier<List<Message>> {
         state = updatedMessages;
 
         // Debug: print message order
-        print('[LocalMessagesNotifier] ✅ Added new message: ${message.id}');
-        print('[LocalMessagesNotifier] 📊 Message order (first 2, last 2):');
         if (state.length > 3) {
-          print(
-            '[LocalMessagesNotifier]   Index 0: ${state[0].id} - ${state[0].createdAt}',
-          );
-          print(
-            '[LocalMessagesNotifier]   Index 1: ${state[1].id} - ${state[1].createdAt}',
-          );
-          print(
-            '[LocalMessagesNotifier]   Index ${state.length - 2}: ${state[state.length - 2].id} - ${state[state.length - 2].createdAt}',
-          );
-          print(
-            '[LocalMessagesNotifier]   Index ${state.length - 1}: ${state[state.length - 1].id} - ${state[state.length - 1].createdAt}',
-          );
         }
 
         // Mark RECEIVED messages as delivered immediately
@@ -312,9 +271,6 @@ class LocalMessagesNotifier extends StateNotifier<List<Message>> {
           _markMessageAsDelivered(message.id);
         }
       } else {
-        print(
-          '[LocalMessagesNotifier] ℹ️ Message already exists: ${message.id}',
-        );
       }
     }
   }
@@ -322,7 +278,7 @@ class LocalMessagesNotifier extends StateNotifier<List<Message>> {
   /// Mark a message as delivered via API
   void _markMessageAsDelivered(String messageId) {
     // Call the API to mark as delivered
-    ChatApiService(baseUrl: 'http://localhost:8081')
+    ChatApiService(baseUrl: ApiClient.getBaseUrl())
         .updateMessageStatus(
           token: token,
           chatId: chatId,
@@ -330,12 +286,8 @@ class LocalMessagesNotifier extends StateNotifier<List<Message>> {
           newStatus: 'delivered',
         )
         .then((_) {
-          print('[LocalMessagesNotifier] 📦 Marked $messageId as delivered');
         })
         .catchError((e) {
-          print(
-            '[LocalMessagesNotifier] ⚠️ Error marking $messageId as delivered: $e',
-          );
         });
   }
 
@@ -347,9 +299,6 @@ class LocalMessagesNotifier extends StateNotifier<List<Message>> {
     }
     messages.sort((a, b) => a.createdAt.compareTo(b.createdAt)); // Oldest first
     state = messages;
-    print(
-      '[LocalMessagesNotifier] ✓ Replaced optimistic message $tempId with ${serverMessage.id}',
-    );
   }
 
   void upsertMessage(Message message) {
@@ -359,13 +308,25 @@ class LocalMessagesNotifier extends StateNotifier<List<Message>> {
       updatedMessages[index] = message;
       updatedMessages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
       state = updatedMessages;
-      print(
-        '[LocalMessagesNotifier] 🔄 Updated existing message: ${message.id}',
-      );
       return;
     }
 
     addMessage(message);
+  }
+
+  void markMessageDeleted(String messageId) {
+    final index = state.indexWhere((message) => message.id == messageId);
+    if (index < 0) {
+      return;
+    }
+
+    final updatedMessages = [...state];
+    updatedMessages[index] = updatedMessages[index].copyWith(
+      isDeleted: true,
+      deletedAt: DateTime.now().toUtc(),
+      decryptedContent: '[Message deleted]',
+    );
+    state = updatedMessages;
   }
 
   /// Status hierarchy: sent (0) < delivered (1) < read (2)
@@ -378,66 +339,70 @@ class LocalMessagesNotifier extends StateNotifier<List<Message>> {
   }
 
   /// Update message status - only allow status upgrades (sent → delivered → read), never downgrades
-  void updateMessageStatus(String messageId, String newStatus) {
+  void updateMessageStatus(
+    String messageId,
+    String newStatus, {
+    String? aggregateStatus,
+    int? recipientCount,
+    int? deliveredCount,
+    int? readCount,
+  }) {
     final index = state.indexWhere((m) => m.id == messageId);
     if (index >= 0) {
       final updated = state[index];
+      final nextStatus = updated.senderId == currentUserId
+          ? (aggregateStatus ?? newStatus)
+          : newStatus;
       final currentStatus = updated.status;
 
       // Only update if it's a genuine upgrade in status hierarchy
-      if (_isStatusUpgrade(currentStatus, newStatus)) {
-        print(
-          '[LocalMessagesNotifier] 📦 Status upgrade: $messageId $currentStatus → $newStatus',
-        );
+      if (_isStatusUpgrade(currentStatus, nextStatus)) {
         final newList = [...state];
         // Use copyWith to preserve all fields and just update status
-        newList[index] = updated.copyWith(status: newStatus);
+        newList[index] = updated.copyWith(
+          status: nextStatus,
+          recipientCount: recipientCount,
+          deliveredCount: deliveredCount,
+          readCount: readCount,
+        );
         state = newList;
-        print(
-          '[LocalMessagesNotifier] ✅ State updated for $messageId, new status: ${newList[index].status}',
+      } else if (currentStatus == nextStatus) {
+        final newList = [...state];
+        newList[index] = updated.copyWith(
+          recipientCount: recipientCount,
+          deliveredCount: deliveredCount,
+          readCount: readCount,
         );
-      } else if (currentStatus == newStatus) {
-        print(
-          '[LocalMessagesNotifier] ℹ️ Status already $currentStatus for $messageId, no change needed',
-        );
+        state = newList;
       } else {
-        print(
-          '[LocalMessagesNotifier] ⏸️ Skipping downgrade: $currentStatus → $newStatus for $messageId (keeping $currentStatus)',
-        );
       }
     } else {
-      print(
-        '[LocalMessagesNotifier] ⚠️ Message not found: $messageId (total messages: ${state.length})',
-      );
     }
   }
 
   /// Mark message as read AND call API (for incoming messages when chat is open)
   Future<void> markAsReadAndBroadcast(String messageId, String chatId) async {
     try {
-      print(
-        '[LocalMessagesNotifier] 🔴 markAsReadAndBroadcast called for $messageId',
-      );
+      final targetMessage = state.cast<Message?>().firstWhere(
+            (message) => message?.id == messageId,
+            orElse: () => null,
+          );
+      if (targetMessage == null) {
+        return;
+      }
 
       // First update local state
       updateMessageStatus(messageId, 'read');
 
       // Then call API to broadcast to sender
-      final apiService = ChatApiService(baseUrl: 'http://localhost:8081');
-      print(
-        '[LocalMessagesNotifier] 📤 Calling API to mark $messageId as read and broadcast...',
-      );
+      final apiService = ChatApiService(baseUrl: ApiClient.getBaseUrl());
       await apiService.updateMessageStatus(
         token: token,
         chatId: chatId,
         messageId: messageId,
         newStatus: 'read',
       );
-      print(
-        '[LocalMessagesNotifier] ✅ API call success: $messageId marked as read',
-      );
     } catch (e) {
-      print('[LocalMessagesNotifier] ⚠️ Error marking $messageId as read: $e');
     }
   }
 
@@ -445,7 +410,6 @@ class LocalMessagesNotifier extends StateNotifier<List<Message>> {
   @override
   void dispose() {
     _webSocketSubscription?.cancel();
-    print('[LocalMessagesNotifier] ✅ Disposed WebSocket subscription');
     super.dispose();
   }
 }
@@ -474,12 +438,8 @@ final localMessagesProvider =
       notifier
           .initialize()
           .then((_) {
-            print(
-              '[LocalMessagesProvider] ✅ Notifier initialized for chat ${params.chatId}',
-            );
           })
           .catchError((e) {
-            print('[LocalMessagesProvider] ❌ Initialization error: $e');
           });
 
       // Return the notifier - its state will be updated as messages load and arrive
@@ -512,49 +472,42 @@ final messagesWithCacheProvider =
         try {
           final webSocket = ref.watch(messageWebSocketProvider);
           webSocket.eventStream.listen((event) {
-            print(
-              '[MessagesWithCacheProvider] 📨 WebSocket event: ${event.type.name} for chat ${event.chatId}',
-            );
             if (event.chatId == chatId &&
                 (event.type == WebSocketEventType.messageCreated ||
                     event.type == WebSocketEventType.messageReceived)) {
-              print(
-                '[MessagesWithCacheProvider] 🔄 Invalidating cache for chat $chatId',
-              );
               ref
                   .read(messagesCacheInvalidatorProvider(chatId).notifier)
                   .state++;
             }
           });
         } catch (e) {
-          print('[MessagesWithCacheProvider] Error setting up listener: $e');
         }
       });
 
       // Fetch messages
-      final apiService = ChatApiService(baseUrl: 'http://localhost:8081');
+      final apiService = ChatApiService(baseUrl: ApiClient.getBaseUrl());
 
       try {
-        print(
-          '[MessagesWithCacheProvider] 🔄 Fetching messages for chat $chatId...',
-        );
         final messages = await apiService.fetchMessages(
           token: token,
           chatId: chatId,
           limit: 50,
         );
 
-        // Decrypt all messages using the encryption service
+        // Decrypt all messages using AES-256-GCM encryption service
+        // Note: We don't have access to currentUserId here in this provider,
+        // so we use the token to derive a temporary user context
         final encryptedMessages = messages;
+        // For now, use a placeholder - in production this should be retrieved from auth context
+        final currentUserId = 'user_from_token'; // TODO: Extract actual user ID from token
         final decryptedMessages =
-            await MessageEncryptionService.decryptMessages(encryptedMessages);
+            await MessageEncryptionService.decryptMessages(
+              encryptedMessages,
+              userId: currentUserId,
+            );
 
-        print(
-          '[MessagesWithCacheProvider] ✓ Fetched and decrypted ${decryptedMessages.length} messages',
-        );
         return decryptedMessages;
       } catch (e) {
-        print('[MessagesWithCacheProvider] Error fetching messages: $e');
         rethrow;
       }
     });
@@ -576,12 +529,9 @@ final editMessageProvider =
         throw Exception('User not authenticated');
       }
 
-      final apiService = ChatApiService(baseUrl: 'http://localhost:8081');
+      final apiService = ChatApiService(baseUrl: ApiClient.getBaseUrl());
 
       try {
-        print(
-          '[EditMessageProvider] 📝 Editing message $messageId with new content',
-        );
 
         final editedMessage = await apiService.editMessage(
           token: token,
@@ -590,7 +540,6 @@ final editMessageProvider =
           newEncryptedContent: newContent,
         );
 
-        print('[EditMessageProvider] ✓ Message edited successfully');
 
         // Invalidate messages cache to refresh
         ref.invalidate(
@@ -599,7 +548,6 @@ final editMessageProvider =
 
         return editedMessage;
       } catch (e) {
-        print('[EditMessageProvider] ❌ Error editing message: $e');
         rethrow;
       }
     });
@@ -617,10 +565,9 @@ final deleteMessageProvider =
         throw Exception('User not authenticated');
       }
 
-      final apiService = ChatApiService(baseUrl: 'http://localhost:8081');
+      final apiService = ChatApiService(baseUrl: ApiClient.getBaseUrl());
 
       try {
-        print('[DeleteMessageProvider] 🗑️ Deleting message $messageId');
 
         await apiService.deleteMessage(
           token: token,
@@ -628,14 +575,12 @@ final deleteMessageProvider =
           messageId: messageId,
         );
 
-        print('[DeleteMessageProvider] ✓ Message deleted successfully');
 
         // Invalidate messages cache to refresh
         ref.invalidate(
           messagesWithCacheProvider((chatId: chatId, token: token)),
         );
       } catch (e) {
-        print('[DeleteMessageProvider] ❌ Error deleting message: $e');
         rethrow;
       }
     });

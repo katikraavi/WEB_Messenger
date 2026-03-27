@@ -1,6 +1,6 @@
 import 'package:test/test.dart';
-import '../../lib/src/models/enums.dart';
-import '../../lib/src/services/user_service.dart';
+import 'package:messenger_server/src/models/enums.dart';
+import 'package:messenger_server/src/services/user_service.dart';
 
 void main() {
   group('UserService', () {

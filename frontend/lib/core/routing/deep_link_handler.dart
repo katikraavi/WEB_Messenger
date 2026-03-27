@@ -31,7 +31,6 @@ class DeepLinkHandler {
     //     print('[DeepLink] Error: $error');
     //   },
     // );
-    print('[DeepLink] Android deep link support not yet enabled');
   }
 
   /// Handle iOS deep links
@@ -48,7 +47,6 @@ class DeepLinkHandler {
     //     print('[DeepLink] Error: $error');
     //   },
     // );
-    print('[DeepLink] iOS deep link support not yet enabled');
   }
 
   /// Handle both Android and iOS deep links
@@ -56,7 +54,6 @@ class DeepLinkHandler {
   /// - messenger://verify?token=abc123
   /// - messenger://reset?token=abc123
   static void _handleDeepLink(BuildContext context, String link) {
-    print('[DeepLink] Received: $link');
 
     try {
       final uri = Uri.parse(link);
@@ -64,7 +61,6 @@ class DeepLinkHandler {
       // Email verification deep link
       if (uri.host == 'verify' && uri.queryParameters.containsKey('token')) {
         final token = uri.queryParameters['token']!;
-        print('[DeepLink] Email verification token: $token');
         _navigateToVerification(context, token);
         return;
       }
@@ -72,14 +68,11 @@ class DeepLinkHandler {
       // Password reset deep link
       if (uri.host == 'reset' && uri.queryParameters.containsKey('token')) {
         final token = uri.queryParameters['token']!;
-        print('[DeepLink] Password reset token: $token');
         _navigateToPasswordReset(context, token);
         return;
       }
 
-      print('[DeepLink] Unknown deep link: $link');
     } catch (e) {
-      print('[DeepLink] Error parsing deep link: $e');
     }
   }
 

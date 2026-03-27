@@ -1,14 +1,14 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
-import 'package:fvp/mdk.dart' as fvp_mdk;
 import 'package:media_kit/media_kit.dart';
+import 'package:frontend/core/services/api_client.dart';
+import 'package:video_player/video_player.dart';
 import '../models/message_model.dart';
 import './message_status_indicator.dart';
 import './user_avatar_widget.dart';
 
 /// Message bubble widget (T025, T040, T052, T054)
-/// 
+///
 /// Displays a message in a chat in a Material Design bubble
 /// with support for:
 /// - Sent vs received styling
@@ -20,6 +20,7 @@ import './user_avatar_widget.dart';
 /// - "(edited)" indicator for edited messages (T054)
 /// - Encryption indicator
 /// - Long content wrapping
+/// - Search result highlighting
 class MessageBubble extends StatelessWidget {
   final Message message;
   final String currentUserId;
@@ -27,12 +28,21 @@ class MessageBubble extends StatelessWidget {
   final VoidCallback? onRetry; // Callback to retry failed send
   final Function(String)? onEdit; // Callback for edit action (T052)
   final VoidCallback? onDelete; // Callback for delete action (T052)
-  
+
   /// Whether this is the last message from this sender in a group
   final bool isLastFromSender;
-  
+
   /// Whether this is the first message from this sender in a group
   final bool isFirstFromSender;
+
+  /// Whether this message is currently the focused search result
+  final bool isCurrentSearchResult;
+
+  /// Whether this message is a search result (but not the current one)
+  final bool isOtherSearchResult;
+
+  /// Search query to highlight in the message content
+  final String? searchQuery;
 
   const MessageBubble({
     super.key,
@@ -44,6 +54,9 @@ class MessageBubble extends StatelessWidget {
     this.onDelete,
     this.isLastFromSender = true,
     this.isFirstFromSender = true,
+    this.isCurrentSearchResult = false,
+    this.isOtherSearchResult = false,
+    this.searchQuery,
   });
 
   /// Check if message is sent by current user
@@ -52,19 +65,20 @@ class MessageBubble extends StatelessWidget {
   /// Get display content (decrypted if available)
   String get displayContent => message.getDisplayContent();
 
-  String get failureLabel => message.hasError
-      ? 'Not sent'
-      : 'Failed to send';
+  String get failureLabel => message.hasError ? 'Not sent' : 'Failed to send';
 
   @override
   Widget build(BuildContext context) {
     // Reduce padding for grouped messages from same sender
     final verticalPadding = isFirstFromSender ? 8.0 : 2.0;
-    
+
     return Align(
       alignment: isSentByUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: verticalPadding),
+        padding: EdgeInsets.symmetric(
+          horizontal: 16.0,
+          vertical: verticalPadding,
+        ),
         child: Row(
           mainAxisAlignment: isSentByUser
               ? MainAxisAlignment.end
@@ -79,7 +93,7 @@ class MessageBubble extends StatelessWidget {
                     ? _buildProfilePicture()
                     : SizedBox(width: 36), // Placeholder for alignment
               ),
-            
+
             // Message bubble column
             Flexible(
               child: Column(
@@ -88,7 +102,9 @@ class MessageBubble extends StatelessWidget {
                     : CrossAxisAlignment.start,
                 children: [
                   // Username - only show for first message in group from receiver
-                  if (!isSentByUser && isFirstFromSender && message.senderUsername != null)
+                  if (!isSentByUser &&
+                      isFirstFromSender &&
+                      message.senderUsername != null)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 4.0, left: 4.0),
                       child: Text(
@@ -109,18 +125,54 @@ class MessageBubble extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: _getBubbleColor(),
                         borderRadius: BorderRadius.circular(16),
-                        border: message.hasError ? Border.all(color: Colors.red.shade300, width: 1) : null,
-                        boxShadow: message.isSending
+                        border: isCurrentSearchResult
+                            ? Border.all(
+                                color: Colors.orange.shade600,
+                                width: 3,
+                              )
+                            : isOtherSearchResult
+                                ? Border.all(
+                                    color: Colors.amber.shade300,
+                                    width: 2,
+                                  )
+                                : message.hasError
+                                    ? Border.all(
+                                        color: Colors.red.shade300,
+                                        width: 1,
+                                      )
+                                    : null,
+                        boxShadow: isCurrentSearchResult
                             ? [
                                 BoxShadow(
-                                  color: Colors.blue.withValues(alpha: 0.3),
-                                  blurRadius: 4,
-                                  spreadRadius: 1,
-                                )
+                                  color: Colors.orange.withValues(alpha: 0.5),
+                                  blurRadius: 12,
+                                  spreadRadius: 2,
+                                ),
                               ]
-                            : null,
+                            : isOtherSearchResult
+                                ? [
+                                    BoxShadow(
+                                      color: Colors.amber.withValues(alpha: 0.3),
+                                      blurRadius: 8,
+                                      spreadRadius: 1,
+                                    ),
+                                  ]
+                                : message.isSending
+                                    ? [
+                                        BoxShadow(
+                                          color: Colors.blue.withValues(
+                                            alpha: 0.3,
+                                          ),
+                                          blurRadius: 4,
+                                          spreadRadius: 1,
+                                        ),
+                                      ]
+                                    : null,
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
                       child: Column(
                         crossAxisAlignment: isSentByUser
                             ? CrossAxisAlignment.end
@@ -129,29 +181,21 @@ class MessageBubble extends StatelessWidget {
                           // Media display (T077)
                           if (message.mediaUrl != null)
                             _buildMediaWidget(context),
-                          
+
                           // Message content
                           if (displayContent.isNotEmpty)
                             Padding(
-                              padding: message.mediaUrl != null 
+                              padding: message.mediaUrl != null
                                   ? const EdgeInsets.only(top: 8)
                                   : EdgeInsets.zero,
-                              child: Text(
-                                displayContent,
-                                style: TextStyle(
-                                  color: _getTextColor(),
-                                  fontSize: 16,
-                                  height: 1.4,
-                                ),
-                                softWrap: true,
-                              ),
+                              child: _buildHighlightedText(displayContent, searchQuery),
                             ),
                           const SizedBox(height: 6),
                           // Timestamp + Edited indicator + Status indicator row
                           Row(
                             mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: isSentByUser 
-                                ? MainAxisAlignment.end 
+                            mainAxisAlignment: isSentByUser
+                                ? MainAxisAlignment.end
                                 : MainAxisAlignment.start,
                             children: [
                               // Timestamp
@@ -177,9 +221,11 @@ class MessageBubble extends StatelessWidget {
                               ],
                               const SizedBox(width: 6),
                               // Status indicator (only for sent messages)
-                              if (isSentByUser)
+                              if (isSentByUser && message.hasReceiptTracking)
                                 MessageStatusIndicator(
-                                  key: ValueKey('${message.id}_${message.status}'),
+                                  key: ValueKey(
+                                    '${message.id}_${message.status}',
+                                  ),
                                   message: message,
                                 ),
                               // Loading spinner if sending
@@ -278,27 +324,24 @@ class MessageBubble extends StatelessWidget {
     }
     return Colors.grey.shade600;
   }
-  
+
   /// Build media widget (image or video) (T077)
   Widget _buildMediaWidget(BuildContext context) {
     final mediaUrl = message.mediaUrl;
     final mimeType = message.mediaType ?? '';
-    
+
     if (mediaUrl == null) {
       return SizedBox.shrink();
     }
 
     final resolvedMediaUrl = _resolveMediaUrl(mediaUrl);
-    
+
     if (mimeType.startsWith('image/')) {
       // Image media
       return ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          constraints: BoxConstraints(
-            maxWidth: 250,
-            maxHeight: 300,
-          ),
+          constraints: BoxConstraints(maxWidth: 250, maxHeight: 300),
           color: Colors.grey.shade200,
           child: Image.network(
             resolvedMediaUrl,
@@ -333,10 +376,7 @@ class MessageBubble extends StatelessWidget {
       return mediaUrl;
     }
 
-    const baseUrl = String.fromEnvironment(
-      'API_BASE_URL',
-      defaultValue: 'http://localhost:8081',
-    );
+    final baseUrl = ApiClient.getBaseUrl();
 
     if (mediaUrl.startsWith('/')) {
       return '$baseUrl$mediaUrl';
@@ -353,14 +393,96 @@ class MessageBubble extends StatelessWidget {
       username: message.senderUsername,
     );
   }
-  
+
+  /// Build text widget with search term highlighting
+  Widget _buildHighlightedText(String text, String? searchQuery) {
+    // If no search query or empty query, return plain text
+    if (searchQuery == null || searchQuery.trim().isEmpty) {
+      return Text(
+        text,
+        style: TextStyle(
+          color: _getTextColor(),
+          fontSize: 16,
+          height: 1.4,
+        ),
+        softWrap: true,
+      );
+    }
+
+    // Split text by search term (case-insensitive)
+    final query = searchQuery.toLowerCase();
+    final lowerText = text.toLowerCase();
+    final spans = <TextSpan>[];
+    
+    int lastIndex = 0;
+    int index = 0;
+
+    while ((index = lowerText.indexOf(query, lastIndex)) != -1) {
+      // Add non-matching text before the match
+      if (index > lastIndex) {
+        spans.add(TextSpan(
+          text: text.substring(lastIndex, index),
+          style: TextStyle(
+            color: _getTextColor(),
+            fontSize: 16,
+            height: 1.4,
+          ),
+        ));
+      }
+
+      // Add highlighted match
+      spans.add(TextSpan(
+        text: text.substring(index, index + query.length),
+        style: TextStyle(
+          color: Colors.black87,
+          fontSize: 16,
+          height: 1.4,
+          backgroundColor: Colors.yellow[300],
+          fontWeight: FontWeight.w600,
+        ),
+      ));
+
+      lastIndex = index + query.length;
+    }
+
+    // Add remaining text after last match
+    if (lastIndex < text.length) {
+      spans.add(TextSpan(
+        text: text.substring(lastIndex),
+        style: TextStyle(
+          color: _getTextColor(),
+          fontSize: 16,
+          height: 1.4,
+        ),
+      ));
+    }
+
+    // If no matches found, return plain text
+    if (spans.isEmpty) {
+      return Text(
+        text,
+        style: TextStyle(
+          color: _getTextColor(),
+          fontSize: 16,
+          height: 1.4,
+        ),
+        softWrap: true,
+      );
+    }
+
+    return RichText(
+      text: TextSpan(children: spans),
+      softWrap: true,
+    );
+  }
+
   /// Show context menu for edit/delete (T052)
   void _showContextMenu() {
     onLongPress?.call();
-    
+
     // Only show menu for own messages
     if (!isSentByUser) return;
-    
+
     // Show context menu with edit/delete options
     // This would typically use showMenu or a custom popup
     // For now, this is a placeholder - actual implementation would
@@ -482,7 +604,7 @@ class _InlineAudioPlayerState extends State<_InlineAudioPlayer> {
                   final progress = duration.inMilliseconds <= 0
                       ? 0.0
                       : (position.inMilliseconds / duration.inMilliseconds)
-                          .clamp(0.0, 1.0);
+                            .clamp(0.0, 1.0);
 
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -492,7 +614,9 @@ class _InlineAudioPlayerState extends State<_InlineAudioPlayer> {
                           IconButton(
                             onPressed: () => _togglePlayback(isPlaying),
                             icon: Icon(
-                              isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill,
+                              isPlaying
+                                  ? Icons.pause_circle_filled
+                                  : Icons.play_circle_fill,
                             ),
                           ),
                           const SizedBox(width: 4),
@@ -532,7 +656,8 @@ class _VideoPlayerErrorBoundary extends StatefulWidget {
   const _VideoPlayerErrorBoundary({required this.url});
 
   @override
-  State<_VideoPlayerErrorBoundary> createState() => _VideoPlayerErrorBoundaryState();
+  State<_VideoPlayerErrorBoundary> createState() =>
+      _VideoPlayerErrorBoundaryState();
 }
 
 class _VideoPlayerErrorBoundaryState extends State<_VideoPlayerErrorBoundary> {
@@ -560,10 +685,7 @@ class _VideoPlayerErrorBoundaryState extends State<_VideoPlayerErrorBoundary> {
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        constraints: const BoxConstraints(
-          maxWidth: 250,
-          maxHeight: 300,
-        ),
+        constraints: const BoxConstraints(maxWidth: 250, maxHeight: 300),
         color: Colors.black12,
         child: AspectRatio(
           aspectRatio: 16 / 9,
@@ -574,19 +696,13 @@ class _VideoPlayerErrorBoundaryState extends State<_VideoPlayerErrorBoundary> {
               const SizedBox(height: 8),
               Text(
                 'Video unavailable',
-                style: TextStyle(
-                  color: Colors.grey.shade400,
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 4),
               Text(
                 widget.url.split('/').last,
-                style: TextStyle(
-                  color: Colors.grey.shade500,
-                  fontSize: 10,
-                ),
+                style: TextStyle(color: Colors.grey.shade500, fontSize: 10),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
@@ -610,40 +726,39 @@ class _InlineVideoPlayer extends StatefulWidget {
 }
 
 class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
-  fvp_mdk.Player? _player;
+  VideoPlayerController? _controller;
   Timer? _progressTimer;
   bool _showControls = true;
-  bool _isMuted = Platform.isLinux;
+  bool _isMuted = false;
   bool _initialized = false;
   bool _hasError = false;
-  bool _playerCreated = false;
   double _aspectRatio = 16 / 9;
-  int _durationMs = 0;
   double _progress = 0.0;
 
   @override
   void initState() {
     super.initState();
-    debugPrint('[InlineVideoPlayer] Video widget created (tap to play)');
+    _initialize();
   }
 
   @override
   void dispose() {
     _progressTimer?.cancel();
-    _player?.dispose();
+    _controller?.dispose();
     super.dispose();
   }
 
-  bool get _isPlaying => _player?.state == fvp_mdk.PlaybackState.playing;
+  bool get _isPlaying => _controller?.value.isPlaying ?? false;
 
   void _startProgressTimer() {
     _progressTimer?.cancel();
     _progressTimer = Timer.periodic(const Duration(milliseconds: 250), (_) {
-      if (!mounted || !_initialized || _player == null) {
+      final controller = _controller;
+      if (!mounted || !_initialized || controller == null) {
         return;
       }
-      final durationMs = _durationMs;
-      final positionMs = _player!.position;
+      final durationMs = controller.value.duration.inMilliseconds;
+      final positionMs = controller.value.position.inMilliseconds;
       setState(() {
         _progress = durationMs <= 0
             ? 0.0
@@ -652,55 +767,26 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
     });
   }
 
-  Future<void> _ensureInitialized() async {
-    if (_playerCreated || _hasError) return;
+  Future<void> _initialize() async {
     try {
-      debugPrint('[InlineVideoPlayer] Initializing: ${widget.url}');
-      final player = fvp_mdk.Player();
-      _player = player;
-      _playerCreated = true;
+      final controller = VideoPlayerController.networkUrl(
+        Uri.parse(widget.url),
+      );
+      _controller = controller;
 
-      // WSLg/Linux desktop is crashing in native audio initialization. Force a
-      // safer backend and disable embedded audio tracks for inline playback.
-      if (Platform.isLinux) {
-        player.audioBackends = const ['ALSA'];
-        player.setActiveTracks(fvp_mdk.MediaType.audio, const []);
-      }
-
-      player.loop = 0;
-      player.media = widget.url;
-
-      final prepared = await player.prepare().timeout(
+      await controller.initialize().timeout(
         const Duration(seconds: 15),
         onTimeout: () => throw Exception('Video loading timeout'),
       );
-      if (prepared < 0) {
-        throw Exception('Video prepare failed: $prepared');
+      controller.setLooping(false);
+
+      final ratio = controller.value.aspectRatio;
+      if (ratio > 0) {
+        _aspectRatio = ratio;
       }
 
-      final textureId = await player.updateTexture().timeout(
-        const Duration(seconds: 10),
-        onTimeout: () => throw Exception('Video texture initialization timeout'),
-      );
-      if (textureId < 0) {
-        throw Exception('Video texture creation failed: $textureId');
-      }
-
-      final mediaInfo = player.mediaInfo;
-      final videoInfo = mediaInfo.video;
-      if (videoInfo != null && videoInfo.isNotEmpty) {
-        final width = videoInfo.first.codec.width;
-        final height = videoInfo.first.codec.height;
-        if (width > 0 && height > 0) {
-          _aspectRatio = width / height;
-        }
-      }
-      _durationMs = mediaInfo.duration;
-
-      player.onStateChanged((_, _) {
-        if (mounted) {
-          setState(() {});
-        }
+      controller.addListener(() {
+        if (mounted) setState(() {});
       });
       _startProgressTimer();
 
@@ -709,26 +795,25 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
         _initialized = true;
       });
     } catch (e) {
-      debugPrint('[InlineVideoPlayer] Init error: $e');
       widget.onError();
       if (!mounted) return;
-      setState(() { _hasError = true; });
+      setState(() {
+        _hasError = true;
+      });
     }
   }
 
   Future<void> _togglePlayback() async {
-    if (!_playerCreated) {
-      await _ensureInitialized();
-      if (_hasError || !_initialized) return;
-    }
-    final player = _player!;
+    final player = _controller;
+    if (player == null || !_initialized) return;
+
     if (_isPlaying) {
-      player.state = fvp_mdk.PlaybackState.paused;
+      await player.pause();
       setState(() {
         _showControls = true;
       });
     } else {
-      player.state = fvp_mdk.PlaybackState.playing;
+      await player.play();
       setState(() {
         _showControls = false;
       });
@@ -736,16 +821,20 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
   }
 
   Future<void> _toggleMute() async {
-    if (_player == null || Platform.isLinux) return;
+    final player = _controller;
+    if (player == null) return;
     _isMuted = !_isMuted;
-    _player!.mute = _isMuted;
+    await player.setVolume(_isMuted ? 0 : 1);
     if (mounted) setState(() {});
   }
 
   Future<void> _seekTo(double fraction) async {
-    if (_player == null || _durationMs <= 0) return;
-    final ms = (_durationMs * fraction).round();
-    await _player!.seek(position: ms);
+    final player = _controller;
+    if (player == null || !player.value.isInitialized) return;
+    final durationMs = player.value.duration.inMilliseconds;
+    if (durationMs <= 0) return;
+    final ms = (durationMs * fraction).round();
+    await player.seekTo(Duration(milliseconds: ms));
     if (mounted) {
       setState(() {
         _progress = fraction.clamp(0.0, 1.0);
@@ -769,43 +858,18 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
               children: [
                 Icon(Icons.video_file, color: Colors.grey.shade400, size: 40),
                 const SizedBox(height: 8),
-                Text('Video unavailable',
-                    style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
+                Text(
+                  'Video unavailable',
+                  style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
+                ),
                 const SizedBox(height: 4),
-                Text(widget.url.split('/').last,
-                    style: TextStyle(color: Colors.grey.shade500, fontSize: 10),
-                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(
+                  widget.url.split('/').last,
+                  style: TextStyle(color: Colors.grey.shade500, fontSize: 10),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    // Tap-to-play placeholder (before first tap)
-    if (!_playerCreated) {
-      return GestureDetector(
-        onTap: _togglePlayback,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 250),
-            color: Colors.black,
-            child: AspectRatio(
-              aspectRatio: 16 / 9,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.play_circle_fill,
-                      color: Colors.white.withValues(alpha: 0.85), size: 52),
-                  const SizedBox(height: 8),
-                  Text('Tap to play',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.7),
-                        fontSize: 12,
-                      )),
-                ],
-              ),
             ),
           ),
         ),
@@ -821,81 +885,78 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
           color: Colors.black,
           child: const AspectRatio(
             aspectRatio: 16 / 9,
-            child: Center(child: CircularProgressIndicator(color: Colors.white)),
+            child: Center(
+              child: CircularProgressIndicator(color: Colors.white),
+            ),
           ),
         ),
       );
     }
 
     // Initialized: render player
-    final player = _player!;
+    final player = _controller!;
+    final durationMs = player.value.duration.inMilliseconds;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
       child: Container(
         constraints: const BoxConstraints(maxWidth: 250, maxHeight: 300),
         color: Colors.black,
-        child: ValueListenableBuilder<int?>(
-          valueListenable: player.textureId,
-          builder: (context, textureId, _) {
-            if (textureId == null) {
-              return const AspectRatio(
-                aspectRatio: 16 / 9,
-                child: Center(child: CircularProgressIndicator(color: Colors.white)),
-              );
-            }
-
-            return AspectRatio(
-              aspectRatio: _aspectRatio,
-              child: GestureDetector(
-                onTap: () => setState(() { _showControls = !_showControls; }),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Positioned.fill(child: Texture(textureId: textureId)),
-                    if (_showControls || !_isPlaying)
-                      Container(color: Colors.black.withValues(alpha: 0.28)),
-                    if (_showControls || !_isPlaying)
-                      IconButton(
-                        onPressed: _togglePlayback,
-                        iconSize: 48,
-                        color: Colors.white,
-                        icon: Icon(
-                          _isPlaying
-                              ? Icons.pause_circle_filled
-                              : Icons.play_circle_fill,
-                        ),
-                      ),
-                    Positioned(
-                      right: 8,
-                      top: 8,
-                      child: IconButton(
-                        onPressed: Platform.isLinux ? null : _toggleMute,
-                        color: Colors.white,
-                        icon: Icon(_isMuted ? Icons.volume_off : Icons.volume_up),
-                      ),
+        child: AspectRatio(
+          aspectRatio: _aspectRatio,
+          child: GestureDetector(
+            onTap: () => setState(() {
+              _showControls = !_showControls;
+            }),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Positioned.fill(child: VideoPlayer(player)),
+                if (_showControls || !_isPlaying)
+                  Container(color: Colors.black.withValues(alpha: 0.28)),
+                if (_showControls || !_isPlaying)
+                  IconButton(
+                    onPressed: _togglePlayback,
+                    iconSize: 48,
+                    color: Colors.white,
+                    icon: Icon(
+                      _isPlaying
+                          ? Icons.pause_circle_filled
+                          : Icons.play_circle_fill,
                     ),
-                    Positioned(
-                      left: 8,
-                      right: 8,
-                      bottom: 8,
-                      child: SliderTheme(
-                        data: SliderTheme.of(context).copyWith(
-                          trackHeight: 3,
-                          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
-                          overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
-                        ),
-                        child: Slider(
-                          value: _progress,
-                          onChanged: _durationMs <= 0 ? null : _seekTo,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: IconButton(
+                    onPressed: _toggleMute,
+                    color: Colors.white,
+                    icon: Icon(_isMuted ? Icons.volume_off : Icons.volume_up),
+                  ),
                 ),
-              ),
-            );
-          },
+                Positioned(
+                  left: 8,
+                  right: 8,
+                  bottom: 8,
+                  child: SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 3,
+                      thumbShape: const RoundSliderThumbShape(
+                        enabledThumbRadius: 5,
+                      ),
+                      overlayShape: const RoundSliderOverlayShape(
+                        overlayRadius: 10,
+                      ),
+                    ),
+                    child: Slider(
+                      value: _progress,
+                      onChanged: durationMs <= 0 ? null : _seekTo,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

@@ -1,8 +1,8 @@
 import 'package:test/test.dart';
 import 'dart:convert';
 import 'package:postgres/postgres.dart';
-import '../../lib/src/endpoints/auth.dart';
-import '../../lib/src/services/user_auth_service.dart';
+import 'package:messenger_server/src/endpoints/auth.dart';
+import 'package:messenger_server/src/services/user_auth_service.dart';
 import 'package:shelf/shelf.dart';
 
 void main() {

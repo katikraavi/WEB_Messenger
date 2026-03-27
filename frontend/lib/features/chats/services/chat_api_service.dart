@@ -1,4 +1,3 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../models/chat_model.dart';
@@ -41,10 +40,6 @@ class ChatApiService {
     try {
       final url = Uri.parse('$_baseUrl/api/chats?limit=$limit&offset=$offset');
 
-      print('[ChatApiService] 📡 Fetching chats from: $url');
-      print(
-        '[ChatApiService] Token: ${token.isNotEmpty ? 'present' : 'EMPTY'}',
-      );
 
       final response = await _httpClient.get(
         url,
@@ -54,43 +49,28 @@ class ChatApiService {
         },
       );
 
-      print('[ChatApiService] Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
-        print('[ChatApiService] 📦 Raw response body: ${response.body}');
 
         final json = jsonDecode(response.body) as Map<String, dynamic>;
-        print('[ChatApiService] 🔍 Decoded JSON keys: ${json.keys.toList()}');
-        print('[ChatApiService] Total chats in response: ${json['total']}');
 
         final chatsList = (json['chats'] as List<dynamic>).map((chat) {
-          print('[ChatApiService] 🔍 Processing chat object: $chat');
           try {
             // Ensure backend includes last_message_preview, last_message_timestamp, last_message_sender_avatar_url
             return Chat.fromJson(chat as Map<String, dynamic>);
           } catch (e) {
-            print('[ChatApiService] ❌ Failed to parse chat: $e');
-            print('[ChatApiService] Chat data: $chat');
             rethrow;
           }
         }).toList();
-        print('[ChatApiService] ✅ Parsed ${chatsList.length} chats');
         return chatsList;
       } else if (response.statusCode == 401) {
-        print('[ChatApiService] ❌ Unauthorized: Invalid or expired token');
         throw Exception('Unauthorized: Invalid or expired token');
       } else if (response.statusCode >= 500) {
-        print('[ChatApiService] ❌ Server error: ${response.statusCode}');
         throw Exception('Server error: ${response.statusCode}');
       } else {
-        print(
-          '[ChatApiService] ❌ Failed to fetch chats: ${response.statusCode}',
-        );
-        print('[ChatApiService] Response body: ${response.body}');
         throw Exception('Failed to fetch chats: ${response.statusCode}');
       }
     } catch (e) {
-      print('[ChatApiService] ❌ Exception in fetchChats: $e');
       rethrow;
     }
   }
@@ -152,7 +132,6 @@ class ChatApiService {
         throw Exception('Failed to fetch messages: ${response.statusCode}');
       }
     } catch (e) {
-      print('[ChatApiService] Error fetching messages for chat $chatId: $e');
       rethrow;
     }
   }
@@ -190,7 +169,6 @@ class ChatApiService {
         throw Exception('Failed to fetch message: ${response.statusCode}');
       }
     } catch (e) {
-      print('[ChatApiService] Error fetching message $messageId: $e');
       rethrow;
     }
   }
@@ -229,7 +207,6 @@ class ChatApiService {
         );
       }
     } catch (e) {
-      print('[ChatApiService] Error verifying chat participation: $e');
       rethrow;
     }
   }
@@ -299,7 +276,6 @@ class ChatApiService {
         throw Exception('Failed to send message: ${response.statusCode}');
       }
     } catch (e) {
-      print('[ChatApiService] Error sending message to chat $chatId: $e');
       rethrow;
     }
   }
@@ -321,7 +297,6 @@ class ChatApiService {
     try {
       final url = Uri.parse('$_baseUrl/api/chats/$chatId/archive');
 
-      print('[ChatApiService] 📌 Archiving chat: $chatId');
 
       final response = await _httpClient.put(
         url,
@@ -333,7 +308,6 @@ class ChatApiService {
 
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body) as Map<String, dynamic>;
-        print('[ChatApiService] ✅ Chat archived: $chatId');
         return Chat.fromJson(json);
       } else if (response.statusCode == 401) {
         throw Exception('Unauthorized: Invalid or expired token');
@@ -345,7 +319,6 @@ class ChatApiService {
         throw Exception('Failed to archive chat: ${response.statusCode}');
       }
     } catch (e) {
-      print('[ChatApiService] Error archiving chat $chatId: $e');
       rethrow;
     }
   }
@@ -367,7 +340,6 @@ class ChatApiService {
     try {
       final url = Uri.parse('$_baseUrl/api/chats/$chatId/unarchive');
 
-      print('[ChatApiService] 📌 Unarchiving chat: $chatId');
 
       final response = await _httpClient.put(
         url,
@@ -379,7 +351,6 @@ class ChatApiService {
 
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body) as Map<String, dynamic>;
-        print('[ChatApiService] ✅ Chat unarchived: $chatId');
         return Chat.fromJson(json);
       } else if (response.statusCode == 401) {
         throw Exception('Unauthorized: Invalid or expired token');
@@ -391,7 +362,6 @@ class ChatApiService {
         throw Exception('Failed to unarchive chat: ${response.statusCode}');
       }
     } catch (e) {
-      print('[ChatApiService] Error unarchiving chat $chatId: $e');
       rethrow;
     }
   }
@@ -409,7 +379,6 @@ class ChatApiService {
     try {
       final url = Uri.parse('$_baseUrl/api/chats/archived');
 
-      print('[ChatApiService] 📡 Fetching archived chats');
 
       final response = await _httpClient.get(
         url,
@@ -424,7 +393,6 @@ class ChatApiService {
         final chatsList = (json['chats'] as List<dynamic>)
             .map((chat) => Chat.fromJson(chat as Map<String, dynamic>))
             .toList();
-        print('[ChatApiService] ✅ Fetched ${chatsList.length} archived chats');
         return chatsList;
       } else if (response.statusCode == 401) {
         throw Exception('Unauthorized: Invalid or expired token');
@@ -436,7 +404,6 @@ class ChatApiService {
         );
       }
     } catch (e) {
-      print('[ChatApiService] Error fetching archived chats: $e');
       rethrow;
     }
   }
@@ -476,7 +443,6 @@ class ChatApiService {
 
       final body = {'encrypted_content': newEncryptedContent};
 
-      print('[ChatApiService] 📝 Editing message: $messageId');
 
       final response = await _httpClient.put(
         url,
@@ -487,10 +453,10 @@ class ChatApiService {
         body: jsonEncode(body),
       );
 
+
       if (response.statusCode == 200) {
         final messageData = jsonDecode(response.body) as Map<String, dynamic>;
         final editedMessage = Message.fromJson(messageData);
-        print('[ChatApiService] ✅ Message edited successfully: $messageId');
         return editedMessage;
       } else if (response.statusCode == 401) {
         throw Exception('Unauthorized: Invalid or expired token');
@@ -504,7 +470,6 @@ class ChatApiService {
         throw Exception('Failed to edit message: ${response.statusCode}');
       }
     } catch (e) {
-      print('[ChatApiService] ❌ Error editing message: $e');
       rethrow;
     }
   }
@@ -527,7 +492,6 @@ class ChatApiService {
     try {
       final url = Uri.parse('$_baseUrl/api/chats/$chatId/messages/$messageId');
 
-      print('[ChatApiService] 🗑️ Deleting message: $messageId');
 
       final response = await _httpClient.delete(
         url,
@@ -537,8 +501,8 @@ class ChatApiService {
         },
       );
 
+
       if (response.statusCode == 204) {
-        print('[ChatApiService] ✅ Message deleted successfully: $messageId');
         return;
       } else if (response.statusCode == 401) {
         throw Exception('Unauthorized: Invalid or expired token');
@@ -552,7 +516,6 @@ class ChatApiService {
         throw Exception('Failed to delete message: ${response.statusCode}');
       }
     } catch (e) {
-      print('[ChatApiService] ❌ Error deleting message: $e');
       rethrow;
     }
   }
@@ -569,9 +532,6 @@ class ChatApiService {
 
       final body = {'message_id': messageId, 'status': newStatus};
 
-      print(
-        '[ChatApiService] 📤 Updating message status: $messageId → $newStatus',
-      );
 
       final response = await _httpClient.put(
         url,
@@ -583,9 +543,6 @@ class ChatApiService {
       );
 
       if (response.statusCode == 200) {
-        print(
-          '[ChatApiService] ✅ Message status updated: $messageId → $newStatus',
-        );
       } else if (response.statusCode == 401) {
         throw Exception('Unauthorized: Invalid or expired token');
       } else if (response.statusCode == 404) {
@@ -593,13 +550,9 @@ class ChatApiService {
       } else if (response.statusCode >= 500) {
         throw Exception('Server error: ${response.statusCode}');
       } else {
-        print(
-          '[ChatApiService] ⚠️ Status update returned ${response.statusCode}',
-        );
         // Non-blocking - status update is best-effort
       }
     } catch (e) {
-      print('[ChatApiService] ⚠️ Error updating message status: $e');
       // Non-blocking - status update is best-effort, don't rethrow
     }
   }
@@ -616,7 +569,6 @@ class ChatApiService {
     try {
       final url = Uri.parse('$_baseUrl/api/chats/$chatId');
 
-      print('[ChatApiService] 🗑️ Deleting chat: $chatId');
 
       final response = await _httpClient.delete(
         url,
@@ -627,7 +579,6 @@ class ChatApiService {
       );
 
       if (response.statusCode == 204 || response.statusCode == 200) {
-        print('[ChatApiService] ✅ Chat deleted successfully: $chatId');
       } else if (response.statusCode == 401) {
         throw Exception('Unauthorized: Invalid or expired token');
       } else if (response.statusCode == 403) {
@@ -643,7 +594,6 @@ class ChatApiService {
         throw Exception('Failed to delete chat: ${response.statusCode}');
       }
     } catch (e) {
-      print('[ChatApiService] ❌ Error deleting chat: $e');
       rethrow;
     }
   }

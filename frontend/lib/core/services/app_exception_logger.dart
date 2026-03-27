@@ -10,9 +10,7 @@ class AppExceptionLogger {
     bool fatal = false,
   }) {
     final severity = fatal ? 'FATAL' : 'ERROR';
-    debugPrint('[AppException][$severity][$context] $error');
     if (stackTrace != null) {
-      debugPrint(stackTrace.toString());
     }
   }
 }

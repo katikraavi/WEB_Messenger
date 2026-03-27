@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:async';
@@ -129,9 +130,17 @@ class _VerificationPendingScreenState
         elevation: 0,
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final maxWidth = kIsWeb ? 620.0 : constraints.maxWidth;
+            final horizontalPadding = kIsWeb ? 20.0 : 24.0;
+
+            return Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxWidth),
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.all(horizontalPadding),
+                  child: Column(
             children: [
               // Illustration/Icon
               Container(
@@ -400,6 +409,10 @@ class _VerificationPendingScreenState
                 const CircularProgressIndicator(),
             ],
           ),
+                ),
+              ),
+            );
+          },
         ),
       ),
     );

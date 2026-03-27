@@ -1,0 +1,30 @@
+# Optional frontend service — only include after build succeeds
+# Usage: docker compose -f docker-compose.yml -f docker-compose.frontend.yml up
+# Or: docker compose --profile frontend up (requires backend to be running)
+
+services:
+  # Flutter Web Frontend (nginx serving build/web at port 5000)
+  # NOTE: Ensure `flutter build web` has been run in ./frontend before starting this service.
+  # See ./frontend/BUILD_INSTRUCTIONS.md for details.
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: messenger-frontend
+    ports:
+      - "5000:80"
+    depends_on:
+      - serverpod
+    networks:
+      messenger-network:
+        ipv4_address: 172.20.0.5
+    restart: unless-stopped
+    profiles:
+      - frontend
+
+networks:
+  messenger-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

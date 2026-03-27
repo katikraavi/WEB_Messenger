@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:convert';
 import 'package:frontend/core/notifications/app_feedback_service.dart';
+import 'package:frontend/core/services/api_client.dart';
 import '../models/message_model.dart';
 import '../services/chat_api_service.dart';
 import '../services/message_encryption_service.dart';
@@ -53,7 +54,7 @@ class SendMessageNotifier extends StateNotifier<SendMessageState> {
 
   final Ref ref;
 
-  static const _baseUrl = 'http://localhost:8081';
+  static String get _baseUrl => ApiClient.getBaseUrl();
 
   /// Send a message to a chat with optimistic updates (T027)
   /// 
@@ -154,14 +155,16 @@ class SendMessageNotifier extends StateNotifier<SendMessageState> {
       }
 
       if (addOptimisticMessage) {
-        print('[SendMessage] 📤 Optimistic update: Adding message ${optimisticMessage.id}');
         _updateMessagesOptimistic(chatId, token, currentUserId, optimisticMessage, isAdding: true);
       } else {
-        print('[SendMessage] 🔁 Retrying failed message ${optimisticMessage.id}');
         _upsertLocalMessage(chatId, token, currentUserId, optimisticMessage);
       }
 
-      final encryptedContent = base64Encode(utf8.encode(plaintext));
+      // Encrypt message using AES-256-GCM (same as backend)
+      final encryptedContent = await MessageEncryptionService.encryptMessage(
+        plaintext,
+        currentUserId,
+      );
       final apiService = ChatApiService(baseUrl: _baseUrl);
 
       final sentMessage = await apiService.sendMessage(
@@ -170,9 +173,12 @@ class SendMessageNotifier extends StateNotifier<SendMessageState> {
         encryptedContent: encryptedContent,
       );
 
-      final decryptedMessage = await MessageEncryptionService.decryptMessage(sentMessage);
-
-      print('[SendMessage] ✓ Message sent and decrypted: ${decryptedMessage.id}');
+      // Decrypt received message for local display
+      // Use sentMessage.senderId to decrypt (it's the sender's key)
+      final decryptedMessage = await MessageEncryptionService.decryptMessage(
+        sentMessage,
+        userId: sentMessage.senderId,
+      );
 
       _updateMessagesOptimistic(
         chatId,
@@ -188,7 +194,6 @@ class SendMessageNotifier extends StateNotifier<SendMessageState> {
         lastSentMessageId: sentMessage.id,
       );
     } catch (e, st) {
-      print('[SendMessage] ❌ Error sending message: $e\n$st');
 
       final errorMessage = e.toString();
       final failedMessage = optimisticMessage.copyWith(
@@ -227,7 +232,6 @@ class SendMessageNotifier extends StateNotifier<SendMessageState> {
       final messagesNotifier = ref.read(localMessagesProvider(cacheKey).notifier);
       messagesNotifier.upsertMessage(message);
     } catch (e) {
-      print('[SendMessage] ⚠️ Error updating failed message for retry: $e');
     }
   }
 
@@ -250,15 +254,12 @@ class SendMessageNotifier extends StateNotifier<SendMessageState> {
       
       if (isAdding) {
         // Add new optimistic message directly to the notifier
-        print('[SendMessage] 📥 Adding optimistic message ${message.id} to local state');
         messagesNotifier.addMessage(message);
       } else if (replaceId != null) {
         // Replace optimistic message with server response
-        print('[SendMessage] 🔄 Replacing optimistic message $replaceId → ${message.id}');
         messagesNotifier.replaceOptimisticMessage(replaceId, message);
       }
     } catch (e) {
-      print('[SendMessage] ⚠️ Error updating optimistic message: $e');
       // Continue anyway - message will still appear from server
     }
   }

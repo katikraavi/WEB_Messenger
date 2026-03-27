@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/password_recovery_provider.dart';
 import 'forgot_password_screen.dart';
@@ -88,9 +89,17 @@ class _PasswordResetScreenState extends ConsumerState<PasswordResetScreen> {
               recoveryState.phase == PasswordRecoveryPhase.error,
         ),
         body: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final maxWidth = kIsWeb ? 620.0 : constraints.maxWidth;
+              final horizontalPadding = kIsWeb ? 20.0 : 24.0;
+
+              return Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: maxWidth),
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.all(horizontalPadding),
+                    child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Icon
@@ -314,6 +323,10 @@ class _PasswordResetScreenState extends ConsumerState<PasswordResetScreen> {
                   ),
               ],
             ),
+                  ),
+                ),
+              );
+            },
           ),
         ),
       ),

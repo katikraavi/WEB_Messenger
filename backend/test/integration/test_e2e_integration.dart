@@ -1,8 +1,8 @@
 import 'package:test/test.dart';
-import '../../lib/src/models/user_model.dart';
-import '../../lib/src/models/chat_model.dart';
-import '../../lib/src/models/message_model.dart';
-import '../../lib/src/models/invite_model.dart';
+import 'package:messenger_server/src/models/user_model.dart';
+import 'package:messenger_server/src/models/chat_model.dart';
+import 'package:messenger_server/src/models/message_model.dart';
+import 'package:messenger_server/src/models/invite_model.dart';
 import '../../lib/src/models/enums.dart';
 
 void main() {

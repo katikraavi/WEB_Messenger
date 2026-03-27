@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -13,16 +12,14 @@ import '../services/image_picker_service.dart';
 import '../widgets/image_picker_permissions_handler.dart';
 import '../widgets/image_upload_progress_widget.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../chats/providers/user_profile_provider.dart' as chats_profile_provider;
 
 class ProfileImageUploadWidget extends ConsumerWidget {
   final String? currentImageUrl;
   final String? userId;
 
-  const ProfileImageUploadWidget({
-    this.currentImageUrl,
-    this.userId,
-    Key? key,
-  }) : super(key: key);
+  const ProfileImageUploadWidget({this.currentImageUrl, this.userId, Key? key})
+    : super(key: key);
 
   /// Build default profile picture with asset fallback
   Widget _buildDefaultProfilePicture() {
@@ -39,13 +36,16 @@ class ProfileImageUploadWidget extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final authProvider = provider_pkg.Provider.of<AuthProvider>(context, listen: false);
+    final authProvider = provider_pkg.Provider.of<AuthProvider>(
+      context,
+      listen: false,
+    );
     final token = authProvider.token;
     final imageState = ref.watch(profileImageProvider);
-    
+
     // Watch the updated profile to display newly uploaded image URL
-    final userProfileAsync = userId != null 
-      ? ref.watch(userProfileWithTokenProvider((userId!, token))) 
+    final userProfileAsync = userId != null
+        ? ref.watch(userProfileWithTokenProvider((userId!, token)))
         : null;
 
     return Column(
@@ -63,56 +63,66 @@ class ProfileImageUploadWidget extends ConsumerWidget {
                 border: Border.all(color: Colors.grey[400]!, width: 2),
               ),
               child: Center(
-                child: imageState.selectedImagePath != null
+                child: imageState.selectedImageBytes != null
                     ? ClipOval(
-                  child: Image.file(
-                    File(imageState.selectedImagePath!),
-                    fit: BoxFit.cover,
-                  ),
-                )
+                        child: Image.memory(
+                          imageState.selectedImageBytes!,
+                          fit: BoxFit.cover,
+                        ),
+                      )
+                    : (!kIsWeb && imageState.selectedImagePath != null)
+                    ? ClipOval(
+                        child: Image.file(
+                          File(imageState.selectedImagePath!),
+                          fit: BoxFit.cover,
+                        ),
+                      )
                     : imageState.uploadedImageUrl != null
                     ? ClipOval(
-                  child: Image.network(
-                    imageState.uploadedImageUrl!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      debugPrint('[ProfileImageUploadWidget] ERROR loading uploaded image: $error');
-                      return _buildDefaultProfilePicture();
-                    },
-                  ),
-                )
+                        child: Image.network(
+                          imageState.uploadedImageUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return _buildDefaultProfilePicture();
+                          },
+                        ),
+                      )
                     // After refresh, check if profile has updated image URL
-                    : (userProfileAsync?.hasValue ?? false) && 
-                        (userProfileAsync!.value!.profilePictureUrl?.isNotEmpty ?? false) &&
-                        userProfileAsync!.value!.profilePictureUrl != currentImageUrl
+                    : (userProfileAsync?.hasValue ?? false) &&
+                          (userProfileAsync!
+                                  .value!
+                                  .profilePictureUrl
+                                  ?.isNotEmpty ??
+                              false) &&
+                          userProfileAsync!.value!.profilePictureUrl !=
+                              currentImageUrl
                     ? ClipOval(
-                  child: Image.network(
-                    userProfileAsync!.value!.profilePictureUrl!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      debugPrint('[ProfileImageUploadWidget] ERROR loading refreshed profile image: $error');
-                      return _buildDefaultProfilePicture();
-                    },
-                  ),
-                )
+                        child: Image.network(
+                          userProfileAsync!.value!.profilePictureUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return _buildDefaultProfilePicture();
+                          },
+                        ),
+                      )
                     : currentImageUrl != null && currentImageUrl!.isNotEmpty
                     ? ClipOval(
-                  child: Image.network(
-                    currentImageUrl!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      debugPrint('[ProfileImageUploadWidget] ERROR loading current profile picture: $error');
-                      return _buildDefaultProfilePicture();
-                    },
-                  ),
-                )
+                        child: Image.network(
+                          currentImageUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return _buildDefaultProfilePicture();
+                          },
+                        ),
+                      )
                     : _buildDefaultProfilePicture(),
               ),
             ),
             // Remove button - only show if there's an uploaded image
             if (imageState.uploadedImageUrl != null ||
-                ((userProfileAsync?.hasValue ?? false) && 
-                (userProfileAsync!.value!.profilePictureUrl?.isNotEmpty ?? false)) ||
+                ((userProfileAsync?.hasValue ?? false) &&
+                    (userProfileAsync!.value!.profilePictureUrl?.isNotEmpty ??
+                        false)) ||
                 (currentImageUrl != null && currentImageUrl!.isNotEmpty))
               Container(
                 decoration: BoxDecoration(
@@ -126,49 +136,77 @@ class ProfileImageUploadWidget extends ConsumerWidget {
                   onPressed: imageState.isUploading
                       ? null
                       : () async {
-                    try {
-                      await ref
-                          .read(profileImageProvider.notifier)
-                          .deleteImage(token: token);
-                      
-                      // Refresh profile after successful delete to update image URL
-                      final deletedImageState = ref.read(profileImageProvider);
-                      if (context.mounted && deletedImageState.error == null && userId != null) {
-                        // Mark form as dirty so SAVE button is enabled (image was deleted)
-                        try {
-                          final profileAsync = ref.read(userProfileWithTokenProvider((userId!, token)));
-                          if (profileAsync.hasValue) {
-                            final userProfile = profileAsync.value!;
-                            ref.read(profileFormStateProvider(userProfile).notifier).markImageChanged();
+                          try {
+                            await ref
+                                .read(profileImageProvider.notifier)
+                                .deleteImage(token: token);
+
+                            // Refresh profile after successful delete to update image URL
+                            final deletedImageState = ref.read(
+                              profileImageProvider,
+                            );
+                            if (context.mounted &&
+                                deletedImageState.error == null &&
+                                userId != null) {
+                              // Mark form as dirty so SAVE button is enabled (image was deleted)
+                              try {
+                                final profileAsync = ref.read(
+                                  userProfileWithTokenProvider((
+                                    userId!,
+                                    token,
+                                  )),
+                                );
+                                if (profileAsync.hasValue) {
+                                  final userProfile = profileAsync.value!;
+                                  ref
+                                      .read(
+                                        profileFormStateProvider(
+                                          userProfile,
+                                        ).notifier,
+                                      )
+                                      .markImageChanged();
+                                }
+                              } catch (e) {
+                                // If we can't mark it as dirty, continue anyway
+                              }
+
+                              // Refresh the userProfileProvider to update profile after delete
+                              await ref.refresh(
+                                userProfileWithTokenProvider((userId!, token)),
+                              );
+
+                              // Also invalidate the chats module's profile provider so chat list avatars update
+                              ref.invalidate(
+                                chats_profile_provider.userProfileProvider((userId!, token!)),
+                              );
+
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Image deleted successfully!',
+                                    ),
+                                  ),
+                                );
+                              }
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              showCopyableErrorSnackBar(
+                                context,
+                                'Delete failed: $e',
+                              );
+                            }
                           }
-                        } catch (e) {
-                          // If we can't mark it as dirty, continue anyway
-                          debugPrint('[ProfileImageUploadWidget] Error marking form dirty on delete: $e');
-                        }
-                        
-                        // Refresh the userProfileProvider to update profile after delete
-                        await ref.refresh(userProfileWithTokenProvider((userId!, token)));
-                        
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Image deleted successfully!')),
-                          );
-                        }
-                      }
-                    } catch (e) {
-                      if (context.mounted) {
-                        showCopyableErrorSnackBar(context, 'Delete failed: $e');
-                      }
-                    }
-                  },
+                        },
                 ),
               ),
           ],
         ),
         const SizedBox(height: 16),
 
-        // Image picker buttons
-        // T138: Accessibility labels for gallery and camera buttons
+        // Image picker buttons - Gallery only (camera not implemented)
+        // T138: Accessibility labels for gallery button
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -180,77 +218,47 @@ class ProfileImageUploadWidget extends ConsumerWidget {
                 onPressed: imageState.isUploading
                     ? null
                     : () async {
-                  try {
-                    // T133: Request gallery permission before opening picker
-                    final hasPermission = await ImagePickerPermissionsHandler
-                        .requestGalleryPermission(context);
-                    if (!hasPermission) {
-                      return; // User denied permission
-                    }
+                        try {
+                          // T133: Request gallery permission before opening picker
+                          final hasPermission =
+                              await ImagePickerPermissionsHandler.requestGalleryPermission(
+                                context,
+                              );
+                          if (!hasPermission) {
+                            return; // User denied permission
+                          }
 
-                    final image =
-                    await ImagePickerService.pickImageFromGallery();
-                    if (image != null) {
-                      // Comprehensive validation with specific error messages
-                      final validationError =
-                          await ImagePickerService.validateImageComprehensive(image);
-                      if (validationError != null) {
-                        if (context.mounted) {
-                          showCopyableErrorSnackBar(context, validationError.message);
+                          final image =
+                              await ImagePickerService.pickImageFromGallery();
+                          if (image != null) {
+                            // Comprehensive validation with specific error messages
+                            final validationError =
+                                await ImagePickerService.validateImageComprehensive(
+                                  image,
+                                );
+                            if (validationError != null) {
+                              if (context.mounted) {
+                                showCopyableErrorSnackBar(
+                                  context,
+                                  validationError.message,
+                                );
+                              }
+                              return;
+                            }
+                            await ref
+                                .read(profileImageProvider.notifier)
+                                .selectImage(
+                                  image.path,
+                                  imageBytes: await image.readAsBytes(),
+                                  imageName: image.name,
+                                );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            showCopyableErrorSnackBar(context, 'Error: $e');
+                          }
                         }
-                        return;
-                      }
-                      await ref
-                          .read(profileImageProvider.notifier)
-                          .selectImage(image.path);
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      showCopyableErrorSnackBar(context, 'Error: $e');
-                    }
-                  }
-                },
-              ),
-            ),
-            const SizedBox(width: 12),
-            Tooltip(
-              message: 'Take photo with camera',
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.camera_alt),
-                label: const Text('Camera'),
-                onPressed: imageState.isUploading
-                    ? null
-                    : () async {
-                  try {
-                    // T133: Request camera permission before opening picker
-                    final hasPermission = await ImagePickerPermissionsHandler
-                        .requestCameraPermission(context);
-                    if (!hasPermission) {
-                      return; // User denied permission
-                    }
-
-                    final image =
-                    await ImagePickerService.pickImageFromCamera();
-                    if (image != null) {
-                      // Comprehensive validation with specific error messages
-                      final validationError =
-                          await ImagePickerService.validateImageComprehensive(image);
-                      if (validationError != null) {
-                        if (context.mounted) {
-                          showCopyableErrorSnackBar(context, validationError.message);
-                        }
-                        return;
-                      }
-                      await ref
-                          .read(profileImageProvider.notifier)
-                          .selectImage(image.path);
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      showCopyableErrorSnackBar(context, 'Error: $e');
-                    }
-                  }
-                },
+                      },
               ),
             ),
           ],
@@ -277,32 +285,49 @@ class ProfileImageUploadWidget extends ConsumerWidget {
             icon: const Icon(Icons.cloud_upload),
             label: const Text('Upload'),
             onPressed: () async {
-              await ref.read(profileImageProvider.notifier).uploadImage(token: token);
-              
+              await ref
+                  .read(profileImageProvider.notifier)
+                  .uploadImage(token: token);
+
               // Check updated state after upload completes
               final updatedImageState = ref.read(profileImageProvider);
-              
+
               // Refresh profile after successful upload to show new image URL
-              if (context.mounted && updatedImageState.error == null && userId != null) {
+              if (context.mounted &&
+                  updatedImageState.error == null &&
+                  userId != null &&
+                  token != null) {
                 // Mark form as dirty so SAVE button is enabled (image has changed)
                 // Fetch the current user profile to access the form state notifier
                 try {
-                  final profileAsync = ref.read(userProfileWithTokenProvider((userId!, token)));
+                  final profileAsync = ref.read(
+                    userProfileWithTokenProvider((userId!, token)),
+                  );
                   if (profileAsync.hasValue) {
                     final userProfile = profileAsync.value!;
-                    ref.read(profileFormStateProvider(userProfile).notifier).markImageChanged();
+                    ref
+                        .read(profileFormStateProvider(userProfile).notifier)
+                        .markImageChanged();
                   }
                 } catch (e) {
                   // If we can't mark it as dirty, continue anyway - profile will still be saved
-                  debugPrint('[ProfileImageUploadWidget] Error marking form dirty: $e');
                 }
-                
+
                 // Refresh the userProfileProvider to update profile with new image URL
-                await ref.refresh(userProfileWithTokenProvider((userId!, token)));
-                
+                await ref.refresh(
+                  userProfileWithTokenProvider((userId!, token)),
+                );
+
+                // Also invalidate the chats module's profile provider so chat list avatars update
+                ref.invalidate(
+                  chats_profile_provider.userProfileProvider((userId!, token!)),
+                );
+
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Image uploaded successfully!')),
+                    const SnackBar(
+                      content: Text('Image uploaded successfully!'),
+                    ),
                   );
                 }
               }

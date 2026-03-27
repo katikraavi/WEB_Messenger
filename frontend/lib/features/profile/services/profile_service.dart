@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:frontend/core/services/api_client.dart';
 import '../../../core/models/user.dart';
 
 class ProfileService {
-  static const String baseUrl = 'http://localhost:8081';
   final String? authToken;
+
+  static String get baseUrl => ApiClient.getBaseUrl();
 
   ProfileService({this.authToken});
 

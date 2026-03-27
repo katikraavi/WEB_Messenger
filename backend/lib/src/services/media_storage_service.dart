@@ -169,7 +169,7 @@ class MediaStorageService {
       validateFile(fileName, fileBytes.length, mimeType);
 
       // Generate safe file name with UUID prefix
-      final fileId = const Uuid().v4();
+      final fileId = Uuid().v4();
       final ext = path.extension(fileName);
       final safeFileName = '$fileId$ext';
       final filePath = '$uploadDir/$safeFileName';
@@ -179,7 +179,7 @@ class MediaStorageService {
       await file.writeAsBytes(fileBytes);
 
       // Store metadata in database
-      const mediaId = Uuid();
+      final mediaId = Uuid();
       final id = mediaId.v4();
 
       await connection.execute(

@@ -1,7 +1,7 @@
 import 'package:test/test.dart';
-import '../../lib/src/models/chat_model.dart';
-import '../../lib/src/models/chat_member_model.dart';
-import '../../lib/src/services/chat_service.dart';
+import 'package:messenger_server/src/models/chat_model.dart';
+import 'package:messenger_server/src/models/chat_member_model.dart';
+import 'package:messenger_server/src/services/chat_service.dart';
 
 void main() {
   group('ChatService', () {

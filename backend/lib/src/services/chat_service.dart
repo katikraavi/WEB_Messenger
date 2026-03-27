@@ -108,6 +108,7 @@ class ChatService {
   /// Throws: Exception if database query fails
   Future<List<Message>> getMessages(
     String chatId, {
+    required String viewerUserId,
     int limit = 20,
     DateTime? beforeCursor,
   }) async {
@@ -118,13 +119,25 @@ class ChatService {
                m.sender_id,
                m.recipient_id,
                m.encrypted_content,
-               COALESCE(mds.status, m.status) as effective_status,
+               CASE
+                 WHEN m.sender_id = @viewerUserId THEN
+                   CASE
+                     WHEN COUNT(mds.recipient_id) = 0 THEN m.status
+                     WHEN COUNT(CASE WHEN mds.status = 'read' THEN 1 END) = COUNT(mds.recipient_id) THEN 'read'
+                     WHEN COUNT(CASE WHEN mds.status IN ('delivered', 'read') THEN 1 END) > 0 THEN 'delivered'
+                     ELSE 'sent'
+                   END
+                 ELSE COALESCE(MAX(CASE WHEN mds.recipient_id = @viewerUserId THEN mds.status END), m.status)
+               END as effective_status,
                m.created_at,
                m.edited_at,
                m.deleted_at,
                m.is_deleted,
-           m.media_url,
-           m.media_type,
+               m.media_url,
+               m.media_type,
+               COUNT(mds.recipient_id)::int AS recipient_count,
+               COUNT(CASE WHEN mds.status IN ('delivered', 'read') THEN 1 END)::int AS delivered_count,
+               COUNT(CASE WHEN mds.status = 'read' THEN 1 END)::int AS read_count,
                u.username as sender_username,
                u.profile_picture_url as sender_avatar
         FROM $_messagesTable m
@@ -136,6 +149,7 @@ class ChatService {
       Map<String, dynamic> substitutionValues = {
         'chatId': chatId,
         'limit': limit,
+        'viewerUserId': viewerUserId,
       };
 
       if (beforeCursor != null) {
@@ -143,7 +157,12 @@ class ChatService {
         substitutionValues['beforeCursor'] = beforeCursor;
       }
 
-      query += ' ORDER BY m.created_at DESC LIMIT @limit';
+      query += '''
+        GROUP BY m.id, m.chat_id, m.sender_id, m.recipient_id, m.encrypted_content,
+                 m.status, m.created_at, m.edited_at, m.deleted_at, m.is_deleted,
+                 m.media_url, m.media_type, u.username, u.profile_picture_url
+        ORDER BY m.created_at DESC
+        LIMIT @limit''';
 
       final result = await connection.query(
         query,
@@ -153,8 +172,8 @@ class ChatService {
       return result.map((row) {
         final message = _rowToMessage(row);
         // Add sender username and avatar to response
-        message.senderUsername = row[12] as String?;
-        message.senderAvatarUrl = row[13] as String?;
+        message.senderUsername = row[15] as String?;
+        message.senderAvatarUrl = row[16] as String?;
         return message;
       }).toList();
     } catch (e) {
@@ -619,6 +638,9 @@ class ChatService {
       isDeleted: row[9] as bool? ?? false,
       mediaUrl: row[10] as String?,
       mediaType: row[11] as String?,
+      recipientCount: row[12] as int? ?? 0,
+      deliveredCount: row[13] as int? ?? 0,
+      readCount: row[14] as int? ?? 0,
     );
   }
 }

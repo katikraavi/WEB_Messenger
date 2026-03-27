@@ -1,0 +1,3 @@
+bool isWslRuntime() {
+  return false;
+}

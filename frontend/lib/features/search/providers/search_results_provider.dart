@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/core/services/api_client.dart';
 import '../../../utils/secure_storage_wrapper.dart';
 import '../services/search_service.dart';
 
@@ -16,14 +17,11 @@ final authTokenProvider = FutureProvider<String>((ref) async {
     final token = await storage.read(key: 'auth_token');
     
     if (token != null) {
-      print('[AuthToken] Successfully retrieved token');
       return token;
     }
     
-    print('[AuthToken] No token stored');
     return '';
   } catch (e) {
-    print('[AuthToken] Error reading token: $e');
     return '';
   }
 });
@@ -64,7 +62,7 @@ class SearchResultsState {
 // Provider for SearchService instance
 final searchServiceProvider = Provider((ref) {
   // Get base URL from config (or use default)
-  final baseUrl = 'http://localhost:8081';
+  final baseUrl = ApiClient.getBaseUrl();
   
   // Get auth token from secure storage
   String getToken() {
@@ -84,7 +82,7 @@ final searchServiceProvider = Provider((ref) {
 
 // Provider for SearchService with token
 final searchServiceWithTokenProvider = FutureProvider((ref) async {
-  const baseUrl = 'http://localhost:8081';
+  final baseUrl = ApiClient.getBaseUrl();
   
   // Get token asynchronously
   final tokenAsync = await ref.watch(authTokenProvider.future);
@@ -144,7 +142,6 @@ final combinedSearchProvider = FutureProvider.family<List<UserSearchResult>, Str
       try {
         return await searchService.searchByEmail(query);
       } catch (e) {
-        print('[CombinedSearch] Email search failed, trying username search: $e');
         try {
           return await searchService.searchByUsername(query);
         } catch (_) {
@@ -178,7 +175,6 @@ final combinedSearchProvider = FutureProvider.family<List<UserSearchResult>, Str
         return merged;
       } catch (e) {
         // If parallel search completely fails, try username first
-        print('[CombinedSearch] Parallel search failed: $e, trying individual searches');
         try {
           return await searchService.searchByUsername(query);
         } catch (_) {
@@ -191,7 +187,6 @@ final combinedSearchProvider = FutureProvider.family<List<UserSearchResult>, Str
       }
     }
   } catch (e) {
-    print('[CombinedSearch] All search attempts failed: $e');
     rethrow;
   }
 });

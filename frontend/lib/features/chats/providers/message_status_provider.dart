@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/message_model.dart';
+import 'package:frontend/core/services/api_client.dart';
 import '../services/chat_api_service.dart';
 import '../services/message_websocket_service.dart';
 import '../services/message_encryption_service.dart';
@@ -11,6 +11,11 @@ final messageStatusUpdateProvider = StreamProvider.autoDispose<({
   String messageId,
   String newStatus,
   String chatId,
+  String? aggregateStatus,
+  int? recipientCount,
+  int? deliveredCount,
+  int? readCount,
+  String? updatedBy,
 })?>(
   (ref) async* {
     // Watch WebSocket service to get access to event stream
@@ -27,6 +32,11 @@ final messageStatusUpdateProvider = StreamProvider.autoDispose<({
             messageId: messageId,
             newStatus: newStatus,
             chatId: event.chatId,
+            aggregateStatus: event.data['aggregateStatus'] as String?,
+            recipientCount: event.data['recipientCount'] as int?,
+            deliveredCount: event.data['deliveredCount'] as int?,
+            readCount: event.data['readCount'] as int?,
+            updatedBy: event.data['updatedBy'] as String?,
           );
         }
       }
@@ -37,14 +47,12 @@ final messageStatusUpdateProvider = StreamProvider.autoDispose<({
 /// Provider to auto-mark messages as read when viewing a chat
 /// Call this when entering a chat to mark all unread messages as 'read'
 final autoMarkAsReadProvider =
-    FutureProvider.family<void, ({String chatId, String token, String currentUserId})>(
+    FutureProvider.family<void, ({String chatId, String token, String currentUserId, bool isGroup})>(
   (ref, params) async {
-    final (:chatId, :token, :currentUserId) = params;
-    final apiService = ChatApiService(baseUrl: 'http://localhost:8081');
+    final (:chatId, :token, :currentUserId, :isGroup) = params;
+    final apiService = ChatApiService(baseUrl: ApiClient.getBaseUrl());
 
     try {
-      print('[AutoMarkAsRead] ⭐ PROVIDER INVOKED for chat $chatId');
-      print('[AutoMarkAsRead] 🔄 Starting to mark messages as read for chat $chatId');
       
       // Fetch messages directly from API (don't use localMessagesProvider to avoid duplicate notifier)
       final fetchedMessages = await apiService.fetchMessages(
@@ -53,57 +61,41 @@ final autoMarkAsReadProvider =
         limit: 50,
       );
       
-      print('[AutoMarkAsRead] 📥 Fetched ${fetchedMessages.length} messages from API');
-      
-      // Show all message statuses to debug
-      final statuses = fetchedMessages.map((m) => m.status).toList();
-      print('[AutoMarkAsRead] 📊 All message statuses from API: $statuses');
-      final sentCount = fetchedMessages.where((m) => m.status == 'sent').length;
-      final deliveredCount = fetchedMessages.where((m) => m.status == 'delivered').length;
-      final readCount = fetchedMessages.where((m) => m.status == 'read').length;
-      print('[AutoMarkAsRead] 📊 Status breakdown: sent=$sentCount, delivered=$deliveredCount, read=$readCount');
       
       // Decrypt messages
-      final decryptedMessages = await MessageEncryptionService.decryptMessages(fetchedMessages);
+      // Decrypt messages using AES-256-GCM with user-specific key
+      // Extract user ID from token (first 36 chars of base64 decoded value)
+      final decryptedMessages = await MessageEncryptionService.decryptMessages(
+        fetchedMessages,
+        userId: currentUserId,
+      );
       
-      print('[AutoMarkAsRead] 🔐 Decrypted ${decryptedMessages.length} messages');
       
       final unreadMessages = decryptedMessages
           .where((msg) => msg.status != 'read' && msg.senderId != currentUserId)
           .toList();
 
-      print('[AutoMarkAsRead] 📖 Found ${unreadMessages.length} unread messages (status != "read")');
       if (unreadMessages.isNotEmpty) {
-        print('[AutoMarkAsRead] 📋 Unread message statuses: ${unreadMessages.map((m) => '${m.id.substring(0, 8)} (status=${m.status})').toList()}');
       }
 
       if (unreadMessages.isEmpty) {
-        print('[AutoMarkAsRead] ℹ️ No unread messages to mark');
         return;
       }
 
       // Mark each unread message as read
-      int successCount = 0;
       for (final message in unreadMessages) {
         try {
-          print('[AutoMarkAsRead] 📤 Marking ${message.id} as read (current status: ${message.status})');
           await apiService.updateMessageStatus(
             token: token,
             chatId: chatId,
             messageId: message.id,
             newStatus: 'read',
           );
-          print('[AutoMarkAsRead] ✓ Marked ${message.id} as read');
-          successCount++;
         } catch (e) {
-          print('[AutoMarkAsRead] ⚠️ Error marking ${message.id} as read: $e');
         }
       }
       
-      print('[AutoMarkAsRead] ✅ Finished marking messages as read ($successCount/${unreadMessages.length} succeeded)');
-      print('[AutoMarkAsRead] 💙 Sender should now see blue checkmarks for these messages');
     } catch (e) {
-      print('[AutoMarkAsRead] ❌ Error auto-marking as read: $e');
       rethrow;
     }
   },
@@ -112,12 +104,9 @@ final autoMarkAsReadProvider =
 /// Provider to update local message with new status
 /// This is called when a messageStatusChanged event is received
 class MessageStatusNotifier extends StateNotifier<void> {
-  final ChatApiService _apiService;
-  final Ref _ref;
-
   MessageStatusNotifier(
-    this._apiService,
-    this._ref,
+    ChatApiService apiService,
+    Ref ref,
   ) : super(null);
 
   /// Handle status change event
@@ -129,13 +118,9 @@ class MessageStatusNotifier extends StateNotifier<void> {
     required String token,
   }) {
     try {
-      print(
-          '[MessageStatusNotifier] 📨 Status changed: $messageId → $newStatus');
       // Note: Message status is already being updated in real-time via 
       // WebSocket messageStatusChanged events handled in LocalMessagesNotifier._handleWebSocketEvent()
-      print('[MessageStatusNotifier] ✓ Status updated for message $messageId');
     } catch (e) {
-      print('[MessageStatusNotifier] ❌ Error handling status change: $e');
     }
   }
 }
@@ -143,5 +128,8 @@ class MessageStatusNotifier extends StateNotifier<void> {
 /// Notifier for message status updates
 final messageStatusNotifierProvider =
     StateNotifierProvider.autoDispose<MessageStatusNotifier, void>(
-  (ref) => MessageStatusNotifier(ChatApiService(baseUrl: 'http://localhost:8081'), ref),
+  (ref) => MessageStatusNotifier(
+    ChatApiService(baseUrl: ApiClient.getBaseUrl()),
+    ref,
+  ),
 );

@@ -236,7 +236,6 @@ class ProfileFormStateNotifier extends StateNotifier<ProfileFormState> {
       );
       return true;
     } catch (e) {
-      debugPrint('[ProfileFormStateNotifier] Error setting image: $e');
       state = state.copyWith(error: ValidationError.imageFormatInvalid);
       return false;
     }
