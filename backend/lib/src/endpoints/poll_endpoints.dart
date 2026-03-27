@@ -10,7 +10,8 @@ import '../services/jwt_service.dart';
 /// Route contract (matches frontend [poll_service.dart]):
 ///   POST   /api/polls                     — create poll
 ///   GET    /api/polls/<pollId>            — fetch poll with results
-///   POST   /api/polls/<pollId>/vote       — cast/change a vote
+///   POST   /api/polls/<pollId>/vote       — cast or change a vote
+///   DELETE /api/polls/<pollId>/vote       — retract a vote
 ///   POST   /api/polls/<pollId>/close      — close a poll (creator only)
 class PollEndpoints {
   final PollService _pollService;
@@ -27,6 +28,7 @@ class PollEndpoints {
     r.post('/api/polls', _createPoll);
     r.get('/api/polls/<pollId>', _getPoll);
     r.post('/api/polls/<pollId>/vote', _vote);
+    r.delete('/api/polls/<pollId>/vote', _retractVote);
     r.post('/api/polls/<pollId>/close', _closePoll);
     return r;
   }
@@ -183,6 +185,37 @@ class PollEndpoints {
     } catch (e) {
       return Response.internalServerError(
         body: jsonEncode({'error': 'Failed to close poll'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+  }
+
+  Future<Response> _retractVote(Request request, String pollId) async {
+    final userId = _extractUserId(request);
+    if (userId == null) {
+      return Response.unauthorized(
+        jsonEncode({'error': 'Unauthorized'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+
+    try {
+      await _pollService.retractVote(
+        pollId: pollId,
+        userId: userId,
+      );
+
+      return Response.ok(
+        jsonEncode({'message': 'Vote retracted'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    } on StateError catch (e) {
+      return Response(409,
+          body: jsonEncode({'error': e.message}),
+          headers: {'Content-Type': 'application/json'});
+    } catch (e) {
+      return Response.internalServerError(
+        body: jsonEncode({'error': 'Failed to retract vote'}),
         headers: {'Content-Type': 'application/json'},
       );
     }

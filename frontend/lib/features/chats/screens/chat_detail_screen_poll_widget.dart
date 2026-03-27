@@ -86,6 +86,18 @@ class _PollMessageWidgetState extends State<_PollMessageWidget> {
     await _loadPoll();
   }
 
+  Future<void> _handleRetractVote() async {
+    final pollId = _pollData?.id;
+    if (pollId == null) {
+      return;
+    }
+    await _pollService.retractVote(
+      token: widget.token,
+      pollId: pollId,
+    );
+    await _loadPoll();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -108,6 +120,7 @@ class _PollMessageWidgetState extends State<_PollMessageWidget> {
     return PollWidget(
       poll: _pollData!,
       onVote: _handleVote,
+      onRetract: _handleRetractVote,
     );
   }
 }

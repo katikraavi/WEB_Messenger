@@ -160,6 +160,46 @@ class PollService {
     );
   }
 
+  /// Retract a user's vote on a poll.
+  ///
+  /// Removes the user's vote entirely from the poll (unlike vote() which
+  /// changes to a new option).
+  Future<void> retractVote({
+    required String pollId,
+    required String userId,
+  }) async {
+    // Ensure the poll exists and is open
+    final pollResult = await connection.execute(
+      Sql.named('SELECT is_closed FROM polls WHERE id = @id LIMIT 1'),
+      parameters: {'id': pollId},
+    );
+    if (pollResult.isEmpty) {
+      throw StateError('Poll not found: $pollId');
+    }
+    final isClosed = pollResult.first.toColumnMap()['is_closed'] as bool;
+    if (isClosed) {
+      throw StateError('Cannot retract votes on a closed poll.');
+    }
+
+    // Check if user has a vote to retract
+    final voteResult = await connection.execute(
+      Sql.named(
+          'SELECT id FROM poll_votes WHERE poll_id = @poll_id AND user_id = @user_id LIMIT 1'),
+      parameters: {'poll_id': pollId, 'user_id': userId},
+    );
+
+    if (voteResult.isEmpty) {
+      throw StateError('No vote found to retract.');
+    }
+
+    // Delete the vote
+    await connection.execute(
+      Sql.named(
+          'DELETE FROM poll_votes WHERE poll_id = @poll_id AND user_id = @user_id'),
+      parameters: {'poll_id': pollId, 'user_id': userId},
+    );
+  }
+
   /// Fetch a poll with its options and per-option vote counts.
   Future<Map<String, dynamic>> getPollWithResults({
     required String pollId,

@@ -9,7 +9,7 @@ import '../widgets/poll_widget.dart';
 ///   POST   /api/polls                   — create a poll
 ///   GET    /api/polls/<id>              — get poll with aggregated results
 ///   POST   /api/polls/<id>/vote         — cast or change vote
-///   DELETE /api/polls/<id>/vote         — retract vote  (future)
+///   DELETE /api/polls/<id>/vote         — retract vote
 ///   POST   /api/polls/<id>/close        — close poll (creator only)
 class PollServiceClient {
   final String baseUrl;
@@ -95,6 +95,16 @@ class PollServiceClient {
       body: jsonEncode({'optionId': optionId}),
     );
     _assertSuccess(response, 'cast vote');
+  }
+
+  /// Retract a previously cast vote on [pollId].
+  Future<void> retractVote({
+    required String token,
+    required String pollId,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/polls/$pollId/vote');
+    final response = await _client.delete(uri, headers: _headers(token));
+    _assertSuccess(response, 'retract vote');
   }
 
   /// Close a poll.  Only the poll creator can do this.

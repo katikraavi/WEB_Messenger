@@ -30,6 +30,7 @@ import 'group_chat_screen.dart';
 import '../../auth/providers/auth_provider.dart' as auth;
 import '../../polls/widgets/poll_widget.dart';
 import '../../polls/services/poll_service.dart';
+import '../../polls/screens/create_poll_screen.dart';
 
 part 'chat_detail_screen_handlers.dart';
 part 'chat_detail_screen_poll_widget.dart';
@@ -507,7 +508,36 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
               });
             },
           ),
-          if (widget.isGroup)
+          if (widget.isGroup) ...[
+            // Create poll button - only for group chats
+            IconButton(
+              icon: const Icon(Icons.poll),
+              tooltip: 'Create poll',
+              onPressed: () async {
+                final pollId = await Navigator.of(context).push<String>(
+                  MaterialPageRoute(
+                    builder: (_) => CreatePollScreen(
+                      groupId: widget.chatId,
+                      token: token,
+                      baseUrl: _backendBaseUrl,
+                    ),
+                  ),
+                );
+
+                if (pollId != null && mounted) {
+                  // Poll created successfully
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Poll created successfully'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                  // Optionally: auto-send the poll as a message
+                  // This would be implemented separately if desired
+                }
+              },
+            ),
+            // View members button
             IconButton(
               icon: const Icon(Icons.group),
               tooltip: 'View members',
@@ -521,7 +551,8 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                   ),
                 );
               },
-            )
+            ),
+          ]
           else
             PopupMenuButton<String>(
               onSelected: (value) {
@@ -765,6 +796,18 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                       onAudioTap: () {
                         _handleAudioRecordingTap(token);
                       },
+                      // Poll creation handler (for group chats)
+                      onPollTap: widget.isGroup ? () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => CreatePollScreen(
+                              groupId: widget.chatId,
+                              token: token,
+                              baseUrl: _backendBaseUrl,
+                            ),
+                          ),
+                        );
+                      } : null,
                       isRecordingAudio: _isRecordingAudio,
                     ),
                   ),

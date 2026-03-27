@@ -78,15 +78,20 @@ class PollWidget extends StatelessWidget {
   /// network call.
   final Future<void> Function(String optionId) onVote;
 
+  /// Called when the user retracts their vote. Optional.
+  final Future<void> Function()? onRetract;
+
   const PollWidget({
     super.key,
     required this.poll,
     required this.onVote,
+    this.onRetract,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final hasUserVoted = poll.currentUserVotedOptionId != null;
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
@@ -137,12 +142,28 @@ class PollWidget extends StatelessWidget {
                       : () => onVote(option.id),
                 )),
 
-            // Footer: total vote count
+            // Footer: total vote count + retract button
             const SizedBox(height: 8),
-            Text(
-              '${poll.totalVotes} vote${poll.totalVotes == 1 ? '' : 's'}',
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: Colors.grey.shade600),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '${poll.totalVotes} vote${poll.totalVotes == 1 ? '' : 's'}',
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: Colors.grey.shade600),
+                ),
+                // Show retract option if user voted and poll is open
+                if (hasUserVoted && !poll.isClosed && onRetract != null)
+                  TextButton.icon(
+                    onPressed: onRetract,
+                    icon: const Icon(Icons.close, size: 16),
+                    label: const Text('Retract'),
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+              ],
             ),
           ],
         ),
