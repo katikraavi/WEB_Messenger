@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
+import 'package:frontend/core/services/api_client.dart';
 import 'package:video_player/video_player.dart';
 import '../models/message_model.dart';
 import './message_status_indicator.dart';
@@ -19,6 +20,7 @@ import './user_avatar_widget.dart';
 /// - "(edited)" indicator for edited messages (T054)
 /// - Encryption indicator
 /// - Long content wrapping
+/// - Search result highlighting
 class MessageBubble extends StatelessWidget {
   final Message message;
   final String currentUserId;
@@ -33,6 +35,15 @@ class MessageBubble extends StatelessWidget {
   /// Whether this is the first message from this sender in a group
   final bool isFirstFromSender;
 
+  /// Whether this message is currently the focused search result
+  final bool isCurrentSearchResult;
+
+  /// Whether this message is a search result (but not the current one)
+  final bool isOtherSearchResult;
+
+  /// Search query to highlight in the message content
+  final String? searchQuery;
+
   const MessageBubble({
     super.key,
     required this.message,
@@ -43,6 +54,9 @@ class MessageBubble extends StatelessWidget {
     this.onDelete,
     this.isLastFromSender = true,
     this.isFirstFromSender = true,
+    this.isCurrentSearchResult = false,
+    this.isOtherSearchResult = false,
+    this.searchQuery,
   });
 
   /// Check if message is sent by current user
@@ -111,18 +125,49 @@ class MessageBubble extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: _getBubbleColor(),
                         borderRadius: BorderRadius.circular(16),
-                        border: message.hasError
-                            ? Border.all(color: Colors.red.shade300, width: 1)
-                            : null,
-                        boxShadow: message.isSending
+                        border: isCurrentSearchResult
+                            ? Border.all(
+                                color: Colors.orange.shade600,
+                                width: 3,
+                              )
+                            : isOtherSearchResult
+                                ? Border.all(
+                                    color: Colors.amber.shade300,
+                                    width: 2,
+                                  )
+                                : message.hasError
+                                    ? Border.all(
+                                        color: Colors.red.shade300,
+                                        width: 1,
+                                      )
+                                    : null,
+                        boxShadow: isCurrentSearchResult
                             ? [
                                 BoxShadow(
-                                  color: Colors.blue.withValues(alpha: 0.3),
-                                  blurRadius: 4,
-                                  spreadRadius: 1,
+                                  color: Colors.orange.withValues(alpha: 0.5),
+                                  blurRadius: 12,
+                                  spreadRadius: 2,
                                 ),
                               ]
-                            : null,
+                            : isOtherSearchResult
+                                ? [
+                                    BoxShadow(
+                                      color: Colors.amber.withValues(alpha: 0.3),
+                                      blurRadius: 8,
+                                      spreadRadius: 1,
+                                    ),
+                                  ]
+                                : message.isSending
+                                    ? [
+                                        BoxShadow(
+                                          color: Colors.blue.withValues(
+                                            alpha: 0.3,
+                                          ),
+                                          blurRadius: 4,
+                                          spreadRadius: 1,
+                                        ),
+                                      ]
+                                    : null,
                       ),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
@@ -143,15 +188,7 @@ class MessageBubble extends StatelessWidget {
                               padding: message.mediaUrl != null
                                   ? const EdgeInsets.only(top: 8)
                                   : EdgeInsets.zero,
-                              child: Text(
-                                displayContent,
-                                style: TextStyle(
-                                  color: _getTextColor(),
-                                  fontSize: 16,
-                                  height: 1.4,
-                                ),
-                                softWrap: true,
-                              ),
+                              child: _buildHighlightedText(displayContent, searchQuery),
                             ),
                           const SizedBox(height: 6),
                           // Timestamp + Edited indicator + Status indicator row
@@ -339,10 +376,7 @@ class MessageBubble extends StatelessWidget {
       return mediaUrl;
     }
 
-    const baseUrl = String.fromEnvironment(
-      'API_BASE_URL',
-      defaultValue: 'http://localhost:8081',
-    );
+    final baseUrl = ApiClient.getBaseUrl();
 
     if (mediaUrl.startsWith('/')) {
       return '$baseUrl$mediaUrl';
@@ -357,6 +391,88 @@ class MessageBubble extends StatelessWidget {
       imageUrl: message.senderAvatarUrl,
       radius: 18,
       username: message.senderUsername,
+    );
+  }
+
+  /// Build text widget with search term highlighting
+  Widget _buildHighlightedText(String text, String? searchQuery) {
+    // If no search query or empty query, return plain text
+    if (searchQuery == null || searchQuery.trim().isEmpty) {
+      return Text(
+        text,
+        style: TextStyle(
+          color: _getTextColor(),
+          fontSize: 16,
+          height: 1.4,
+        ),
+        softWrap: true,
+      );
+    }
+
+    // Split text by search term (case-insensitive)
+    final query = searchQuery.toLowerCase();
+    final lowerText = text.toLowerCase();
+    final spans = <TextSpan>[];
+    
+    int lastIndex = 0;
+    int index = 0;
+
+    while ((index = lowerText.indexOf(query, lastIndex)) != -1) {
+      // Add non-matching text before the match
+      if (index > lastIndex) {
+        spans.add(TextSpan(
+          text: text.substring(lastIndex, index),
+          style: TextStyle(
+            color: _getTextColor(),
+            fontSize: 16,
+            height: 1.4,
+          ),
+        ));
+      }
+
+      // Add highlighted match
+      spans.add(TextSpan(
+        text: text.substring(index, index + query.length),
+        style: TextStyle(
+          color: Colors.black87,
+          fontSize: 16,
+          height: 1.4,
+          backgroundColor: Colors.yellow[300],
+          fontWeight: FontWeight.w600,
+        ),
+      ));
+
+      lastIndex = index + query.length;
+    }
+
+    // Add remaining text after last match
+    if (lastIndex < text.length) {
+      spans.add(TextSpan(
+        text: text.substring(lastIndex),
+        style: TextStyle(
+          color: _getTextColor(),
+          fontSize: 16,
+          height: 1.4,
+        ),
+      ));
+    }
+
+    // If no matches found, return plain text
+    if (spans.isEmpty) {
+      return Text(
+        text,
+        style: TextStyle(
+          color: _getTextColor(),
+          fontSize: 16,
+          height: 1.4,
+        ),
+        softWrap: true,
+      );
+    }
+
+    return RichText(
+      text: TextSpan(children: spans),
+      softWrap: true,
     );
   }
 

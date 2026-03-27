@@ -20,6 +20,6 @@ class MessageSearchResult {
   Map<String, dynamic> toMap() => {
         'message_id': messageId,
         'snippet': snippet,
-        'sent_at': sentAt,
+        'sent_at': sentAt.toIso8601String(),
       };
 }

@@ -1,5 +1,6 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:frontend/core/services/api_client.dart';
 
 /// Service for making HTTP requests to password recovery endpoints
 class PasswordRecoveryService {
@@ -7,9 +8,10 @@ class PasswordRecoveryService {
   final http.Client httpClient;
 
   PasswordRecoveryService({
-    this.baseUrl = 'http://localhost:8081',
+    String? baseUrl,
     http.Client? httpClient,
-  }) : httpClient = httpClient ?? http.Client();
+  }) : baseUrl = baseUrl ?? ApiClient.getBaseUrl(),
+       httpClient = httpClient ?? http.Client();
 
   /// Request password reset email
   Future<PasswordRecoveryResponse> requestPasswordReset({

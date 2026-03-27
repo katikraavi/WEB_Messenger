@@ -130,8 +130,12 @@ extension _ChatDetailScreenStateHandlers on _ChatDetailScreenState {
     String token,
   ) async {
     try {
-      final encryptedContent = MessageEncryptionService.encryptMessage(
+      final currentUserId = currentUserIdFromContext();
+      
+      // Encrypt new message content using AES-256-GCM
+      final encryptedContent = await MessageEncryptionService.encryptMessage(
         newContent,
+        currentUserId,
       );
       final editedMessage = await ChatApiService(baseUrl: _backendBaseUrl)
           .editMessage(
@@ -142,6 +146,7 @@ extension _ChatDetailScreenStateHandlers on _ChatDetailScreenState {
           );
       final decryptedMessage = await MessageEncryptionService.decryptMessage(
         editedMessage,
+        userId: editedMessage.senderId,
       );
 
       _localMessagesNotifier?.upsertMessage(decryptedMessage);
@@ -204,17 +209,26 @@ extension _ChatDetailScreenStateHandlers on _ChatDetailScreenState {
       );
 
 
-      final chatApiService = ChatApiService(baseUrl: 'http://localhost:8081');
+      final currentUserId = currentUserIdFromContext();
+      final chatApiService = ChatApiService(baseUrl: ApiClient.getBaseUrl());
       final mediaPath = '/uploads/media/${uploadedMedia.fileName}';
+      
+      // Encrypt image placeholder using AES-256-GCM
+      final encryptedContent = await MessageEncryptionService.encryptMessage(
+        '[Image]',
+        currentUserId,
+      );
+      
       final sentMessage = await chatApiService.sendMessage(
         token: token,
         chatId: widget.chatId,
-        encryptedContent: base64Encode(utf8.encode('[Image]')),
+        encryptedContent: encryptedContent,
         mediaUrl: mediaPath,
         mediaType: uploadedMedia.mimeType,
       );
       final decryptedMessage = await MessageEncryptionService.decryptMessage(
         sentMessage,
+        userId: sentMessage.senderId,
       );
 
       ref
@@ -269,17 +283,26 @@ extension _ChatDetailScreenStateHandlers on _ChatDetailScreenState {
       );
 
 
-      final chatApiService = ChatApiService(baseUrl: 'http://localhost:8081');
+      final currentUserId = currentUserIdFromContext();
+      final chatApiService = ChatApiService(baseUrl: ApiClient.getBaseUrl());
       final mediaPath = '/uploads/media/${uploadedMedia.fileName}';
+      
+      // Encrypt video placeholder using AES-256-GCM
+      final encryptedContent = await MessageEncryptionService.encryptMessage(
+        '[Video]',
+        currentUserId,
+      );
+      
       final sentMessage = await chatApiService.sendMessage(
         token: token,
         chatId: widget.chatId,
-        encryptedContent: base64Encode(utf8.encode('[Video]')),
+        encryptedContent: encryptedContent,
         mediaUrl: mediaPath,
         mediaType: uploadedMedia.mimeType,
       );
       final decryptedMessage = await MessageEncryptionService.decryptMessage(
         sentMessage,
+        userId: sentMessage.senderId,
       );
 
       ref
@@ -347,17 +370,26 @@ extension _ChatDetailScreenStateHandlers on _ChatDetailScreenState {
         token: token,
       );
 
-      final chatApiService = ChatApiService(baseUrl: 'http://localhost:8081');
+      final currentUserId = currentUserIdFromContext();
+      final chatApiService = ChatApiService(baseUrl: ApiClient.getBaseUrl());
       final mediaPath = '/uploads/media/${uploadedMedia.fileName}';
+      
+      // Encrypt audio placeholder using AES-256-GCM
+      final encryptedContent = await MessageEncryptionService.encryptMessage(
+        '[Audio]',
+        currentUserId,
+      );
+      
       final sentMessage = await chatApiService.sendMessage(
         token: token,
         chatId: widget.chatId,
-        encryptedContent: base64Encode(utf8.encode('[Audio]')),
+        encryptedContent: encryptedContent,
         mediaUrl: mediaPath,
         mediaType: uploadedMedia.mimeType,
       );
       final decryptedMessage = await MessageEncryptionService.decryptMessage(
         sentMessage,
+        userId: sentMessage.senderId,
       );
 
       ref

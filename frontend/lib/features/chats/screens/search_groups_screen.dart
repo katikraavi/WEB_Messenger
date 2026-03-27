@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart' as provider_pkg;
+import 'package:frontend/core/services/api_client.dart';
 
 import '../../auth/providers/auth_provider.dart';
 import '../../invitations/services/group_invite_service.dart';
@@ -13,7 +14,7 @@ class SearchGroupsScreen extends StatefulWidget {
 }
 
 class _SearchGroupsScreenState extends State<SearchGroupsScreen> {
-  static const String _baseUrl = 'http://localhost:8081';
+  static String get _baseUrl => ApiClient.getBaseUrl();
 
   final TextEditingController _searchController = TextEditingController();
   late final GroupInviteService _service;

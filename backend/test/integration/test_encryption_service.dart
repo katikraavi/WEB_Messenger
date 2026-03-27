@@ -1,5 +1,5 @@
 import 'package:test/test.dart';
-import '../../lib/src/services/encryption_service.dart';
+import 'package:messenger_server/src/services/encryption_service.dart';
 
 void main() {
   group('EncryptionService', () {

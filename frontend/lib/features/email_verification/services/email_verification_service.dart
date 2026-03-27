@@ -1,5 +1,6 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:frontend/core/services/api_client.dart';
 
 /// Service for making HTTP requests to email verification endpoints
 class EmailVerificationService {
@@ -7,9 +8,10 @@ class EmailVerificationService {
   final http.Client httpClient;
 
   EmailVerificationService({
-    this.baseUrl = 'http://localhost:8081',
+    String? baseUrl,
     http.Client? httpClient,
-  }) : httpClient = httpClient ?? http.Client();
+  }) : baseUrl = baseUrl ?? ApiClient.getBaseUrl(),
+       httpClient = httpClient ?? http.Client();
 
   /// Request verification email to be sent
   /// Returns EmailVerificationResponse with success/error info

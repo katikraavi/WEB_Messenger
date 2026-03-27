@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart' as provider;
+import 'package:frontend/core/services/api_client.dart';
 
 import '../../auth/providers/auth_provider.dart';
 import '../../invitations/services/group_invite_service.dart';
@@ -14,7 +15,7 @@ class CreateGroupScreen extends StatefulWidget {
 }
 
 class _CreateGroupScreenState extends State<CreateGroupScreen> {
-  static const String _baseUrl = 'http://localhost:8081';
+  static String get _baseUrl => ApiClient.getBaseUrl();
 
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();

@@ -84,7 +84,7 @@ class MessageWebSocketService {
   final _eventStreamController = StreamController<WebSocketEvent>.broadcast();
   final _typingIndicatorsController =
       StreamController<
-        ({String userId, String chatId, bool isTyping})
+        ({String userId, String username, String chatId, bool isTyping})
       >.broadcast();
 
   String? _currentUserId;
@@ -97,7 +97,7 @@ class MessageWebSocketService {
   Stream<WebSocketEvent> get eventStream => _eventStreamController.stream;
 
   /// Stream of typing indicators
-  Stream<({String userId, String chatId, bool isTyping})>
+  Stream<({String userId, String username, String chatId, bool isTyping})>
   get typingIndicators => _typingIndicatorsController.stream;
 
   /// Check if WebSocket is connected
@@ -269,6 +269,7 @@ class MessageWebSocketService {
           final isTyping = event.data['isTyping'] as bool? ?? true;
           _typingIndicatorsController.add((
             userId: event.data['userId'] as String? ?? '',
+            username: event.data['username'] as String? ?? 'Unknown',
             chatId: event.chatId,
             isTyping: isTyping,
           ));

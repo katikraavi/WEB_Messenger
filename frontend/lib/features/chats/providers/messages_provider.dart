@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/core/services/api_client.dart';
 import 'package:frontend/core/notifications/app_feedback_service.dart';
 import '../models/message_model.dart';
 import '../services/chat_api_service.dart';
@@ -24,7 +25,7 @@ final messagesProvider =
       }
 
       // Get API service
-      final apiService = ChatApiService(baseUrl: 'http://localhost:8081');
+      final apiService = ChatApiService(baseUrl: ApiClient.getBaseUrl());
 
       // Fetch messages for this chat
       try {
@@ -132,10 +133,14 @@ class LocalMessagesNotifier extends StateNotifier<List<Message>> {
           final message = Message.fromJson(event.data);
 
           // Decrypt if encrypted (messages from WebSocket arrive encrypted)
+          // IMPORTANT: Use senderId (who encrypted it), not currentUserId (who's receiving it)
           if (!message.isDecrypted && message.encryptedContent.isNotEmpty) {
             try {
               final decryptedMessage =
-                  await MessageEncryptionService.decryptMessage(message);
+                  await MessageEncryptionService.decryptMessage(
+                    message,
+                    userId: message.senderId,
+                  );
               addMessage(decryptedMessage);
 
               // AUTO-READ: If new message from other user AND chat is being viewed, mark as read
@@ -180,6 +185,7 @@ class LocalMessagesNotifier extends StateNotifier<List<Message>> {
         final message = Message.fromJson(event.data);
         final decryptedMessage = await MessageEncryptionService.decryptMessage(
           message,
+          userId: currentUserId,
         );
         upsertMessage(decryptedMessage);
       } else if (event.type == WebSocketEventType.messageDeleted) {
@@ -193,7 +199,7 @@ class LocalMessagesNotifier extends StateNotifier<List<Message>> {
   /// Load messages from server
   Future<void> loadMessagesFromServer() async {
     try {
-      final apiService = ChatApiService(baseUrl: 'http://localhost:8081');
+      final apiService = ChatApiService(baseUrl: ApiClient.getBaseUrl());
 
       final messages = await apiService.fetchMessages(
         token: token,
@@ -202,9 +208,10 @@ class LocalMessagesNotifier extends StateNotifier<List<Message>> {
       );
 
 
-      // Decrypt messages
+      // Decrypt messages using AES-256-GCM with user-specific key
       final decryptedMessages = await MessageEncryptionService.decryptMessages(
         messages,
+        userId: currentUserId,
       );
 
       // Sort by time (oldest first)
@@ -271,7 +278,7 @@ class LocalMessagesNotifier extends StateNotifier<List<Message>> {
   /// Mark a message as delivered via API
   void _markMessageAsDelivered(String messageId) {
     // Call the API to mark as delivered
-    ChatApiService(baseUrl: 'http://localhost:8081')
+    ChatApiService(baseUrl: ApiClient.getBaseUrl())
         .updateMessageStatus(
           token: token,
           chatId: chatId,
@@ -388,7 +395,7 @@ class LocalMessagesNotifier extends StateNotifier<List<Message>> {
       updateMessageStatus(messageId, 'read');
 
       // Then call API to broadcast to sender
-      final apiService = ChatApiService(baseUrl: 'http://localhost:8081');
+      final apiService = ChatApiService(baseUrl: ApiClient.getBaseUrl());
       await apiService.updateMessageStatus(
         token: token,
         chatId: chatId,
@@ -478,7 +485,7 @@ final messagesWithCacheProvider =
       });
 
       // Fetch messages
-      final apiService = ChatApiService(baseUrl: 'http://localhost:8081');
+      final apiService = ChatApiService(baseUrl: ApiClient.getBaseUrl());
 
       try {
         final messages = await apiService.fetchMessages(
@@ -487,10 +494,17 @@ final messagesWithCacheProvider =
           limit: 50,
         );
 
-        // Decrypt all messages using the encryption service
+        // Decrypt all messages using AES-256-GCM encryption service
+        // Note: We don't have access to currentUserId here in this provider,
+        // so we use the token to derive a temporary user context
         final encryptedMessages = messages;
+        // For now, use a placeholder - in production this should be retrieved from auth context
+        final currentUserId = 'user_from_token'; // TODO: Extract actual user ID from token
         final decryptedMessages =
-            await MessageEncryptionService.decryptMessages(encryptedMessages);
+            await MessageEncryptionService.decryptMessages(
+              encryptedMessages,
+              userId: currentUserId,
+            );
 
         return decryptedMessages;
       } catch (e) {
@@ -515,7 +529,7 @@ final editMessageProvider =
         throw Exception('User not authenticated');
       }
 
-      final apiService = ChatApiService(baseUrl: 'http://localhost:8081');
+      final apiService = ChatApiService(baseUrl: ApiClient.getBaseUrl());
 
       try {
 
@@ -551,7 +565,7 @@ final deleteMessageProvider =
         throw Exception('User not authenticated');
       }
 
-      final apiService = ChatApiService(baseUrl: 'http://localhost:8081');
+      final apiService = ChatApiService(baseUrl: ApiClient.getBaseUrl());
 
       try {
 

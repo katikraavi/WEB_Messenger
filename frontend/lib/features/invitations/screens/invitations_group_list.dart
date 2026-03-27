@@ -10,7 +10,7 @@ class _GroupInvitationsList extends ConsumerStatefulWidget {
 }
 
 class _GroupInvitationsListState extends ConsumerState<_GroupInvitationsList> {
-  static const String _baseUrl = 'http://localhost:8081';
+  static String get _baseUrl => ApiClient.getBaseUrl();
 
   late final GroupInviteService _service;
   late Future<List<GroupInviteModel>> _future;

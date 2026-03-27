@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
+import 'package:frontend/core/services/api_client.dart';
 
 import '../models/auth_models.dart';
 import '../../../utils/secure_storage_wrapper.dart';
@@ -21,8 +22,6 @@ class AuthException implements Exception {
 ///
 /// Handles API communication with the backend for registration, login, and session validation
 class AuthService {
-  // Using localhost to connect to Docker container (accessible via 127.0.0.1 on host)
-  static const String _baseUrl = 'http://localhost:8081';
   static const bool _debugLogs = false;
   static const String _deviceIdStorageKey = 'device_id';
   static final SecureStorageWrapper _secureStorage = SecureStorageWrapper();
@@ -33,7 +32,7 @@ class AuthService {
   }
 
   /// Get the base URL (can be overridden for testing)
-  static String get baseUrl => _baseUrl;
+  static String get baseUrl => ApiClient.getBaseUrl();
 
   static Future<String> _getOrCreateDeviceId() async {
     final existing = await _secureStorage.read(key: _deviceIdStorageKey);

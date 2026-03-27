@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:frontend/core/services/api_client.dart';
 import 'resilient_http_client.dart';
 
 class User {
@@ -58,7 +59,6 @@ class Invite {
 }
 
 class InviteService {
-  static const String baseUrl = 'http://localhost:8081';
   static const Duration defaultTimeout = Duration(seconds: 30);
   static const int maxRetries = 3;
   
@@ -72,6 +72,8 @@ class InviteService {
           timeout: timeout ?? defaultTimeout,
           maxRetryAttempts: maxRetries ?? 3,
         );
+
+  static String get baseUrl => ApiClient.getBaseUrl();
   
   /// Search for users by username or email
   Future<List<User>> searchUsers(String query) async {

@@ -1,7 +1,7 @@
 import 'package:test/test.dart';
-import '../../lib/src/models/enums.dart';
-import '../../lib/src/models/message_model.dart';
-import '../../lib/src/services/message_service.dart';
+import 'package:messenger_server/src/models/enums.dart';
+import 'package:messenger_server/src/models/message_model.dart';
+import 'package:messenger_server/src/services/message_service.dart';
 
 void main() {
   group('MessageService', () {

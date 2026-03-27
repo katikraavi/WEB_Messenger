@@ -169,15 +169,14 @@ final typingIndicatorUpdatesProvider =
   
   await for (final typingEvent in webSocket.typingIndicators) {
     
-    final (:userId, :chatId, :isTyping) = typingEvent;
+    final (:userId, :username, :chatId, :isTyping) = typingEvent;
 
 
     final notifier = ref.read(typingIndicatorProvider.notifier);
 
     if (isTyping) {
-      // For now, use userId as username since we don't have it in the event
-      // Backend should send username in the typing indicator data
-      notifier.handleTypingStart(chatId, userId, 'User $userId');
+      // Use username from backend typing event
+      notifier.handleTypingStart(chatId, userId, username);
     } else {
       notifier.handleTypingStop(chatId, userId);
     }

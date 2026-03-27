@@ -6,6 +6,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:frontend/core/notifications/app_feedback_service.dart';
 import 'package:frontend/core/services/app_exception_logger.dart';
+import 'package:frontend/core/services/api_client.dart';
 import '../models/message_model.dart' show Message;
 import '../providers/messages_provider.dart';
 import '../providers/message_status_provider.dart';
@@ -41,7 +42,7 @@ String _displayName(String? value) {
   return value[0].toUpperCase() + value.substring(1);
 }
 
-const String _backendBaseUrl = 'http://localhost:8081';
+String get _backendBaseUrl => ApiClient.getBaseUrl();
 
 /// Screen for displaying a single chat conversation (T042-T043, T025-T027)
 ///
@@ -491,21 +492,21 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         centerTitle: false,
         elevation: 1,
         actions: [
-          if (!widget.isGroup)
-            IconButton(
-              icon: Icon(_searchActive ? Icons.search_off : Icons.search),
-              tooltip: _searchActive ? 'Close search' : 'Search messages',
-              onPressed: () {
-                setState(() {
-                  _searchActive = !_searchActive;
-                  if (!_searchActive) {
-                    _searchResultIds = [];
-                    _searchResultIndex = 0;
-                    _searchController.clear();
-                  }
-                });
-              },
-            ),
+          // Search icon - available for both direct and group chats
+          IconButton(
+            icon: Icon(_searchActive ? Icons.search_off : Icons.search),
+            tooltip: _searchActive ? 'Close search' : 'Search messages',
+            onPressed: () {
+              setState(() {
+                _searchActive = !_searchActive;
+                if (!_searchActive) {
+                  _searchResultIds = [];
+                  _searchResultIndex = 0;
+                  _searchController.clear();
+                }
+              });
+            },
+          ),
           if (widget.isGroup)
             IconButton(
               icon: const Icon(Icons.group),
@@ -863,6 +864,15 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           currentUserId: currentUserId,
           isFirstFromSender: isFirstFromSender,
           isLastFromSender: isLastFromSender,
+          isCurrentSearchResult: _searchActive && 
+              _searchResultIds.isNotEmpty && 
+              _searchResultIndex < _searchResultIds.length &&
+              _searchResultIds[_searchResultIndex] == message.id,
+          isOtherSearchResult: _searchActive && 
+              _searchResultIds.contains(message.id) &&
+              !(_searchResultIndex < _searchResultIds.length && 
+                _searchResultIds[_searchResultIndex] == message.id),
+          searchQuery: _searchActive ? _searchController.text : '',
           onRetry: message.hasError
               ? () => _handleRetry(message, token, currentUserId)
               : null,

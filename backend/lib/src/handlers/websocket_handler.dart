@@ -124,30 +124,14 @@ class WebSocketHandler {
 
         case 'typing.start':
         case 'user_typing':
-          final event = WebSocketEvent(
-            type: WebSocketEventType.messageCreated,
-            data: {
-              'type': 'typing_indicator',
-              'userId': userId,
-              'isTyping': true,
-              ...json['data'] ?? {},
-            },
-          );
-          _webSocketService.broadcastToChat(chatId, event);
+          // Fetch username async for typing indicator
+          _fetchAndBroadcastTypingStart(webSocket, chatId, userId, connection);
           break;
 
         case 'typing.stop':
         case 'user_stopped_typing':
-          final event = WebSocketEvent(
-            type: WebSocketEventType.messageCreated,
-            data: {
-              'type': 'typing_indicator',
-              'userId': userId,
-              'isTyping': false,
-              ...json['data'] ?? {},
-            },
-          );
-          _webSocketService.broadcastToChat(chatId, event);
+          // Fetch username async for typing indicator
+          _fetchAndBroadcastTypingStop(webSocket, chatId, userId, connection);
           break;
 
         default:
@@ -157,5 +141,69 @@ class WebSocketHandler {
     } catch (e) {
       print('[WebSocket] ❌ Error processing message: $e');
     }
+  }
+
+  /// Fetch username and broadcast typing start event
+  static void _fetchAndBroadcastTypingStart(
+    WebSocketChannel webSocket,
+    String chatId,
+    String? userId,
+    Connection connection,
+  ) async {
+    String? username;
+    try {
+      final userRows = await connection.query(
+        'SELECT username FROM users WHERE id = @id LIMIT 1',
+        substitutionValues: {'id': userId},
+      );
+      if (userRows.isNotEmpty) {
+        username = userRows.first[0] as String?;
+      }
+    } catch (e) {
+      print('[WebSocket] Error fetching username for typing indicator: $e');
+    }
+    
+    final event = WebSocketEvent(
+      type: WebSocketEventType.messageCreated,
+      data: {
+        'type': 'typing_indicator',
+        'userId': userId,
+        'username': username ?? 'Unknown',
+        'isTyping': true,
+      },
+    );
+    _webSocketService.broadcastToChat(chatId, event);
+  }
+
+  /// Fetch username and broadcast typing stop event
+  static void _fetchAndBroadcastTypingStop(
+    WebSocketChannel webSocket,
+    String chatId,
+    String? userId,
+    Connection connection,
+  ) async {
+    String? username;
+    try {
+      final userRows = await connection.query(
+        'SELECT username FROM users WHERE id = @id LIMIT 1',
+        substitutionValues: {'id': userId},
+      );
+      if (userRows.isNotEmpty) {
+        username = userRows.first[0] as String?;
+      }
+    } catch (e) {
+      print('[WebSocket] Error fetching username for typing indicator: $e');
+    }
+    
+    final event = WebSocketEvent(
+      type: WebSocketEventType.messageCreated,
+      data: {
+        'type': 'typing_indicator',
+        'userId': userId,
+        'username': username ?? 'Unknown',
+        'isTyping': false,
+      },
+    );
+    _webSocketService.broadcastToChat(chatId, event);
   }
 }

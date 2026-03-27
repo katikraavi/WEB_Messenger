@@ -70,22 +70,6 @@ services:
     volumes:
       - uploads_data:/app/backend/uploads
 
-  # Flutter Web Frontend (nginx serving build/web at port 5000)
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: messenger-frontend
-    ports:
-      - "5000:80"
-    depends_on:
-      serverpod:
-        condition: service_healthy
-    networks:
-      messenger-network:
-        ipv4_address: 172.20.0.5
-    restart: unless-stopped
-
   # ── Mailhog — local email catcher ──────────────────────────────────
   # All outgoing emails are caught here during development.
   # Web UI: http://localhost:8025  |  SMTP: localhost:1025

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
 class MessageSearchBar extends StatelessWidget {
   final TextEditingController controller;
@@ -23,6 +24,7 @@ class MessageSearchBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasResults = totalResults > 0;
+    final isSearching = controller.text.isNotEmpty;
 
     return Material(
       color: Colors.amber.shade50,
@@ -54,6 +56,40 @@ class MessageSearchBar extends StatelessWidget {
                 ),
               ),
             ),
+            // Search term chip - Web only
+            if (kIsWeb && isSearching) ...[
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade600,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.label,
+                      size: 14,
+                      color: Colors.white,
+                    ),
+                    const SizedBox(width: 6),
+                    SizedBox(
+                      width: 200,
+                      child: Text(
+                        'Searching: "${controller.text}"',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(width: 8),
             Text(
               hasResults ? '${currentIndex + 1} of $totalResults' : '0 results',

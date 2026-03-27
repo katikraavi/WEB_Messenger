@@ -1,11 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/core/services/api_client.dart';
 import '../models/chat_model.dart';
 import '../services/chat_api_service.dart';
 import './chat_cache_invalidator.dart';
 
 /// Provider for the chat API service instance
 final chatApiServiceProvider = Provider((ref) {
-  return ChatApiService(baseUrl: 'http://localhost:8081');
+  return ChatApiService(baseUrl: ApiClient.getBaseUrl());
 });
 
 /// FutureProvider for fetching chats

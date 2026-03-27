@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/core/services/api_client.dart';
 import '../services/chat_api_service.dart';
 import '../services/message_websocket_service.dart';
 import '../services/message_encryption_service.dart';
@@ -49,7 +50,7 @@ final autoMarkAsReadProvider =
     FutureProvider.family<void, ({String chatId, String token, String currentUserId, bool isGroup})>(
   (ref, params) async {
     final (:chatId, :token, :currentUserId, :isGroup) = params;
-    final apiService = ChatApiService(baseUrl: 'http://localhost:8081');
+    final apiService = ChatApiService(baseUrl: ApiClient.getBaseUrl());
 
     try {
       
@@ -62,7 +63,12 @@ final autoMarkAsReadProvider =
       
       
       // Decrypt messages
-      final decryptedMessages = await MessageEncryptionService.decryptMessages(fetchedMessages);
+      // Decrypt messages using AES-256-GCM with user-specific key
+      // Extract user ID from token (first 36 chars of base64 decoded value)
+      final decryptedMessages = await MessageEncryptionService.decryptMessages(
+        fetchedMessages,
+        userId: currentUserId,
+      );
       
       
       final unreadMessages = decryptedMessages
@@ -122,5 +128,8 @@ class MessageStatusNotifier extends StateNotifier<void> {
 /// Notifier for message status updates
 final messageStatusNotifierProvider =
     StateNotifierProvider.autoDispose<MessageStatusNotifier, void>(
-  (ref) => MessageStatusNotifier(ChatApiService(baseUrl: 'http://localhost:8081'), ref),
+  (ref) => MessageStatusNotifier(
+    ChatApiService(baseUrl: ApiClient.getBaseUrl()),
+    ref,
+  ),
 );

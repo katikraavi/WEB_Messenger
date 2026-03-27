@@ -1,6 +1,6 @@
 import 'package:test/test.dart';
-import '../../../lib/src/services/search_service.dart';
-import '../../../lib/src/models/user_search_result.dart';
+import 'package:messenger_server/src/services/search_service.dart';
+import 'package:messenger_server/src/models/user_search_result.dart';
 
 void main() {
   // Note: These tests require a real PostgreSQL connection

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/core/services/api_client.dart';
 import '../models/chat_model.dart';
 import '../providers/archived_chats_provider.dart';
 import '../services/chat_api_service.dart';
@@ -240,10 +241,7 @@ class _ArchivedChatTile extends ConsumerWidget {
     return ElevatedButton.icon(
       onPressed: () async {
         try {
-          const baseUrl = String.fromEnvironment(
-            'API_BASE_URL',
-            defaultValue: 'http://localhost:8081',
-          );
+          final baseUrl = ApiClient.getBaseUrl();
           final chatService = ChatApiService(baseUrl: baseUrl);
 
           await chatService.unarchiveChat(token: token, chatId: chat.id);

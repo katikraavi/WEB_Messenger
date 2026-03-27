@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:convert';
 import 'package:frontend/core/notifications/app_feedback_service.dart';
+import 'package:frontend/core/services/api_client.dart';
 import '../models/message_model.dart';
 import '../services/chat_api_service.dart';
 import '../services/message_encryption_service.dart';
@@ -53,7 +54,7 @@ class SendMessageNotifier extends StateNotifier<SendMessageState> {
 
   final Ref ref;
 
-  static const _baseUrl = 'http://localhost:8081';
+  static String get _baseUrl => ApiClient.getBaseUrl();
 
   /// Send a message to a chat with optimistic updates (T027)
   /// 
@@ -159,7 +160,11 @@ class SendMessageNotifier extends StateNotifier<SendMessageState> {
         _upsertLocalMessage(chatId, token, currentUserId, optimisticMessage);
       }
 
-      final encryptedContent = base64Encode(utf8.encode(plaintext));
+      // Encrypt message using AES-256-GCM (same as backend)
+      final encryptedContent = await MessageEncryptionService.encryptMessage(
+        plaintext,
+        currentUserId,
+      );
       final apiService = ChatApiService(baseUrl: _baseUrl);
 
       final sentMessage = await apiService.sendMessage(
@@ -168,8 +173,12 @@ class SendMessageNotifier extends StateNotifier<SendMessageState> {
         encryptedContent: encryptedContent,
       );
 
-      final decryptedMessage = await MessageEncryptionService.decryptMessage(sentMessage);
-
+      // Decrypt received message for local display
+      // Use sentMessage.senderId to decrypt (it's the sender's key)
+      final decryptedMessage = await MessageEncryptionService.decryptMessage(
+        sentMessage,
+        userId: sentMessage.senderId,
+      );
 
       _updateMessagesOptimistic(
         chatId,

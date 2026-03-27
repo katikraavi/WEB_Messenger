@@ -316,7 +316,7 @@ Future<Response> _handleValidateSession(
       final payload = JwtService.validateToken(token);
 
       final result = await database.query(
-        'SELECT email_verified FROM "users" WHERE id = @id',
+        'SELECT username, email_verified FROM "users" WHERE id = @id',
         substitutionValues: {'id': payload.userId},
       );
 
@@ -329,6 +329,7 @@ Future<Response> _handleValidateSession(
       }
 
       final userRow = result.first.toColumnMap();
+      final username = userRow['username'] as String?;
       final emailVerified = userRow['email_verified'] as bool? ?? false;
       if (!emailVerified) {
         return Response(
@@ -338,11 +339,19 @@ Future<Response> _handleValidateSession(
         );
       }
 
+      if (username == null || username.isEmpty) {
+        return Response(
+          500,
+          body: jsonEncode({'error': 'User session is missing profile data'}),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
+
       return Response.ok(
         jsonEncode({
-          'is_authenticated': true,
           'user_id': payload.userId,
           'email': payload.email,
+          'username': username,
         }),
         headers: {'Content-Type': 'application/json'},
       );

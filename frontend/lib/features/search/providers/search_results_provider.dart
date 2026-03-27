@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/core/services/api_client.dart';
 import '../../../utils/secure_storage_wrapper.dart';
 import '../services/search_service.dart';
 
@@ -61,7 +62,7 @@ class SearchResultsState {
 // Provider for SearchService instance
 final searchServiceProvider = Provider((ref) {
   // Get base URL from config (or use default)
-  final baseUrl = 'http://localhost:8081';
+  final baseUrl = ApiClient.getBaseUrl();
   
   // Get auth token from secure storage
   String getToken() {
@@ -81,7 +82,7 @@ final searchServiceProvider = Provider((ref) {
 
 // Provider for SearchService with token
 final searchServiceWithTokenProvider = FutureProvider((ref) async {
-  const baseUrl = 'http://localhost:8081';
+  final baseUrl = ApiClient.getBaseUrl();
   
   // Get token asynchronously
   final tokenAsync = await ref.watch(authTokenProvider.future);

@@ -150,7 +150,8 @@ Future<Response> _handleMessageSearch(
       );
     }
 
-    final membership = await database.query(
+    // Check membership: direct chat OR group chat member
+    final directChatCheck = await database.query(
       '''SELECT 1 FROM chats
          WHERE id = @chatId
            AND (participant_1_id = @userId OR participant_2_id = @userId)
@@ -161,10 +162,22 @@ Future<Response> _handleMessageSearch(
       },
     );
 
-    if (membership.isEmpty) {
+    // Also check if it's a group chat where user is a member
+    final groupChatCheck = await database.query(
+      '''SELECT 1 FROM group_members
+         WHERE group_id = @chatId AND user_id = @userId
+         LIMIT 1''',
+      substitutionValues: {
+        'chatId': chatId,
+        'userId': payload.userId,
+      },
+    );
+
+    if (directChatCheck.isEmpty && groupChatCheck.isEmpty) {
+      print('[MessageSearch] ❌ Forbidden: User ${payload.userId} not member of chat $chatId');
       return Response(
         403,
-        body: jsonEncode({'error': 'Forbidden'}),
+        body: jsonEncode({'error': 'Forbidden - not a member of this chat'}),
         headers: {'Content-Type': 'application/json'},
       );
     }
@@ -176,10 +189,12 @@ Future<Response> _handleMessageSearch(
       jsonEncode(results.map((result) => result.toMap()).toList()),
       headers: {'Content-Type': 'application/json'},
     );
-  } catch (e) {
+  } catch (e, st) {
+    print('[MessageSearch] ❌ Error: $e');
+    print('[MessageSearch] Stack: $st');
     return Response(
       500,
-      body: jsonEncode({'error': 'Server error'}),
+      body: jsonEncode({'error': 'Server error: $e'}),
       headers: {'Content-Type': 'application/json'},
     );
   }

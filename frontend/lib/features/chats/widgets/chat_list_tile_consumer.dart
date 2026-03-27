@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/chat_model.dart';
+import '../models/message_model.dart';
 import '../providers/user_profile_provider.dart';
+import '../providers/messages_provider.dart';
+import '../services/message_encryption_service.dart';
 import 'user_avatar_widget.dart';
 import '../screens/chat_detail_screen.dart';
 
@@ -171,7 +174,14 @@ class ChatListTileConsumer extends ConsumerWidget {
         ),
       ),
       data: (userProfile) {
-        // No bold/unread logic, always normal style
+        // Fetch and decrypt messages for this chat to show actual last message content
+        final messages = ref.watch(
+          localMessagesProvider((
+            chatId: chat.id,
+            token: token,
+            currentUserId: currentUserId,
+          )),
+        );
 
         return _wrapTile(
           context,
@@ -195,14 +205,26 @@ class ChatListTileConsumer extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
-                  child: Text(
-                    chat.lastMessagePreview == null ||
-                            chat.lastMessagePreview!.isEmpty
-                        ? 'No messages yet'
-                        : _truncatePreview(chat.lastMessagePreview!),
-                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
+                  child: Builder(
+                    builder: (context) {
+                      // Display the last message if available, otherwise use backend preview
+                      String displayText = 'No messages yet';
+                      
+                      if (messages.isNotEmpty) {
+                        // Use the decrypted content of the last message
+                        displayText = messages.last.getDisplayContent();
+                      } else if (chat.lastMessagePreview != null && 
+                                 chat.lastMessagePreview!.isNotEmpty) {
+                        displayText = chat.lastMessagePreview!;
+                      }
+                      
+                      return Text(
+                        _truncatePreview(displayText),
+                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      );
+                    },
                   ),
                 ),
                 Padding(

@@ -7,6 +7,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:frontend/core/notifications/app_feedback_service.dart';
 import 'package:frontend/core/services/app_exception_logger.dart';
 import 'package:frontend/core/services/api_client.dart';
+import 'package:frontend/core/config/web_layout_config.dart';
 import 'package:frontend/core/push_notifications/push_notification_handler.dart';
 import 'package:frontend/core/notifications/local_notification_service.dart';
 import 'package:frontend/features/auth/models/auth_models.dart';
@@ -551,14 +552,14 @@ class _AuthenticatedHomeScreenState
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFFEAF2FF), Color(0xFFF8FBFF)],
+          colors: [Color(0xFFF8FAFC), Color(0xFFFCFDFE)],
         ),
       ),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1240),
+          constraints: const BoxConstraints(maxWidth: WebLayoutConfig.kPageMaxWidth),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
             child: body,
           ),
         ),
@@ -789,7 +790,17 @@ class _AuthenticatedHomeScreenState
             selected: _selectedIndex == 2,
             onTap: () => _selectTab(2),
             trailing: pendingCount > 0
-                ? Badge(label: Text(pendingCount.toString()))
+                ? Badge(
+                    backgroundColor: Colors.red[600] ?? Colors.red,
+                    label: Text(
+                      pendingCount.toString(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  )
                 : null,
           ),
           _buildSidebarNavItem(
@@ -833,14 +844,19 @@ class _AuthenticatedHomeScreenState
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFFEAF2FF), Color(0xFFF8FBFF)],
+          colors: [Color(0xFFF8FAFC), Color(0xFFFCFDFE)],
         ),
       ),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1440),
+          constraints: const BoxConstraints(maxWidth: WebLayoutConfig.kChatPaneMaxWidth),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+            padding: EdgeInsets.fromLTRB(
+              WebLayoutConfig.getHorizontalPadding(context),
+              12,
+              WebLayoutConfig.getHorizontalPadding(context),
+              12,
+            ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -849,12 +865,22 @@ class _AuthenticatedHomeScreenState
                 Expanded(
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.72),
-                      borderRadius: BorderRadius.circular(28),
-                      border: Border.all(color: const Color(0xFFE1EAF7)),
+                      color: Colors.white.withValues(alpha: 0.85),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: const Color(0xFFE5E7EB),
+                        width: 1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(28),
+                      borderRadius: BorderRadius.circular(20),
                       child: _buildBody(),
                     ),
                   ),
@@ -968,7 +994,15 @@ class _AuthenticatedHomeScreenState
                     BottomNavigationBarItem(
                       icon: Badge(
                         isLabelVisible: pendingCount > 0,
-                        label: Text(pendingCount.toString()),
+                        backgroundColor: Colors.red[600] ?? Colors.red,
+                        label: Text(
+                          pendingCount.toString(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                         child: const Icon(Icons.mail_outline),
                       ),
                       label: 'Invitations',

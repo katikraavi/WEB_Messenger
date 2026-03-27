@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
+import 'package:frontend/core/services/api_client.dart';
 import 'media_picker_service.dart';
 
 /// Media Upload Service Model
@@ -83,7 +84,7 @@ class MediaUploadService {
 
   MediaUploadService({http.Client? httpClient, String? baseUrl})
     : _httpClient = httpClient ?? http.Client(),
-      _baseUrl = baseUrl ?? 'http://localhost:8081';
+      _baseUrl = baseUrl ?? ApiClient.getBaseUrl();
 
   /// Upload media file (T074)
   ///

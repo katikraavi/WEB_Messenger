@@ -1,10 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/core/services/api_client.dart';
 import '../models/message_model.dart';
 import '../services/media_upload_service.dart';
 
 /// Media upload service provider
 final mediaUploadServiceProvider = Provider<MediaUploadService>((ref) {
-  return MediaUploadService(baseUrl: 'http://localhost:8081');
+  return MediaUploadService(baseUrl: ApiClient.getBaseUrl());
 });
 
 /// Upload media provider (T074)

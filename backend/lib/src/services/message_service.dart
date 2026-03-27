@@ -44,9 +44,21 @@ class MessageService {
     String? mediaUrl,
     String? mediaType,
   }) async {
-    // Validate encrypted content format (should be Base64)
+    // Validate encrypted content format
+    // Supports both:
+    // - New format: base64(nonce)::base64(ciphertext)::base64(mac)
+    // - Old format (legacy): valid base64 string
     try {
-      base64Decode(encryptedContent);
+      final parts = encryptedContent.split('::');
+      if (parts.length == 3) {
+        // New format: validate each part is base64
+        for (final part in parts) {
+          base64Decode(part);
+        }
+      } else {
+        // Old format: validate entire string is base64
+        base64Decode(encryptedContent);
+      }
     } catch (e) {
       throw ArgumentError(
         'Invalid encrypted content: must be valid Base64 encoding. Error: $e',

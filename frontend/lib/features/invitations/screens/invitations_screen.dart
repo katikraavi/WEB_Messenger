@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:provider/provider.dart' as provider;
+import 'package:frontend/core/services/api_client.dart';
 
 import '../models/chat_invite_model.dart';
 import '../providers/invites_provider.dart';

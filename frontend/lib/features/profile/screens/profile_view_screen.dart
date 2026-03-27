@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart' as provider;
 import 'package:frontend/core/notifications/app_feedback_service.dart';
 import 'package:frontend/core/services/app_exception_logger.dart';
+import 'package:frontend/core/services/api_client.dart';
 import '../models/user_profile.dart';
 import '../providers/user_profile_provider.dart';
 import '../widgets/profile_picture_widget.dart';
@@ -31,11 +32,12 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
   bool _isLoadingInvite = false;
   String? _inviteError;
   bool _missingAuthProviderWarningShown = false;
+  bool _isEditMode = false;
 
   @override
   void initState() {
     super.initState();
-    _inviteService = InviteApiService(baseUrl: 'http://localhost:8081');
+    _inviteService = InviteApiService(baseUrl: ApiClient.getBaseUrl());
   }
 
   Future<void> _sendInvite() async {
@@ -87,6 +89,65 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
             body: _buildErrorState(context, ref, error.toString(), token),
           ),
           data: (profile) {
+            final isWeb = MediaQuery.of(context).size.width > 900;
+            
+            // On web, show side-by-side layout if in edit mode
+            if (isWeb && _isEditMode) {
+              return Scaffold(
+                appBar: AppBar(
+                  title: const Text('Profile & Edit'),
+                ),
+                body: Row(
+                  children: [
+                    // Profile view on left (60% width)
+                    Expanded(
+                      flex: 60,
+                      child: _buildProfileContent(context, ref, profile, token),
+                    ),
+                    // Divider
+                    Container(
+                      width: 1,
+                      color: Colors.grey[300],
+                    ),
+                    // Edit form on right (40% width)
+                    Expanded(
+                      flex: 40,
+                      child: Container(
+                        color: Colors.grey[50],
+                        child: Stack(
+                          children: [
+                            // Close button in top-right
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: IconButton(
+                                icon: const Icon(Icons.close),
+                                onPressed: () {
+                                  setState(() {
+                                    _isEditMode = false;
+                                  });
+                                },
+                              ),
+                            ),
+                            // Edit form
+                            ProfileEditScreenContent(
+                              profile: profile,
+                              onSaveSuccess: () {
+                                setState(() {
+                                  _isEditMode = false;
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+            
+            // Default view (mobile or non-edit mode)
             return Scaffold(
               appBar: AppBar(
                 title: const Text('Profile'),
@@ -95,11 +156,19 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                     IconButton(
                       icon: const Icon(Icons.edit),
                       onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => ProfileEditScreen(profile: profile),
-                          ),
-                        );
+                        if (isWeb) {
+                          // On web, show edit panel on the right
+                          setState(() {
+                            _isEditMode = true;
+                          });
+                        } else {
+                          // On mobile, navigate to edit screen
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => ProfileEditScreen(profile: profile),
+                            ),
+                          );
+                        }
                       },
                     ),
                 ],
@@ -259,21 +328,25 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
         await Future.delayed(const Duration(milliseconds: 500));
       },
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
         physics: const AlwaysScrollableScrollPhysics(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // T037: Profile Picture Widget (circular with network image)
-            ProfilePictureWidget(
-              imageUrl: profile.profilePictureUrl,
-              size: 120,
-              onTap: widget.isOwnProfile
-                  ? () {
-                      // Will implement picture upload in Phase 6
-                    }
-                  : null,
-            ),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 600),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // T037: Profile Picture Widget (circular with network image)
+                  ProfilePictureWidget(
+                    imageUrl: profile.profilePictureUrl,
+                    size: 120,
+                    onTap: widget.isOwnProfile
+                        ? () {
+                            // Will implement picture upload in Phase 6
+                          }
+                        : null,
+                  ),
             const SizedBox(height: 24),
 
             // Username display (read-only)
@@ -331,23 +404,6 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Edit Profile button (for own profile)
-            if (widget.isOwnProfile)
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => ProfileEditScreen(profile: profile),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.edit),
-                  label: const Text('Edit Profile'),
-                ),
-              ),
-
             // Active device sessions section (own profile only — GAP-005/T031)
             if (widget.isOwnProfile && token != null) ...[
               const SizedBox(height: 32),
@@ -402,7 +458,10 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                   ),
                 ),
               ),
-          ],
+            ],
+          ),
+            ),
+          ),
         ),
       ),
     );
@@ -461,7 +520,7 @@ class _ActiveSessionsSection extends StatefulWidget {
 }
 
 class _ActiveSessionsSectionState extends State<_ActiveSessionsSection> {
-  static const String _baseUrl = 'http://localhost:8081';
+  static String get _baseUrl => ApiClient.getBaseUrl();
 
   List<_DeviceSessionInfo> _sessions = [];
   bool _isLoading = false;

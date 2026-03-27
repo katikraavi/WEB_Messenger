@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:provider/provider.dart' as provider_pkg;
+import 'package:frontend/core/services/api_client.dart';
 
 import '../../auth/providers/auth_provider.dart';
 import '../../invitations/services/group_invite_service.dart';
@@ -24,7 +25,7 @@ class GroupChatScreen extends ConsumerStatefulWidget {
 }
 
 class _GroupChatScreenState extends ConsumerState<GroupChatScreen> {
-  static const String _baseUrl = 'http://localhost:8081';
+  static String get _baseUrl => ApiClient.getBaseUrl();
 
   late final GroupInviteService _service;
   bool _isLoading = true;
@@ -310,7 +311,7 @@ class _GroupInvitePeopleScreen extends StatefulWidget {
 }
 
 class _GroupInvitePeopleScreenState extends State<_GroupInvitePeopleScreen> {
-  static const String _baseUrl = 'http://localhost:8081';
+  static String get _baseUrl => ApiClient.getBaseUrl();
 
   final TextEditingController _searchController = TextEditingController();
   late final SearchService _searchService;

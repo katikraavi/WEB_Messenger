@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:provider/provider.dart' as provider_pkg;
+import 'package:frontend/core/services/api_client.dart';
 import '../providers/active_chats_provider.dart';
 import '../providers/chats_provider.dart';
 import '../providers/user_profile_provider.dart';
@@ -256,10 +257,7 @@ class ChatListScreen extends ConsumerWidget {
     // Get active chats with token parameter
     final activeChatsStream = ref.watch(activeChatListProvider(token));
 
-    const baseUrl = String.fromEnvironment(
-      'API_BASE_URL',
-      defaultValue: 'http://localhost:8081',
-    );
+    final baseUrl = ApiClient.getBaseUrl();
     final chatApiService = ChatApiService(baseUrl: baseUrl);
 
     return _buildShell(

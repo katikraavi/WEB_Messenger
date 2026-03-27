@@ -12,6 +12,7 @@ import '../services/image_picker_service.dart';
 import '../widgets/image_picker_permissions_handler.dart';
 import '../widgets/image_upload_progress_widget.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../chats/providers/user_profile_provider.dart' as chats_profile_provider;
 
 class ProfileImageUploadWidget extends ConsumerWidget {
   final String? currentImageUrl;
@@ -174,6 +175,11 @@ class ProfileImageUploadWidget extends ConsumerWidget {
                                 userProfileWithTokenProvider((userId!, token)),
                               );
 
+                              // Also invalidate the chats module's profile provider so chat list avatars update
+                              ref.invalidate(
+                                chats_profile_provider.userProfileProvider((userId!, token!)),
+                              );
+
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
@@ -199,8 +205,8 @@ class ProfileImageUploadWidget extends ConsumerWidget {
         ),
         const SizedBox(height: 16),
 
-        // Image picker buttons
-        // T138: Accessibility labels for gallery and camera buttons
+        // Image picker buttons - Gallery only (camera not implemented)
+        // T138: Accessibility labels for gallery button
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -224,58 +230,6 @@ class ProfileImageUploadWidget extends ConsumerWidget {
 
                           final image =
                               await ImagePickerService.pickImageFromGallery();
-                          if (image != null) {
-                            // Comprehensive validation with specific error messages
-                            final validationError =
-                                await ImagePickerService.validateImageComprehensive(
-                                  image,
-                                );
-                            if (validationError != null) {
-                              if (context.mounted) {
-                                showCopyableErrorSnackBar(
-                                  context,
-                                  validationError.message,
-                                );
-                              }
-                              return;
-                            }
-                            await ref
-                                .read(profileImageProvider.notifier)
-                                .selectImage(
-                                  image.path,
-                                  imageBytes: await image.readAsBytes(),
-                                  imageName: image.name,
-                                );
-                          }
-                        } catch (e) {
-                          if (context.mounted) {
-                            showCopyableErrorSnackBar(context, 'Error: $e');
-                          }
-                        }
-                      },
-              ),
-            ),
-            const SizedBox(width: 12),
-            Tooltip(
-              message: 'Take photo with camera',
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.camera_alt),
-                label: const Text('Camera'),
-                onPressed: imageState.isUploading
-                    ? null
-                    : () async {
-                        try {
-                          // T133: Request camera permission before opening picker
-                          final hasPermission =
-                              await ImagePickerPermissionsHandler.requestCameraPermission(
-                                context,
-                              );
-                          if (!hasPermission) {
-                            return; // User denied permission
-                          }
-
-                          final image =
-                              await ImagePickerService.pickImageFromCamera();
                           if (image != null) {
                             // Comprehensive validation with specific error messages
                             final validationError =
@@ -341,7 +295,8 @@ class ProfileImageUploadWidget extends ConsumerWidget {
               // Refresh profile after successful upload to show new image URL
               if (context.mounted &&
                   updatedImageState.error == null &&
-                  userId != null) {
+                  userId != null &&
+                  token != null) {
                 // Mark form as dirty so SAVE button is enabled (image has changed)
                 // Fetch the current user profile to access the form state notifier
                 try {
@@ -361,6 +316,11 @@ class ProfileImageUploadWidget extends ConsumerWidget {
                 // Refresh the userProfileProvider to update profile with new image URL
                 await ref.refresh(
                   userProfileWithTokenProvider((userId!, token)),
+                );
+
+                // Also invalidate the chats module's profile provider so chat list avatars update
+                ref.invalidate(
+                  chats_profile_provider.userProfileProvider((userId!, token!)),
                 );
 
                 if (context.mounted) {
