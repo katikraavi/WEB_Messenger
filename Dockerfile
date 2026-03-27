@@ -5,13 +5,12 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+WORKDIR /app/backend
 
-# Copy backend pubspec files
-COPY backend/pubspec.yaml backend/pubspec.lock ./backend/
+# Copy backend pubspec only (pubspec.lock is gitignored)
+COPY backend/pubspec.yaml ./
 
 # Install Dart dependencies
-WORKDIR /app/backend
 RUN dart pub get
 
 # Copy entire backend source
