@@ -126,7 +126,14 @@ class _SearchGroupsScreenState extends State<SearchGroupsScreen> {
                                   backgroundColor: Colors.indigo.shade100,
                                   child: const Icon(Icons.group, color: Colors.indigo),
                                 ),
-                                title: Text(group.name),
+                                title: Tooltip(
+                                  message: group.name,
+                                  child: Text(
+                                    group.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
                                 subtitle: Text(
                                   '${group.memberCount} member${group.memberCount == 1 ? '' : 's'} • ${group.myRole}',
                                 ),

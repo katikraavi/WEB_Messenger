@@ -451,7 +451,8 @@ class MessageService {
       final result = await connection.query(
         '''
         SELECT id, chat_id, sender_id, recipient_id, encrypted_content, 
-               status, created_at, edited_at, deleted_at, is_deleted
+               status, created_at, edited_at, deleted_at, is_deleted,
+               media_url, media_type
         FROM $_tableName
         WHERE chat_id = @chatId
         ORDER BY created_at DESC
@@ -476,6 +477,8 @@ class MessageService {
           editedAt: row[7] as DateTime?,
           deletedAt: row[8] as DateTime?,
           isDeleted: row[9] as bool,
+          mediaUrl: row[10] as String?,
+          mediaType: row[11] as String?,
         );
       }).toList();
     } catch (e) {

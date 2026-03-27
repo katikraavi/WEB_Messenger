@@ -229,8 +229,8 @@ class PollEndpoints {
 
     final token = authHeader.substring('Bearer '.length);
     try {
-      final claims = _jwtService.verifyAndDecode(token);
-      return claims['sub'] as String?;
+      final payload = JwtService.validateToken(token);
+      return payload.userId;
     } catch (_) {
       return null;
     }

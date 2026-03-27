@@ -14,6 +14,7 @@ import '../providers/send_message_provider.dart';
 import '../providers/typing_indicator_provider.dart';
 import '../providers/websocket_provider.dart';
 import '../services/chat_api_service.dart';
+import '../services/message_encryption_service.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/message_input_box.dart';
 import '../widgets/typing_indicator.dart';
@@ -28,12 +29,8 @@ import '../widgets/message_search_bar.dart';
 import '../services/message_search_service.dart';
 import 'group_chat_screen.dart';
 import '../../auth/providers/auth_provider.dart' as auth;
-import '../../polls/widgets/poll_widget.dart';
-import '../../polls/services/poll_service.dart';
-import '../../polls/screens/create_poll_screen.dart';
 
 part 'chat_detail_screen_handlers.dart';
-part 'chat_detail_screen_poll_widget.dart';
 
 String _displayName(String? value) {
   if (value == null || value.isEmpty) {
@@ -509,34 +506,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
             },
           ),
           if (widget.isGroup) ...[
-            // Create poll button - only for group chats
-            IconButton(
-              icon: const Icon(Icons.poll),
-              tooltip: 'Create poll',
-              onPressed: () async {
-                final pollId = await Navigator.of(context).push<String>(
-                  MaterialPageRoute(
-                    builder: (_) => CreatePollScreen(
-                      groupId: widget.chatId,
-                      token: token,
-                      baseUrl: _backendBaseUrl,
-                    ),
-                  ),
-                );
-
-                if (pollId != null && mounted) {
-                  // Poll created successfully
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Poll created successfully'),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                  // Optionally: auto-send the poll as a message
-                  // This would be implemented separately if desired
-                }
-              },
-            ),
             // View members button
             IconButton(
               icon: const Icon(Icons.group),
@@ -797,8 +766,8 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                         _handleAudioRecordingTap(token);
                       },
                       // Poll creation handler (for group chats)
-                      onPollTap: widget.isGroup ? () {
-                        Navigator.of(context).push(
+                      onPollTap: widget.isGroup ? () async {
+                        final pollId = await Navigator.of(context).push<String>(
                           MaterialPageRoute(
                             builder: (_) => CreatePollScreen(
                               groupId: widget.chatId,
@@ -807,6 +776,38 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                             ),
                           ),
                         );
+
+                        if (pollId != null && mounted) {
+                          // Poll created successfully - send as message
+                          try {
+                            final apiService = ChatApiService(baseUrl: _backendBaseUrl);
+                            final pollMessage = jsonEncode({'pollId': pollId});
+                            
+                            // Encrypt the poll message
+                            final encryptedContent = 
+                                await MessageEncryptionService.encryptMessage(pollMessage, currentUserId);
+                            
+                            // Send the poll as a message with mediaType='application/poll'
+                            await apiService.sendMessage(
+                              token: token,
+                              chatId: widget.chatId,
+                              encryptedContent: encryptedContent,
+                              mediaType: 'application/poll',
+                            );
+                            
+                            if (mounted) {
+                              _scrollToBottom();
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Failed to share poll: $e'),
+                                ),
+                              );
+                            }
+                          }
+                        }
                       } : null,
                       isRecordingAudio: _isRecordingAudio,
                     ),
@@ -890,16 +891,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         // Check if this is first message from same sender (show name)
         final isFirstFromSender =
             index == 0 || allMessages[index - 1].senderId != message.senderId;
-
-        // Poll messages get an inline interactive widget (T041)
-        if (message.mediaType == 'application/poll') {
-          return _PollMessageWidget(
-            key: ValueKey('poll_${message.id}'),
-            message: message,
-            token: token,
-            currentUserId: currentUserId,
-          );
-        }
 
         return MessageBubble(
           key: ValueKey('${message.id}_${message.status}'),

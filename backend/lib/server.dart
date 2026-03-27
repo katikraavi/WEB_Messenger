@@ -25,11 +25,14 @@ import 'src/services/verification_service.dart';
 import 'src/endpoints/profile.dart' as profileEndpoint;
 import 'src/models/user_search_result.dart';
 import 'src/models/chat_invite_model.dart';
+import 'src/models/poll.dart';
 import 'src/handlers/chat_handlers.dart';
 import 'src/handlers/message_handlers.dart';
 import 'src/handlers/media_handlers.dart';
 import 'src/handlers/websocket_handler.dart';
 import 'src/services/websocket_service.dart';
+import 'src/services/poll_service.dart';
+import 'src/endpoints/poll_endpoints.dart';
 
 part 'src/server/middleware.dart';
 part 'src/server/auth_handlers.dart';
@@ -157,6 +160,12 @@ void main() async {
   print('[INFO] Initializing profile service...');
   profileEndpoint.initializeProfileService(dbConnection);
 
+  // Initialize poll service
+  final pollService = PollService(
+    connection: dbConnection,
+    encryptionService: encryptionService,
+  );
+
   // Setup middleware pipeline
   final handler = Pipeline()
       .addMiddleware(_logRequestsExceptHealth())
@@ -169,6 +178,7 @@ void main() async {
         encryptionService,
         verificationService,
         passwordResetService,
+        pollService,
       ));
 
   final server = await shelf_io.serve(handler, InternetAddress.anyIPv4, port);
@@ -195,6 +205,7 @@ Handler _createHandler(
   EncryptionService encryptionService,
   VerificationService verificationService,
   PasswordResetService passwordResetService,
+  PollService pollService,
 ) {
   return (Request request) async {
     try {
@@ -2083,6 +2094,41 @@ Handler _createHandler(
             headers: {'Content-Type': 'application/json'},
           );
         }
+      }
+
+      // Poll endpoints - create poll
+      if (path == 'api/polls' && method == 'POST') {
+        return await _handleCreatePoll(request, database, pollService);
+      }
+
+      // Poll endpoints - get poll
+      if (path.startsWith('api/polls/') && method == 'GET' && !path.contains('/vote') && !path.contains('/close')) {
+        final pollId = path.replaceFirst('api/polls/', '');
+        return await _handleGetPoll(request, database, pollService, pollId);
+      }
+
+      // Poll endpoints - vote
+      if (path.startsWith('api/polls/') && path.endsWith('/vote') && method == 'POST') {
+        final pollId = path
+            .replaceFirst('api/polls/', '')
+            .replaceFirst('/vote', '');
+        return await _handleVotePoll(request, database, pollService, pollId);
+      }
+
+      // Poll endpoints - retract vote
+      if (path.startsWith('api/polls/') && path.endsWith('/vote') && method == 'DELETE') {
+        final pollId = path
+            .replaceFirst('api/polls/', '')
+            .replaceFirst('/vote', '');
+        return await _handleRetractVote(request, database, pollService, pollId);
+      }
+
+      // Poll endpoints - close poll
+      if (path.startsWith('api/polls/') && path.endsWith('/close') && method == 'POST') {
+        final pollId = path
+            .replaceFirst('api/polls/', '')
+            .replaceFirst('/close', '');
+        return await _handleClosePoll(request, database, pollService, pollId);
       }
 
       return Response.notFound(

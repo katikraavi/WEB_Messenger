@@ -175,7 +175,14 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(title),
+        title: Tooltip(
+          message: title,
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.person_add_alt_1),

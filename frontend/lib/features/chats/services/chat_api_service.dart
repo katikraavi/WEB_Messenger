@@ -236,8 +236,10 @@ class ChatApiService {
 
       final body = {'encrypted_content': encryptedContent};
 
-      if (mediaUrl != null && mediaType != null) {
+      if (mediaUrl != null) {
         body['media_url'] = mediaUrl;
+      }
+      if (mediaType != null) {
         body['media_type'] = mediaType;
       }
 

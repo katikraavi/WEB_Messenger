@@ -173,31 +173,32 @@ class MessageBubble extends StatelessWidget {
                         horizontal: 16,
                         vertical: 10,
                       ),
-                      child: Column(
-                        crossAxisAlignment: isSentByUser
-                            ? CrossAxisAlignment.end
-                            : CrossAxisAlignment.start,
-                        children: [
-                          // Media display (T077)
-                          if (message.mediaUrl != null)
-                            _buildMediaWidget(context),
+                      child: SelectionArea(
+                        child: Column(
+                          crossAxisAlignment: isSentByUser
+                              ? CrossAxisAlignment.end
+                              : CrossAxisAlignment.start,
+                          children: [
+                            // Media display (T077)
+                            if (message.mediaUrl != null)
+                              _buildMediaWidget(context),
 
-                          // Message content
-                          if (displayContent.isNotEmpty)
-                            Padding(
-                              padding: message.mediaUrl != null
-                                  ? const EdgeInsets.only(top: 8)
-                                  : EdgeInsets.zero,
-                              child: _buildHighlightedText(displayContent, searchQuery),
-                            ),
-                          const SizedBox(height: 6),
-                          // Timestamp + Edited indicator + Status indicator row
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: isSentByUser
-                                ? MainAxisAlignment.end
-                                : MainAxisAlignment.start,
-                            children: [
+                            // Message content
+                            if (displayContent.isNotEmpty)
+                              Padding(
+                                padding: message.mediaUrl != null
+                                    ? const EdgeInsets.only(top: 8)
+                                    : EdgeInsets.zero,
+                                child: _buildHighlightedText(displayContent, searchQuery),
+                              ),
+                            const SizedBox(height: 6),
+                            // Timestamp + Edited indicator + Status indicator row
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: isSentByUser
+                                  ? MainAxisAlignment.end
+                                  : MainAxisAlignment.start,
+                              children: [
                               // Timestamp
                               Text(
                                 message.getDisplayTime(),
@@ -243,6 +244,7 @@ class MessageBubble extends StatelessWidget {
                             ],
                           ),
                         ],
+                      ),
                       ),
                     ),
                   ),
@@ -396,16 +398,15 @@ class MessageBubble extends StatelessWidget {
 
   /// Build text widget with search term highlighting
   Widget _buildHighlightedText(String text, String? searchQuery) {
-    // If no search query or empty query, return plain text
+    // If no search query or empty query, return selectable plain text
     if (searchQuery == null || searchQuery.trim().isEmpty) {
-      return Text(
+      return SelectableText(
         text,
         style: TextStyle(
           color: _getTextColor(),
           fontSize: 16,
           height: 1.4,
         ),
-        softWrap: true,
       );
     }
 
@@ -457,19 +458,20 @@ class MessageBubble extends StatelessWidget {
       ));
     }
 
-    // If no matches found, return plain text
+    // If no matches found, return selectable plain text
     if (spans.isEmpty) {
-      return Text(
+      return SelectableText(
         text,
         style: TextStyle(
           color: _getTextColor(),
           fontSize: 16,
           height: 1.4,
         ),
-        softWrap: true,
       );
     }
 
+    // For highlighted text, we need to use SelectableRichText if available,
+    // otherwise wrap RichText in SelectionArea (already done at bubble level)
     return RichText(
       text: TextSpan(children: spans),
       softWrap: true,

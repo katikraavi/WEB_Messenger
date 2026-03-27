@@ -9,7 +9,7 @@ import 'encryption_service.dart';
 /// Poll questions and option text are stored AES-256-GCM encrypted following
 /// the same pattern used for messages (see [EncryptionService]).
 class PollService {
-  final Connection connection;
+  final PostgreSQLConnection connection;
   final EncryptionService encryptionService;
   final Uuid _uuid = const Uuid();
 
@@ -46,13 +46,13 @@ class PollService {
         await encryptionService.encrypt(question.trim(), creatorUserId);
 
     await connection.execute(
-      Sql.named('''
+      '''
         INSERT INTO polls (id, group_id, created_by, question, is_anonymous,
                            is_closed, created_at, closes_at)
         VALUES (@id, @group_id, @created_by, @question, @is_anonymous,
                 false, @created_at, @closes_at)
-      '''),
-      parameters: {
+      ''',
+      substitutionValues: {
         'id': pollId,
         'group_id': groupId,
         'created_by': creatorUserId,
@@ -67,11 +67,11 @@ class PollService {
       final encryptedText =
           await encryptionService.encrypt(optionTexts[i].trim(), creatorUserId);
       await connection.execute(
-        Sql.named('''
+        '''
           INSERT INTO poll_options (id, poll_id, text, position)
           VALUES (@id, @poll_id, @text, @position)
-        '''),
-        parameters: {
+        ''',
+        substitutionValues: {
           'id': _uuid.v4(),
           'poll_id': pollId,
           'text': encryptedText,
@@ -101,9 +101,9 @@ class PollService {
     required String userId,
   }) async {
     // Ensure the poll exists and is open
-    final pollResult = await connection.execute(
-      Sql.named('SELECT is_closed FROM polls WHERE id = @id LIMIT 1'),
-      parameters: {'id': pollId},
+    final pollResult = await connection.query(
+      'SELECT is_closed FROM polls WHERE id = @id LIMIT 1',
+      substitutionValues: {'id': pollId},
     );
     if (pollResult.isEmpty) {
       throw StateError('Poll not found: $pollId');
@@ -118,17 +118,16 @@ class PollService {
 
     // Remove previous vote from this user on this poll, then insert new one.
     await connection.execute(
-      Sql.named(
-          'DELETE FROM poll_votes WHERE poll_id = @poll_id AND user_id = @user_id'),
-      parameters: {'poll_id': pollId, 'user_id': userId},
+          'DELETE FROM poll_votes WHERE poll_id = @poll_id AND user_id = @user_id',
+      substitutionValues: {'poll_id': pollId, 'user_id': userId},
     );
 
     await connection.execute(
-      Sql.named('''
+      '''
         INSERT INTO poll_votes (id, poll_id, option_id, user_id, voted_at)
         VALUES (@id, @poll_id, @option_id, @user_id, @voted_at)
-      '''),
-      parameters: {
+      ''',
+      substitutionValues: {
         'id': voteId,
         'poll_id': pollId,
         'option_id': optionId,
@@ -143,10 +142,9 @@ class PollService {
     required String pollId,
     required String requestingUserId,
   }) async {
-    final result = await connection.execute(
-      Sql.named(
-          'SELECT created_by FROM polls WHERE id = @id LIMIT 1'),
-      parameters: {'id': pollId},
+    final result = await connection.query(
+      'SELECT created_by FROM polls WHERE id = @id LIMIT 1',
+      substitutionValues: {'id': pollId},
     );
     if (result.isEmpty) throw StateError('Poll not found.');
     final creator = result.first.toColumnMap()['created_by'] as String;
@@ -155,8 +153,8 @@ class PollService {
     }
 
     await connection.execute(
-      Sql.named('UPDATE polls SET is_closed = true WHERE id = @id'),
-      parameters: {'id': pollId},
+      'UPDATE polls SET is_closed = true WHERE id = @id',
+      substitutionValues: {'id': pollId},
     );
   }
 
@@ -169,9 +167,9 @@ class PollService {
     required String userId,
   }) async {
     // Ensure the poll exists and is open
-    final pollResult = await connection.execute(
-      Sql.named('SELECT is_closed FROM polls WHERE id = @id LIMIT 1'),
-      parameters: {'id': pollId},
+    final pollResult = await connection.query(
+      'SELECT is_closed FROM polls WHERE id = @id LIMIT 1',
+      substitutionValues: {'id': pollId},
     );
     if (pollResult.isEmpty) {
       throw StateError('Poll not found: $pollId');
@@ -182,10 +180,9 @@ class PollService {
     }
 
     // Check if user has a vote to retract
-    final voteResult = await connection.execute(
-      Sql.named(
-          'SELECT id FROM poll_votes WHERE poll_id = @poll_id AND user_id = @user_id LIMIT 1'),
-      parameters: {'poll_id': pollId, 'user_id': userId},
+    final voteResult = await connection.query(
+      'SELECT id FROM poll_votes WHERE poll_id = @poll_id AND user_id = @user_id LIMIT 1',
+      substitutionValues: {'poll_id': pollId, 'user_id': userId},
     );
 
     if (voteResult.isEmpty) {
@@ -194,9 +191,8 @@ class PollService {
 
     // Delete the vote
     await connection.execute(
-      Sql.named(
-          'DELETE FROM poll_votes WHERE poll_id = @poll_id AND user_id = @user_id'),
-      parameters: {'poll_id': pollId, 'user_id': userId},
+      'DELETE FROM poll_votes WHERE poll_id = @poll_id AND user_id = @user_id',
+      substitutionValues: {'poll_id': pollId, 'user_id': userId},
     );
   }
 
@@ -205,11 +201,10 @@ class PollService {
     required String pollId,
     required String requestingUserId,
   }) async {
-    final pollResult = await connection.execute(
-      Sql.named(
-          'SELECT id, group_id, created_by, question, is_anonymous, is_closed, '
-          'created_at, closes_at FROM polls WHERE id = @id LIMIT 1'),
-      parameters: {'id': pollId},
+    final pollResult = await connection.query(
+      'SELECT id, group_id, created_by, question, is_anonymous, is_closed, '
+      'created_at, closes_at FROM polls WHERE id = @id LIMIT 1',
+      substitutionValues: {'id': pollId},
     );
     if (pollResult.isEmpty) throw StateError('Poll not found.');
     final pollMap = pollResult.first.toColumnMap();
@@ -219,16 +214,14 @@ class PollService {
     final question =
         await encryptionService.decrypt(encryptedQ, pollMap['created_by'] as String);
 
-    final optionsResult = await connection.execute(
-      Sql.named(
-          'SELECT id, text, position FROM poll_options WHERE poll_id = @poll_id ORDER BY position'),
-      parameters: {'poll_id': pollId},
+    final optionsResult = await connection.query(
+      'SELECT id, text, position FROM poll_options WHERE poll_id = @poll_id ORDER BY position',
+      substitutionValues: {'poll_id': pollId},
     );
 
-    final voteCounts = await connection.execute(
-      Sql.named(
-          'SELECT option_id, COUNT(*) AS cnt FROM poll_votes WHERE poll_id = @poll_id GROUP BY option_id'),
-      parameters: {'poll_id': pollId},
+    final voteCounts = await connection.query(
+      'SELECT option_id, COUNT(*) AS cnt FROM poll_votes WHERE poll_id = @poll_id GROUP BY option_id',
+      substitutionValues: {'poll_id': pollId},
     );
     final countByOption = <String, int>{
       for (final r in voteCounts)
@@ -236,10 +229,35 @@ class PollService {
             (r.toColumnMap()['cnt'] as int?) ?? 0
     };
 
-    final userVoteResult = await connection.execute(
-      Sql.named(
-          'SELECT option_id FROM poll_votes WHERE poll_id = @poll_id AND user_id = @user_id LIMIT 1'),
-      parameters: {'poll_id': pollId, 'user_id': requestingUserId},
+    // For non-anonymous polls, get voter names
+    final isAnonymous = pollMap['is_anonymous'] as bool? ?? false;
+    final votersByOption = <String, List<Map<String, dynamic>>>{};
+    
+    if (!isAnonymous) {
+      final votersResult = await connection.query(
+        '''SELECT pv.option_id, u.id, u.username, u.email 
+           FROM poll_votes pv 
+           JOIN users u ON pv.user_id = u.id 
+           WHERE pv.poll_id = @poll_id
+           ORDER BY pv.voted_at''',
+        substitutionValues: {'poll_id': pollId},
+      );
+      
+      for (final row in votersResult) {
+        final m = row.toColumnMap();
+        final optionId = m['option_id'] as String;
+        final voters = votersByOption.putIfAbsent(optionId, () => []);
+        voters.add({
+          'userId': m['id'],
+          'username': m['username'],
+          'email': m['email'],
+        });
+      }
+    }
+
+    final userVoteResult = await connection.query(
+      'SELECT option_id FROM poll_votes WHERE poll_id = @poll_id AND user_id = @user_id LIMIT 1',
+      substitutionValues: {'poll_id': pollId, 'user_id': requestingUserId},
     );
     final userVotedOptionId = userVoteResult.isEmpty
         ? null
@@ -251,12 +269,19 @@ class PollService {
       final optId = m['id'] as String;
       final decryptedText = await encryptionService.decrypt(
           m['text'] as String, pollMap['created_by'] as String);
-      options.add({
+      final optionData = {
         'id': optId,
         'text': decryptedText,
         'position': m['position'],
         'voteCount': countByOption[optId] ?? 0,
-      });
+      };
+      
+      // Add voter names if poll is not anonymous
+      if (!isAnonymous && votersByOption.containsKey(optId)) {
+        optionData['voters'] = votersByOption[optId];
+      }
+      
+      options.add(optionData);
     }
 
     final totalVotes = countByOption.values.fold<int>(0, (a, b) => a + b);
@@ -266,7 +291,7 @@ class PollService {
       'groupId': pollMap['group_id'],
       'createdBy': pollMap['created_by'],
       'question': question,
-      'isAnonymous': pollMap['is_anonymous'],
+      'isAnonymous': isAnonymous,
       'isClosed': pollMap['is_closed'],
       'createdAt': (pollMap['created_at'] as DateTime).toIso8601String(),
       'closesAt': (pollMap['closes_at'] as DateTime?)?.toIso8601String(),

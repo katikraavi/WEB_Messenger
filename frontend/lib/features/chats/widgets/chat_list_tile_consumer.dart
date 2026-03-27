@@ -84,36 +84,7 @@ class ChatListTileConsumer extends ConsumerWidget {
       final groupTitle = _buildGroupTitle(chat);
       return _wrapTile(
         context,
-        ListTile(
-          key: ValueKey('group-data-${chat.id}'),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 8,
-          ),
-          leading: CircleAvatar(
-            radius: 24,
-            backgroundColor: Colors.indigo.shade100,
-            child: const Icon(Icons.group, color: Colors.indigo),
-          ),
-          title: Text(
-            groupTitle,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-            overflow: TextOverflow.ellipsis,
-          ),
-          subtitle: Text(
-            chat.memberCount == null
-                ? (chat.lastMessagePreview ?? 'Group chat')
-                : '${chat.memberCount} member${chat.memberCount == 1 ? '' : 's'}',
-            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-            overflow: TextOverflow.ellipsis,
-            maxLines: 1,
-          ),
-          trailing: Text(
-            chat.lastMessageTimestamp != null
-                ? _formatTimestamp(chat.lastMessageTimestamp!)
-                : _formatTimestamp(chat.updatedAt),
-            style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-          ),
+        InkWell(
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(
@@ -126,6 +97,60 @@ class ChatListTileConsumer extends ConsumerWidget {
               ),
             );
           },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: Colors.indigo.shade100,
+                  child: const Icon(Icons.group, color: Colors.indigo),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Tooltip(
+                        message: groupTitle,
+                        child: Text(
+                          groupTitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        chat.memberCount == null
+                            ? (chat.lastMessagePreview ?? 'Group chat')
+                            : '${chat.memberCount} member${chat.memberCount == 1 ? '' : 's'}',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Padding(
+                  padding: const EdgeInsets.only(left: 8.0),
+                  child: Text(
+                    chat.lastMessageTimestamp != null
+                        ? _formatTimestamp(chat.lastMessageTimestamp!)
+                        : _formatTimestamp(chat.updatedAt),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                    maxLines: 1,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       );
     }

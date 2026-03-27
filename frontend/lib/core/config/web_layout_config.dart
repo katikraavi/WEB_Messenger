@@ -28,7 +28,7 @@ class WebLayoutConfig {
   static const double kDualColumnMaxWidth = 1600.0;
 
   /// Maximum width for chat/messaging dual-pane layout
-  static const double kChatPaneMaxWidth = 1600.0;
+  static const double kChatPaneMaxWidth = 1920.0;
 
   // ========== SIDEBAR & PANE WIDTHS ==========
   /// Standard web sidebar width

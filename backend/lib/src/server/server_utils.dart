@@ -326,3 +326,264 @@ Map<String, dynamic> _invitationRowToJson(List<dynamic> row) {
         : null, // canceled_at
   };
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// POLL HANDLERS
+// ════════════════════════════════════════════════════════════════════════════
+
+Future<Response> _handleCreatePoll(
+  Request request,
+  PostgreSQLConnection database,
+  PollService pollService,
+) async {
+  final userId = _extractUserIdFromRequest(request);
+  if (userId == null) {
+    return Response.unauthorized(
+      jsonEncode({'error': 'Unauthorized'}),
+      headers: {'Content-Type': 'application/json'},
+    );
+  }
+
+  try {
+    final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
+    final groupId = body['groupId'] as String?;
+    final question = body['question'] as String?;
+    final options = (body['options'] as List<dynamic>?)?.map((e) => e as String).toList();
+    final isAnonymous = (body['isAnonymous'] as bool?) ?? false;
+    final closesAtRaw = body['closesAt'] as String?;
+    final closesAt = closesAtRaw != null ? DateTime.parse(closesAtRaw) : null;
+
+    if (groupId == null || question == null || options == null) {
+      return Response.badRequest(
+        body: jsonEncode({'error': 'groupId, question, and options are required'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+
+    print('[PollHandler] Creating poll in group $groupId by user $userId');
+
+    late final Poll poll;
+    try {
+      poll = await pollService.createPoll(
+        groupId: groupId,
+        creatorUserId: userId,
+        question: question,
+        optionTexts: options,
+        isAnonymous: isAnonymous,
+        closesAt: closesAt,
+      );
+    } catch (e) {
+      final errorMsg = e.toString();
+      print('[PollHandler] ❌ Service error: $errorMsg');
+      return Response.badRequest(
+        body: jsonEncode({'error': errorMsg}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+
+    print('[PollHandler] Poll created successfully: ${poll.id}');
+
+    // Return poll details
+    return Response.ok(
+      jsonEncode({
+        'id': poll.id,
+        'groupId': poll.groupId,
+        'question': poll.question,
+        'createdBy': poll.createdBy,
+      }),
+      headers: {'Content-Type': 'application/json'},
+    );
+  } on ArgumentError catch (e) {
+    return Response.badRequest(
+      body: jsonEncode({'error': e.message}),
+      headers: {'Content-Type': 'application/json'},
+    );
+  } catch (e) {
+    final errorStr = e.toString();
+    print('[PollHandler] ❌ Error creating poll: $errorStr');
+    return Response.internalServerError(
+      body: jsonEncode({'error': 'Failed to create poll: $errorStr'}),
+      headers: {'Content-Type': 'application/json'},
+    );
+  }
+}
+
+Future<Response> _handleGetPoll(
+  Request request,
+  PostgreSQLConnection database,
+  PollService pollService,
+  String pollId,
+) async {
+  final userId = _extractUserIdFromRequest(request);
+  if (userId == null) {
+    return Response.unauthorized(
+      jsonEncode({'error': 'Unauthorized'}),
+      headers: {'Content-Type': 'application/json'},
+    );
+  }
+
+  try {
+    print('[PollHandler] Getting poll $pollId for user $userId');
+    final result = await pollService.getPollWithResults(
+      pollId: pollId,
+      requestingUserId: userId,
+    );
+    return Response.ok(
+      jsonEncode(result),
+      headers: {'Content-Type': 'application/json'},
+    );
+  } on StateError catch (e) {
+    return Response.notFound(
+      jsonEncode({'error': e.message}),
+      headers: {'Content-Type': 'application/json'},
+    );
+  } catch (e) {
+    print('[PollHandler] ❌ Error getting poll: $e');
+    return Response.internalServerError(
+      body: jsonEncode({'error': 'Failed to fetch poll: $e'}),
+      headers: {'Content-Type': 'application/json'},
+    );
+  }
+}
+
+Future<Response> _handleVotePoll(
+  Request request,
+  PostgreSQLConnection database,
+  PollService pollService,
+  String pollId,
+) async {
+  final userId = _extractUserIdFromRequest(request);
+  if (userId == null) {
+    return Response.unauthorized(
+      jsonEncode({'error': 'Unauthorized'}),
+      headers: {'Content-Type': 'application/json'},
+    );
+  }
+
+  try {
+    final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
+    final optionId = body['optionId'] as String?;
+
+    if (optionId == null) {
+      return Response.badRequest(
+        body: jsonEncode({'error': 'optionId is required'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+
+    print('[PollHandler] User $userId voting on poll $pollId for option $optionId');
+
+    await pollService.vote(
+      pollId: pollId,
+      optionId: optionId,
+      userId: userId,
+    );
+
+    return Response.ok(
+      jsonEncode({'message': 'Vote recorded'}),
+      headers: {'Content-Type': 'application/json'},
+    );
+  } on StateError catch (e) {
+    return Response(409,
+        body: jsonEncode({'error': e.message}),
+        headers: {'Content-Type': 'application/json'});
+  } catch (e) {
+    print('[PollHandler] ❌ Error recording vote: $e');
+    return Response.internalServerError(
+      body: jsonEncode({'error': 'Failed to record vote: $e'}),
+      headers: {'Content-Type': 'application/json'},
+    );
+  }
+}
+
+Future<Response> _handleRetractVote(
+  Request request,
+  PostgreSQLConnection database,
+  PollService pollService,
+  String pollId,
+) async {
+  final userId = _extractUserIdFromRequest(request);
+  if (userId == null) {
+    return Response.unauthorized(
+      jsonEncode({'error': 'Unauthorized'}),
+      headers: {'Content-Type': 'application/json'},
+    );
+  }
+
+  try {
+    print('[PollHandler] User $userId retracting vote on poll $pollId');
+
+    await pollService.retractVote(
+      pollId: pollId,
+      userId: userId,
+    );
+
+    return Response.ok(
+      jsonEncode({'message': 'Vote retracted'}),
+      headers: {'Content-Type': 'application/json'},
+    );
+  } on StateError catch (e) {
+    return Response(409,
+        body: jsonEncode({'error': e.message}),
+        headers: {'Content-Type': 'application/json'});
+  } catch (e) {
+    print('[PollHandler] ❌ Error retracting vote: $e');
+    return Response.internalServerError(
+      body: jsonEncode({'error': 'Failed to retract vote: $e'}),
+      headers: {'Content-Type': 'application/json'},
+    );
+  }
+}
+
+Future<Response> _handleClosePoll(
+  Request request,
+  PostgreSQLConnection database,
+  PollService pollService,
+  String pollId,
+) async {
+  final userId = _extractUserIdFromRequest(request);
+  if (userId == null) {
+    return Response.unauthorized(
+      jsonEncode({'error': 'Unauthorized'}),
+      headers: {'Content-Type': 'application/json'},
+    );
+  }
+
+  try {
+    print('[PollHandler] User $userId closing poll $pollId');
+
+    await pollService.closePoll(
+      pollId: pollId,
+      requestingUserId: userId,
+    );
+
+    return Response.ok(
+      jsonEncode({'message': 'Poll closed'}),
+      headers: {'Content-Type': 'application/json'},
+    );
+  } on StateError catch (e) {
+    return Response(403,
+        body: jsonEncode({'error': e.message}),
+        headers: {'Content-Type': 'application/json'});
+  } catch (e) {
+    print('[PollHandler] ❌ Error closing poll: $e');
+    return Response.internalServerError(
+      body: jsonEncode({'error': 'Failed to close poll: $e'}),
+      headers: {'Content-Type': 'application/json'},
+    );
+  }
+}
+
+String? _extractUserIdFromRequest(Request request) {
+  final authHeader = request.headers['authorization'] ??
+      request.headers['Authorization'];
+  if (authHeader == null || !authHeader.startsWith('Bearer ')) return null;
+
+  final token = authHeader.substring('Bearer '.length);
+  try {
+    final payload = JwtService.validateToken(token);
+    return payload.userId;
+  } catch (_) {
+    return null;
+  }
+}
