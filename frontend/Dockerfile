@@ -6,7 +6,7 @@ ARG BACKEND_URL=http://localhost:8081
 WORKDIR /app
 
 # Resolve deps before copying source so layer is cached on pubspec changes only.
-COPY pubspec.yaml pubspec.lock ./
+COPY pubspec.yaml ./
 RUN flutter pub get
 
 COPY . .
