@@ -8,8 +8,8 @@ RUN flutter pub get
 
 COPY frontend/ .
 
-# Build frontend pointing to localhost:8081 (will use reverse proxy)
-RUN flutter build web --release --dart-define=BACKEND_URL=http://localhost:8081
+# Build frontend pointing to relative API path (will use same domain via nginx proxy)
+RUN flutter build web --release --dart-define=BACKEND_URL=/
 
 # Stage 2: Build backend
 FROM dart:stable AS backend-builder
