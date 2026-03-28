@@ -21,11 +21,14 @@ RUN dart pub get
 
 COPY backend/ .
 
-# Stage 3: Runtime - nginx + Dart backend
-FROM nginx:alpine
+# Stage 3: Runtime - Dart image with nginx
+FROM dart:stable
 
-# Install Dart runtime
-RUN apk add --no-cache dart
+# Install nginx
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends nginx \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -f /etc/nginx/sites-enabled/default /etc/nginx/conf.d/default.conf
 
 # Copy nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
@@ -43,13 +46,13 @@ RUN cat > /start.sh << 'SCRIPT'
 #!/bin/sh
 set -e
 
-# Start backend in background
+# Start backend in background with all environment variables passed through
 echo "[INFO] Starting Dart backend on :8081..."
 dart run bin/server.dart &
 BACKEND_PID=$!
 
 # Give backend time to start
-sleep 2
+sleep 3
 
 # Start nginx in foreground
 echo "[INFO] Starting nginx reverse proxy on :8080..."
