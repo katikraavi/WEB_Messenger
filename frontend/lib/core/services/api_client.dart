@@ -14,6 +14,10 @@ class ApiClient {
   static String _baseUrl = '';
   static late http.Client _httpClient;
   static bool _isHealthy = false;
+  static const String _envBackendUrl = String.fromEnvironment(
+    'BACKEND_URL',
+    defaultValue: '',
+  );
 
   static String _defaultBaseUrl() {
     if (kIsWeb) {
@@ -59,6 +63,13 @@ class ApiClient {
   /// - Physical device: http://localhost:8081 (configure for your network)
   static Future<void> initialize() async {
     _httpClient = http.Client();
+
+    final configuredBackendUrl = _envBackendUrl.trim();
+    if (configuredBackendUrl.isNotEmpty) {
+      _baseUrl = configuredBackendUrl;
+      _isHealthy = await connectToBackend();
+      return;
+    }
 
     // Set base URL based on platform
     if (kIsWeb) {
