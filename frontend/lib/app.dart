@@ -185,9 +185,6 @@ class _MessengerAppState extends State<MessengerApp> {
         e,
         context: 'MessengerApp._initializePushNotifications',
       );
-      AppFeedbackService.showWarning(
-        'Push notifications are unavailable. Messenger continues without them.',
-      );
     }
   }
 

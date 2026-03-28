@@ -182,34 +182,9 @@ class PushNotificationHandler {
     required String body,
     VoidCallback? onTap,
   }) {
-    // Find the context from navigator
-    final context = _navigatorKey?.currentContext;
-    if (context == null) {
-      return;
-    }
-
-    // Show as SnackBar (simple approach)
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 4),
-            Text(body),
-          ],
-        ),
-        duration: const Duration(seconds: 5),
-        action: SnackBarAction(
-          label: 'Open',
-          onPressed: onTap ?? () {},
-        ),
-      ),
-    );
+    // Disabled by request: do not show in-app push notification popups.
+    // Navigation via notification tap still works through payload handlers.
+    return;
   }
 
   /// Get current device FCM token
