@@ -338,6 +338,20 @@ class LocalMessagesNotifier extends StateNotifier<List<Message>> {
     return newLevel > currentLevel;
   }
 
+  String _normalizeStatus(String? rawStatus) {
+    final status = (rawStatus ?? '').trim().toLowerCase();
+    if (status.isEmpty) return 'sent';
+
+    if (status == 'read' || status.contains('read')) {
+      return 'read';
+    }
+    if (status == 'delivered' || status.contains('deliver')) {
+      return 'delivered';
+    }
+
+    return 'sent';
+  }
+
   /// Update message status - only allow status upgrades (sent → delivered → read), never downgrades
   void updateMessageStatus(
     String messageId,
@@ -350,10 +364,11 @@ class LocalMessagesNotifier extends StateNotifier<List<Message>> {
     final index = state.indexWhere((m) => m.id == messageId);
     if (index >= 0) {
       final updated = state[index];
-      final nextStatus = updated.senderId == currentUserId
-          ? (aggregateStatus ?? newStatus)
-          : newStatus;
-      final currentStatus = updated.status;
+      final nextRawStatus = updated.senderId == currentUserId
+        ? (aggregateStatus ?? newStatus)
+        : newStatus;
+      final nextStatus = _normalizeStatus(nextRawStatus);
+      final currentStatus = _normalizeStatus(updated.status);
 
       // Only update if it's a genuine upgrade in status hierarchy
       if (_isStatusUpgrade(currentStatus, nextStatus)) {

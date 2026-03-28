@@ -44,6 +44,12 @@ class MessageBubble extends StatelessWidget {
   /// Search query to highlight in the message content
   final String? searchQuery;
 
+  /// Whether this bubble is rendered inside a group chat
+  final bool isGroupChat;
+
+  /// Optional sender name override resolved from group members.
+  final String? senderNameOverride;
+
   const MessageBubble({
     super.key,
     required this.message,
@@ -57,6 +63,8 @@ class MessageBubble extends StatelessWidget {
     this.isCurrentSearchResult = false,
     this.isOtherSearchResult = false,
     this.searchQuery,
+    this.isGroupChat = false,
+    this.senderNameOverride,
   });
 
   /// Check if message is sent by current user
@@ -64,6 +72,24 @@ class MessageBubble extends StatelessWidget {
 
   /// Get display content (decrypted if available)
   String get displayContent => message.getDisplayContent();
+
+  String get senderDisplayName {
+    final override = senderNameOverride?.trim();
+    if (override != null && override.isNotEmpty) {
+      return override;
+    }
+
+    if (isSentByUser) {
+      return 'You';
+    }
+
+    final username = message.senderUsername?.trim();
+    if (username != null && username.isNotEmpty) {
+      return username;
+    }
+
+    return 'Unknown user';
+  }
 
   String get failureLabel => message.hasError ? 'Not sent' : 'Failed to send';
 
@@ -101,14 +127,12 @@ class MessageBubble extends StatelessWidget {
                     ? CrossAxisAlignment.end
                     : CrossAxisAlignment.start,
                 children: [
-                  // Username - only show for first message in group from receiver
-                  if (!isSentByUser &&
-                      isFirstFromSender &&
-                      message.senderUsername != null)
+                  // Show sender label in group chats for the first message in a run.
+                  if (isGroupChat && isFirstFromSender)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 4.0, left: 4.0),
                       child: Text(
-                        message.senderUsername!,
+                        senderDisplayName,
                         style: TextStyle(
                           color: Colors.grey.shade700,
                           fontSize: 12,
@@ -222,7 +246,7 @@ class MessageBubble extends StatelessWidget {
                               ],
                               const SizedBox(width: 6),
                               // Status indicator (only for sent messages)
-                              if (isSentByUser && message.hasReceiptTracking)
+                              if (isSentByUser && !message.isSending)
                                 MessageStatusIndicator(
                                   key: ValueKey(
                                     '${message.id}_${message.status}',

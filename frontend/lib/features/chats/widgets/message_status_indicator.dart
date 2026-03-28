@@ -89,11 +89,7 @@ class _MessageStatusIndicatorState extends State<MessageStatusIndicator>
 
   /// Build status icon based on message status
   Widget _buildStatusIcon() {
-    if (widget.message.isGroupReceiptTracking) {
-      return _buildGroupReceiptSummary();
-    }
-
-    final status = widget.message.status;
+    final status = _normalizeStatus(widget.message.status);
     final isRead = status == 'read';
     final isDelivered = status == 'delivered';
 
@@ -104,6 +100,20 @@ class _MessageStatusIndicatorState extends State<MessageStatusIndicator>
     } else {
       return _buildSingleCheckmark();
     }
+  }
+
+  String _normalizeStatus(String? rawStatus) {
+    final status = (rawStatus ?? '').trim().toLowerCase();
+    if (status.isEmpty) return 'sent';
+
+    if (status == 'read' || status.contains('read')) {
+      return 'read';
+    }
+    if (status == 'delivered' || status.contains('deliver')) {
+      return 'delivered';
+    }
+
+    return 'sent';
   }
 
   Widget _buildGroupReceiptSummary() {

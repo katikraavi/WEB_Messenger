@@ -9,65 +9,96 @@ class ChatPaneArgs {
   final String otherUserId;
   final String otherUserName;
   final String? otherUserAvatarUrl;
+  final bool isGroup;
 
   const ChatPaneArgs({
     required this.chatId,
     required this.otherUserId,
     required this.otherUserName,
     this.otherUserAvatarUrl,
+    this.isGroup = false,
   });
 }
 
-/// Side-by-side dual-chat layout for wide web screens.
+/// Side-by-side multi-chat layout for wide web screens.
 ///
 /// Only rendered on web (`kIsWeb`) when the screen width meets the
 /// [WebLayoutConfig.kDualPaneBreakpoint].  On narrow screens or non-web
 /// platforms [SizedBox.shrink] is returned instead.
 ///
-/// Each pane runs its own independent [ChatDetailScreen], which means both
-/// panes maintain separate WebSocket subscriptions and message lists.
+/// Each pane runs its own independent [ChatDetailScreen], which means panes
+/// maintain separate WebSocket subscriptions and message lists.
 class DualChatScreen extends StatelessWidget {
-  final ChatPaneArgs leftPane;
-  final ChatPaneArgs rightPane;
+  final List<ChatPaneArgs> panes;
 
   const DualChatScreen({
     super.key,
-    required this.leftPane,
-    required this.rightPane,
+    required this.panes,
   });
+
+  Widget _buildPane(ChatPaneArgs pane, int index) {
+    return ChatDetailScreen(
+      key: ValueKey('pane_${index}_${pane.chatId}'),
+      chatId: pane.chatId,
+      otherUserId: pane.otherUserId,
+      otherUserName: pane.otherUserName,
+      otherUserAvatarUrl: pane.otherUserAvatarUrl,
+      isGroup: pane.isGroup,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     // Guard: only available on web at large widths
-    if (!kIsWeb || !WebLayoutConfig.isDualPaneMode(context)) {
+    if (!kIsWeb || !WebLayoutConfig.isDualPaneMode(context) || panes.isEmpty) {
       return const SizedBox.shrink();
     }
 
+    final visiblePanes = panes.take(4).toList(growable: false);
+
+    final paneCount = visiblePanes.length;
+
+    if (paneCount == 1) {
+      final pane = visiblePanes.first;
+      return Scaffold(body: _buildPane(pane, 0));
+    }
+
     return Scaffold(
-      body: Row(
-        children: [
-          Expanded(
-            flex: WebLayoutConfig.kLeftPaneFlex,
-            child: ChatDetailScreen(
-              key: ValueKey('left_${leftPane.chatId}'),
-              chatId: leftPane.chatId,
-              otherUserId: leftPane.otherUserId,
-              otherUserName: leftPane.otherUserName,
-              otherUserAvatarUrl: leftPane.otherUserAvatarUrl,
-            ),
-          ),
-          const VerticalDivider(width: 1, thickness: 1),
-          Expanded(
-            flex: WebLayoutConfig.kRightPaneFlex,
-            child: ChatDetailScreen(
-              key: ValueKey('right_${rightPane.chatId}'),
-              chatId: rightPane.chatId,
-              otherUserId: rightPane.otherUserId,
-              otherUserName: rightPane.otherUserName,
-              otherUserAvatarUrl: rightPane.otherUserAvatarUrl,
-            ),
-          ),
-        ],
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          const gap = 1.0;
+          const minPaneWidth = 300.0;
+          final availableWidth = constraints.maxWidth;
+          final totalGapWidth = gap * (paneCount - 1);
+          final fittedPaneWidth =
+              (availableWidth - totalGapWidth) / paneCount;
+          final paneWidth = fittedPaneWidth < minPaneWidth
+              ? minPaneWidth
+              : fittedPaneWidth;
+
+          final row = Row(
+            children: [
+              for (var i = 0; i < paneCount; i++) ...[
+                SizedBox(
+                  width: paneWidth,
+                  child: _buildPane(visiblePanes[i], i),
+                ),
+                if (i < paneCount - 1)
+                  const SizedBox(
+                    width: gap,
+                    child: VerticalDivider(width: 1, thickness: 1),
+                  ),
+              ],
+            ],
+          );
+
+          return paneWidth == fittedPaneWidth
+              ? row
+              : SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: row,
+                );
+        },
       ),
     );
   }

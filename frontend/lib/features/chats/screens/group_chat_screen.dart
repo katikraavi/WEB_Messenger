@@ -92,16 +92,34 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> {
     final token = _token;
     if (token == null || token.isEmpty) return;
 
-    final sent = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => _GroupInvitePeopleScreen(
-          token: token,
-          groupId: widget.groupId,
-          existingMemberIds: _members.map((member) => member.userId).toSet(),
-          pendingInviteUserIds:
-              _sentInvites.map((invite) => invite.receiverId).toSet(),
-        ),
-      ),
+    final size = MediaQuery.sizeOf(context);
+    final dialogWidth = (size.width * 0.9).clamp(340.0, 760.0).toDouble();
+    final dialogHeight = (size.height * 0.86).clamp(420.0, 760.0).toDouble();
+
+    final sent = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return Dialog(
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 24,
+          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          clipBehavior: Clip.antiAlias,
+          child: SizedBox(
+            width: dialogWidth,
+            height: dialogHeight,
+            child: _GroupInvitePeopleScreen(
+              token: token,
+              groupId: widget.groupId,
+              existingMemberIds: _members.map((member) => member.userId).toSet(),
+              pendingInviteUserIds:
+                  _sentInvites.map((invite) => invite.receiverId).toSet(),
+            ),
+          ),
+        );
+      },
     );
 
     if (sent == true) {

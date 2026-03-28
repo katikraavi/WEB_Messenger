@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'dart:async';
-import 'dart:html' if (dart.library.html) 'dart:html' as html;
 
 /// HTTP Client for connecting to Serverpod backend
 ///
@@ -12,9 +11,20 @@ import 'dart:html' if (dart.library.html) 'dart:html' as html;
 /// - Dynamic backend URL for web deployments (from environment variables)
 
 class ApiClient {
-  static late String _baseUrl;
+  static String _baseUrl = '';
   static late http.Client _httpClient;
   static bool _isHealthy = false;
+
+  static String _defaultBaseUrl() {
+    if (kIsWeb) {
+      final base = Uri.base;
+      if ((base.scheme == 'http' || base.scheme == 'https') &&
+          base.authority.isNotEmpty) {
+        return '${base.scheme}://${base.authority}';
+      }
+    }
+    return 'http://localhost:8081';
+  }
   
   /// Get WebSocket URL for dynamic backend connection
   /// Converts relative HTTP paths to proper WebSocket URLs
@@ -23,8 +33,8 @@ class ApiClient {
       // On web, derive WebSocket URL from current window location
       // https://example.com/ → wss://example.com/ws/messages
       // http://localhost:3000/ → ws://localhost:3000/ws/messages
-      final protocol = html.window.location.protocol == 'https:' ? 'wss' : 'ws';
-      final host = html.window.location.host; // includes port if non-standard
+      final protocol = Uri.base.scheme == 'https' ? 'wss' : 'ws';
+      final host = Uri.base.hasPort ? '${Uri.base.host}:${Uri.base.port}' : Uri.base.host;
       return '$protocol://$host$path';
     } else {
       // For non-web platforms, derive from _baseUrl
@@ -59,9 +69,7 @@ class ApiClient {
       
       // If BACKEND_URL is just '/' (relative path), convert to full URL using current window location
       if (envBackendUrl == '/' || envBackendUrl.isEmpty) {
-        final protocol = html.window.location.protocol;
-        final host = html.window.location.host; // includes port if non-standard
-        _baseUrl = '$protocol//$host';
+        _baseUrl = _defaultBaseUrl();
       } else {
         _baseUrl = envBackendUrl;
       }
@@ -138,7 +146,7 @@ class ApiClient {
   static String _buildUrl(String endpoint) {
     // Handle None/empty case
     if (_baseUrl.isEmpty) {
-      return endpoint;
+      _baseUrl = _defaultBaseUrl();
     }
     
     // Base URL should always be absolute at this point (http/https)
@@ -154,7 +162,12 @@ class ApiClient {
   }
 
   /// Get base URL for backend
-  static String getBaseUrl() => _baseUrl;
+  static String getBaseUrl() {
+    if (_baseUrl.isEmpty) {
+      _baseUrl = _defaultBaseUrl();
+    }
+    return _baseUrl;
+  }
 
   /// Check if backend connection is established
   static bool get isConnected => _isHealthy;

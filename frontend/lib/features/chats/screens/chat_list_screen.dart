@@ -108,9 +108,7 @@ class ChatListScreen extends ConsumerWidget {
     String currentUserId,
     List<Chat> chats,
   ) async {
-    final directChats = chats.where((chat) => !chat.isGroup).toList();
-
-    if (directChats.length < 2) {
+    if (chats.length < 2) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -121,63 +119,124 @@ class ChatListScreen extends ConsumerWidget {
       return;
     }
 
-    String? leftChatId;
-    String? rightChatId;
+    String groupTitle(Chat chat) {
+      final groupName = chat.displayName?.trim() ?? '';
+      if (groupName.isNotEmpty && groupName.toLowerCase() != 'group') {
+        return groupName;
+      }
 
-    // Pre-fetch usernames for all chats to display in dropdown
-    final chatUsernames = <String, String>{};
-    for (final chat in directChats) {
+      final participants = (chat.participantNames ?? const <String>[])
+          .where((name) => name.trim().isNotEmpty)
+          .toList();
+      if (participants.isNotEmpty) {
+        return participants.join(', ');
+      }
+
+      return 'Group';
+    }
+
+    // Pre-fetch labels for all chats to display in selector.
+    final chatLabels = <String, String>{};
+    for (final chat in chats) {
+      if (chat.isGroup) {
+        chatLabels[chat.id] = groupTitle(chat);
+        continue;
+      }
+
       final otherUserId = chat.getOtherId(currentUserId);
       try {
         final profile = await ref.read(
           userProfileProvider((otherUserId, token)).future,
         );
-        chatUsernames[chat.id] = profile.username;
+        chatLabels[chat.id] = profile.username;
       } catch (_) {
-        chatUsernames[chat.id] = 'Unknown User';
+        chatLabels[chat.id] = 'Unknown User';
       }
     }
 
-    final selected = await showDialog<(String, String)>(
+    final preferredInitial = chats.where((chat) => !chat.isGroup).take(2).toList();
+    final initiallySelected = (preferredInitial.length >= 2
+        ? preferredInitial
+        : chats.take(2).toList())
+      .map((chat) => chat.id)
+      .toSet();
+
+    var includeGroups = true;
+    final selected = <String>{...initiallySelected};
+
+    final selectedChatIds = await showDialog<List<String>>(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (dialogContext, setDialogState) {
+            final selectableChats = includeGroups
+                ? chats
+                : chats.where((chat) => !chat.isGroup).toList();
+
+            if (!includeGroups) {
+              selected.removeWhere(
+                (chatId) =>
+                    chats.firstWhere((chat) => chat.id == chatId).isGroup,
+              );
+            }
+
             return AlertDialog(
-              title: const Text('Open side by side'),
+              title: const Text('Open split chats'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  DropdownButtonFormField<String>(
-                    initialValue: leftChatId,
-                    decoration: const InputDecoration(labelText: 'Left pane'),
-                    items: directChats
-                        .map(
-                          (chat) => DropdownMenuItem<String>(
-                            value: chat.id,
-                            child: Text(chatUsernames[chat.id] ?? 'Loading...'),
-                          ),
-                        )
-                        .toList(),
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('Select 2-4 chats (direct or group)'),
+                  ),
+                  SwitchListTile.adaptive(
+                    value: includeGroups,
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Include group chats'),
+                    subtitle: const Text('Turn off to show direct chats only'),
                     onChanged: (value) {
-                      setDialogState(() => leftChatId = value);
+                      setDialogState(() {
+                        includeGroups = value;
+                      });
                     },
                   ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: rightChatId,
-                    decoration: const InputDecoration(labelText: 'Right pane'),
-                    items: directChats
-                        .map(
-                          (chat) => DropdownMenuItem<String>(
-                            value: chat.id,
-                            child: Text(chatUsernames[chat.id] ?? 'Loading...'),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: 460,
+                    height: 360,
+                    child: ListView.builder(
+                      itemCount: selectableChats.length,
+                      itemBuilder: (context, index) {
+                        final chat = selectableChats[index];
+                        final isSelected = selected.contains(chat.id);
+                        final subtitle = chat.isGroup
+                            ? 'Group chat'
+                            : 'Direct chat';
+
+                        return CheckboxListTile(
+                          dense: true,
+                          value: isSelected,
+                          title: Text(chatLabels[chat.id] ?? 'Loading...'),
+                          subtitle: Text(subtitle),
+                          secondary: Icon(
+                            chat.isGroup
+                                ? Icons.group_outlined
+                                : Icons.person_outline,
                           ),
-                        )
-                        .toList(),
-                    onChanged: (value) {
-                      setDialogState(() => rightChatId = value);
-                    },
+                          onChanged: (checked) {
+                            setDialogState(() {
+                              if (checked == true) {
+                                if (selected.length < 4) {
+                                  selected.add(chat.id);
+                                }
+                              } else {
+                                selected.remove(chat.id);
+                              }
+                            });
+                          },
+                        );
+                      },
+                    ),
                   ),
                 ],
               ),
@@ -187,14 +246,11 @@ class ChatListScreen extends ConsumerWidget {
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
-                  onPressed:
-                      (leftChatId == null ||
-                          rightChatId == null ||
-                          leftChatId == rightChatId)
+                  onPressed: selected.length < 2
                       ? null
                       : () => Navigator.of(
                           dialogContext,
-                        ).pop((leftChatId!, rightChatId!)),
+                        ).pop(selected.toList()),
                   child: const Text('Open'),
                 ),
               ],
@@ -204,38 +260,46 @@ class ChatListScreen extends ConsumerWidget {
       },
     );
 
-    if (selected == null || !context.mounted) return;
+    if (selectedChatIds == null || !context.mounted) return;
 
-    final left = directChats.firstWhere((c) => c.id == selected.$1);
-    final right = directChats.firstWhere((c) => c.id == selected.$2);
-    final leftOtherUserId = left.getOtherId(currentUserId);
-    final rightOtherUserId = right.getOtherId(currentUserId);
+    final panes = <ChatPaneArgs>[];
+    for (final chatId in selectedChatIds.take(4)) {
+      final chat = chats.firstWhere((c) => c.id == chatId);
+      if (chat.isGroup) {
+        panes.add(
+          ChatPaneArgs(
+            chatId: chat.id,
+            otherUserId: chat.id,
+            otherUserName: chatLabels[chat.id] ?? 'Group',
+            isGroup: true,
+          ),
+        );
+        continue;
+      }
 
-    final leftProfile = await ref.read(
-      userProfileProvider((leftOtherUserId, token)).future,
-    );
-    final rightProfile = await ref.read(
-      userProfileProvider((rightOtherUserId, token)).future,
-    );
+      final otherUserId = chat.getOtherId(currentUserId);
+      final profile = await ref.read(
+        userProfileProvider((otherUserId, token)).future,
+      );
 
-    if (!context.mounted) return;
+      panes.add(
+        ChatPaneArgs(
+          chatId: chat.id,
+          otherUserId: otherUserId,
+          otherUserName: profile.username,
+          otherUserAvatarUrl: profile.profilePictureUrl,
+          isGroup: false,
+        ),
+      );
+    }
+
+    if (panes.length < 2 || !context.mounted) {
+      return;
+    }
 
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => DualChatScreen(
-          leftPane: ChatPaneArgs(
-            chatId: left.id,
-            otherUserId: leftOtherUserId,
-            otherUserName: leftProfile.username,
-            otherUserAvatarUrl: leftProfile.profilePictureUrl,
-          ),
-          rightPane: ChatPaneArgs(
-            chatId: right.id,
-            otherUserId: rightOtherUserId,
-            otherUserName: rightProfile.username,
-            otherUserAvatarUrl: rightProfile.profilePictureUrl,
-          ),
-        ),
+        builder: (_) => DualChatScreen(panes: panes),
       ),
     );
   }
@@ -354,7 +418,7 @@ class ChatListScreen extends ConsumerWidget {
                       ),
                       title: const Text('Open side by side'),
                       subtitle: const Text(
-                        'Compare two chats in a dual-pane layout',
+                        'Open 2-4 direct or group chats in split view',
                       ),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () => _openSideBySidePicker(

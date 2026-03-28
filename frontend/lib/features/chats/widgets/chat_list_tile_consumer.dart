@@ -82,6 +82,18 @@ class ChatListTileConsumer extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (chat.isGroup) {
       final groupTitle = _buildGroupTitle(chat);
+
+      final groupMessages = ref.watch(
+        localMessagesProvider((
+          chatId: chat.id,
+          token: token,
+          currentUserId: currentUserId,
+        )),
+      );
+      final unreadCount = groupMessages
+          .where((m) => m.senderId != currentUserId && m.status != 'read')
+          .length;
+
       return _wrapTile(
         context,
         InkWell(
@@ -138,15 +150,39 @@ class ChatListTileConsumer extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Padding(
-                  padding: const EdgeInsets.only(left: 8.0),
-                  child: Text(
-                    chat.lastMessageTimestamp != null
-                        ? _formatTimestamp(chat.lastMessageTimestamp!)
-                        : _formatTimestamp(chat.updatedAt),
-                    style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                    maxLines: 1,
-                  ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      chat.lastMessageTimestamp != null
+                          ? _formatTimestamp(chat.lastMessageTimestamp!)
+                          : _formatTimestamp(chat.updatedAt),
+                      style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                      maxLines: 1,
+                    ),
+                    if (unreadCount > 0) ...[
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.red[600],
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          unreadCount > 99 ? '99+' : '$unreadCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),

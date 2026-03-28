@@ -24,27 +24,41 @@ class ProfileImageUploadWidget extends ConsumerWidget {
   /// Build default profile picture with asset fallback
   Widget _buildDefaultProfilePicture() {
     return ClipOval(
-      child: Image.asset(
-        AssetConstants.defaultProfilePicture,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
-          return const Icon(Icons.person, size: 70);
-        },
+      child: Stack(
+        fit: StackFit.expand,
+        alignment: Alignment.center,
+        children: [
+          Image.asset(
+            AssetConstants.defaultProfilePicture,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return const SizedBox.shrink();
+            },
+          ),
+          const Center(
+            child: Icon(Icons.person, size: 70),
+          ),
+        ],
       ),
     );
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final authProvider = provider_pkg.Provider.of<AuthProvider>(
-      context,
-      listen: false,
-    );
-    final token = authProvider.token;
+    AuthProvider? authProvider;
+    try {
+      authProvider = provider_pkg.Provider.of<AuthProvider?>(
+        context,
+        listen: false,
+      );
+    } catch (_) {
+      authProvider = null;
+    }
+    final token = authProvider?.token;
     final imageState = ref.watch(profileImageProvider);
 
     // Watch the updated profile to display newly uploaded image URL
-    final userProfileAsync = userId != null
+    final userProfileAsync = userId != null && token != null
         ? ref.watch(userProfileWithTokenProvider((userId!, token)))
         : null;
 
@@ -146,16 +160,17 @@ class ProfileImageUploadWidget extends ConsumerWidget {
                               profileImageProvider,
                             );
                             if (context.mounted &&
-                                deletedImageState.error == null &&
-                                userId != null) {
+                              deletedImageState.error == null &&
+                              userId != null &&
+                              token != null) {
                               // Mark form as dirty so SAVE button is enabled (image was deleted)
                               try {
-                                final profileAsync = ref.read(
-                                  userProfileWithTokenProvider((
-                                    userId!,
-                                    token,
-                                  )),
-                                );
+                                  final profileAsync = ref.read(
+                                    userProfileWithTokenProvider((
+                                      userId!,
+                                      token,
+                                    )),
+                                  );
                                 if (profileAsync.hasValue) {
                                   final userProfile = profileAsync.value!;
                                   ref
@@ -205,8 +220,7 @@ class ProfileImageUploadWidget extends ConsumerWidget {
         ),
         const SizedBox(height: 16),
 
-        // Image picker buttons - Gallery only (camera not implemented)
-        // T138: Accessibility labels for gallery button
+        // Image picker buttons
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -232,6 +246,56 @@ class ProfileImageUploadWidget extends ConsumerWidget {
                               await ImagePickerService.pickImageFromGallery();
                           if (image != null) {
                             // Comprehensive validation with specific error messages
+                            final validationError =
+                                await ImagePickerService.validateImageComprehensive(
+                                  image,
+                                );
+                            if (validationError != null) {
+                              if (context.mounted) {
+                                showCopyableErrorSnackBar(
+                                  context,
+                                  validationError.message,
+                                );
+                              }
+                              return;
+                            }
+                            await ref
+                                .read(profileImageProvider.notifier)
+                                .selectImage(
+                                  image.path,
+                                  imageBytes: await image.readAsBytes(),
+                                  imageName: image.name,
+                                );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            showCopyableErrorSnackBar(context, 'Error: $e');
+                          }
+                        }
+                      },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Tooltip(
+              message: 'Take photo with camera',
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.camera_alt),
+                label: const Text('Camera'),
+                onPressed: imageState.isUploading
+                    ? null
+                    : () async {
+                        try {
+                          final hasPermission =
+                              await ImagePickerPermissionsHandler.requestCameraPermission(
+                                context,
+                              );
+                          if (!hasPermission) {
+                            return;
+                          }
+
+                          final image =
+                              await ImagePickerService.pickImageFromCamera();
+                          if (image != null) {
                             final validationError =
                                 await ImagePickerService.validateImageComprehensive(
                                   image,

@@ -29,6 +29,7 @@ import '../widgets/message_search_bar.dart';
 import '../services/message_search_service.dart';
 import 'group_chat_screen.dart';
 import '../../auth/providers/auth_provider.dart' as auth;
+import '../../invitations/services/group_invite_service.dart';
 
 part 'chat_detail_screen_handlers.dart';
 
@@ -94,6 +95,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   String? _headerErrorMessage;
   bool _showReconnectAction = false;
   bool _isReconnectInProgress = false;
+  Map<String, String> _groupMemberUsernamesById = const {};
 
   // Message search state (T020 / GAP-003)
   bool _searchActive = false;
@@ -139,6 +141,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
 
       // Subscribe to this chat
       _webSocketNotifier.subscribeToChat(widget.chatId);
+      await _loadGroupMemberUsernames(token);
       await _reloadMessagesAfterReconnect();
       _clearHeaderError();
     } catch (e) {
@@ -150,6 +153,35 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       AppFeedbackService.showWarning(
         'Realtime updates are unavailable for this chat. Showing the last synced messages.',
       );
+    }
+  }
+
+  Future<void> _loadGroupMemberUsernames(String token) async {
+    if (!widget.isGroup) {
+      return;
+    }
+
+    try {
+      final service = GroupInviteService(baseUrl: _backendBaseUrl);
+      final members = await service.fetchGroupMembers(
+        token: token,
+        groupId: widget.chatId,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      final map = <String, String>{
+        for (final member in members)
+          member.userId: member.username,
+      };
+
+      setState(() {
+        _groupMemberUsernamesById = map;
+      });
+    } catch (_) {
+      // Keep chat usable even if member lookup fails.
     }
   }
 
@@ -511,13 +543,35 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
               icon: const Icon(Icons.group),
               tooltip: 'View members',
               onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => GroupChatScreen(
-                      groupId: widget.chatId,
-                      initialGroupName: widget.otherUserName,
-                    ),
-                  ),
+                final size = MediaQuery.sizeOf(context);
+                final dialogWidth =
+                    (size.width * 0.9).clamp(340.0, 920.0).toDouble();
+                final dialogHeight =
+                    (size.height * 0.86).clamp(420.0, 760.0).toDouble();
+
+                showDialog<void>(
+                  context: context,
+                  barrierDismissible: true,
+                  builder: (dialogContext) {
+                    return Dialog(
+                      insetPadding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 24,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: SizedBox(
+                        width: dialogWidth,
+                        height: dialogHeight,
+                        child: GroupChatScreen(
+                          groupId: widget.chatId,
+                          initialGroupName: widget.otherUserName,
+                        ),
+                      ),
+                    );
+                  },
                 );
               },
             ),
@@ -852,6 +906,10 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           key: ValueKey('${message.id}_${message.status}'),
           message: message,
           currentUserId: currentUserId,
+          isGroupChat: widget.isGroup,
+          senderNameOverride: widget.isGroup
+              ? _groupMemberUsernamesById[message.senderId]
+              : null,
           isFirstFromSender: isFirstFromSender,
           isLastFromSender: isLastFromSender,
           isCurrentSearchResult: _searchActive && 

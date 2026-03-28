@@ -267,9 +267,20 @@ class _MessengerAppState extends State<MessengerApp> {
       themeMode: ThemeMode.system,
       builder: (context, child) {
         final content = child ?? const SizedBox.shrink();
+        final boundedContent = kIsWeb
+            ? Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: WebLayoutConfig.kDualColumnMaxWidth,
+                  ),
+                  child: content,
+                ),
+              )
+            : content;
         return Stack(
           children: [
-            content,
+            boundedContent,
             const _EnvironmentBadge(),
           ],
         );
@@ -690,7 +701,7 @@ class _AuthenticatedHomeScreenState
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: WebLayoutConfig.kPageMaxWidth),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
             child: body,
           ),
         ),
@@ -994,25 +1005,33 @@ class _AuthenticatedHomeScreenState
                 _buildWebSidebar(context, pendingCount),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.85),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: const Color(0xFFE5E7EB),
-                        width: 1,
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        maxWidth: WebLayoutConfig.kPreferredContentWidth,
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.04),
-                          blurRadius: 16,
-                          offset: const Offset(0, 4),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: const Color(0xFFE5E7EB),
+                            width: 1,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.04),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: _buildBody(),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: _buildBody(),
+                        ),
+                      ),
                     ),
                   ),
                 ),

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:cryptography/cryptography.dart';
 import '../models/message_model.dart';
 
@@ -10,6 +11,13 @@ import '../models/message_model.dart';
 /// - Format: base64(nonce)::base64(ciphertext)::base64(mac)
 class MessageEncryptionService {
   static final AesGcm _cipher = AesGcm.with256bits();
+  static const bool _verboseEncryptionLogs = false;
+
+  static void _log(String message) {
+    if (_verboseEncryptionLogs && kDebugMode) {
+      debugPrint(message);
+    }
+  }
   
   /// Master encryption key from environment
   /// Should be set as ENCRYPTION_MASTER_KEY environment variable
@@ -113,10 +121,10 @@ class MessageEncryptionService {
       return message.copyWith(decryptedContent: decrypted);
     } catch (e, st) {
       // Log the error for debugging
-      print('[MessageEncryptionService] Decryption error for message ${message.id}:');
-      print('[MessageEncryptionService] Error: $e');
-      print('[MessageEncryptionService] StackTrace: $st');
-      print('[MessageEncryptionService] Encrypted content (first 50 chars): ${message.encryptedContent.substring(0, (message.encryptedContent.length > 50 ? 50 : message.encryptedContent.length))}');
+      _log('[MessageEncryptionService] Decryption error for message ${message.id}:');
+      _log('[MessageEncryptionService] Error: $e');
+      _log('[MessageEncryptionService] StackTrace: $st');
+      _log('[MessageEncryptionService] Encrypted content (first 50 chars): ${message.encryptedContent.substring(0, (message.encryptedContent.length > 50 ? 50 : message.encryptedContent.length))}');
       
       // If decryption fails, return error message with more detail
       return message.copyWith(decryptedContent: 'Decryption failed: $e');
@@ -157,12 +165,12 @@ class MessageEncryptionService {
         return ''; // Don't decrypt empty strings
       }
 
-      print('[_decrypt] Starting decryption for userId: $userId');
-      print('[_decrypt] Encrypted content: $encrypted');
+      _log('[_decrypt] Starting decryption for userId: $userId');
+      _log('[_decrypt] Encrypted content: $encrypted');
       
       // Parse format: base64(nonce)::base64(ciphertext)::base64(mac)
       final parts = encrypted.split('::');
-      print('[_decrypt] Parts count: ${parts.length}');
+      _log('[_decrypt] Parts count: ${parts.length}');
       
       if (parts.length != 2 && parts.length != 3) {
         throw FormatException(
@@ -174,20 +182,20 @@ class MessageEncryptionService {
       final ctBase64 = parts[1];
       final macBase64 = parts.length == 3 ? parts[2] : null;
 
-      print('[_decrypt] Nonce base64: $nonceBase64 (${nonceBase64.length} chars)');
-      print('[_decrypt] Ciphertext base64: $ctBase64 (${ctBase64.length} chars)');
-      print('[_decrypt] MAC base64: $macBase64 (${macBase64?.length ?? 0} chars)');
+      _log('[_decrypt] Nonce base64: $nonceBase64 (${nonceBase64.length} chars)');
+      _log('[_decrypt] Ciphertext base64: $ctBase64 (${ctBase64.length} chars)');
+      _log('[_decrypt] MAC base64: $macBase64 (${macBase64?.length ?? 0} chars)');
 
       final nonce = base64Decode(nonceBase64);
       var ciphertext = base64Decode(ctBase64);
       late final Mac mac;
 
-      print('[_decrypt] Decoded nonce length: ${nonce.length} bytes');
-      print('[_decrypt] Decoded ciphertext length: ${ciphertext.length} bytes');
+      _log('[_decrypt] Decoded nonce length: ${nonce.length} bytes');
+      _log('[_decrypt] Decoded ciphertext length: ${ciphertext.length} bytes');
 
       if (macBase64 != null && macBase64.isNotEmpty) {
         mac = Mac(base64Decode(macBase64));
-        print('[_decrypt] Using explicit MAC: ${mac.bytes.length} bytes');
+        _log('[_decrypt] Using explicit MAC: ${mac.bytes.length} bytes');
       } else {
         // Legacy compatibility: ciphertext+mac combined
         if (ciphertext.length <= 16) {
@@ -197,7 +205,7 @@ class MessageEncryptionService {
         final macBytes = ciphertext.sublist(splitIndex);
         ciphertext = ciphertext.sublist(0, splitIndex);
         mac = Mac(macBytes);
-        print('[_decrypt] Using legacy MAC (last 16 bytes): ${mac.bytes.length} bytes');
+        _log('[_decrypt] Using legacy MAC (last 16 bytes): ${mac.bytes.length} bytes');
       }
 
       // GCM nonce should be 12 bytes (96 bits)
@@ -205,21 +213,21 @@ class MessageEncryptionService {
         throw FormatException('Invalid nonce length: expected 12 bytes, got ${nonce.length}');
       }
 
-      print('[_decrypt] Deriving key...');
+      _log('[_decrypt] Deriving key...');
       final key = await _deriveKey(userId);
-      print('[_decrypt] Key derived successfully');
+      _log('[_decrypt] Key derived successfully');
 
-      print('[_decrypt] Attempting AES-GCM decryption...');
+      _log('[_decrypt] Attempting AES-GCM decryption...');
       final decrypted = await _cipher.decrypt(
         SecretBox(ciphertext, nonce: nonce, mac: mac),
         secretKey: key,
       );
       
-      print('[_decrypt] Decryption successful! Decrypted ${decrypted.length} bytes');
+      _log('[_decrypt] Decryption successful! Decrypted ${decrypted.length} bytes');
 
       return utf8.decode(decrypted);
     } catch (e) {
-      print('[_decrypt] ❌ Fatal decryption error: $e');
+      _log('[_decrypt] Fatal decryption error: $e');
       throw Exception('Decryption failed: $e');
     }
   }

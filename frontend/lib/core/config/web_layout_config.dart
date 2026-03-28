@@ -22,13 +22,13 @@ class WebLayoutConfig {
 
   // ========== CONTENT WIDTHS ==========
   /// Maximum width for single-column page content (Material Design standard)
-  static const double kPageMaxWidth = 1088.0;
+  static const double kPageMaxWidth = 980.0;
 
   /// Maximum width for two-column layouts (sidebar + content)
-  static const double kDualColumnMaxWidth = 1600.0;
+  static const double kDualColumnMaxWidth = 1360.0;
 
   /// Maximum width for chat/messaging dual-pane layout
-  static const double kChatPaneMaxWidth = 1920.0;
+  static const double kChatPaneMaxWidth = 1360.0;
 
   // ========== SIDEBAR & PANE WIDTHS ==========
   /// Standard web sidebar width
@@ -38,7 +38,7 @@ class WebLayoutConfig {
   static const double kMinSidebarWidth = 400.0;
 
   /// Preferred content pane width for optimal readability
-  static const double kPreferredContentWidth = 800.0;
+  static const double kPreferredContentWidth = 920.0;
 
   // ========== FLEX RATIOS ==========
   /// `Expanded` flex value for the left pane (equal weighting)
