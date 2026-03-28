@@ -268,13 +268,19 @@ Future<Response> _handleLogin(
         await tokenService.extractOrGenerateDeviceId(request.headers);
     final deviceName = tokenService.inferDeviceName(request.headers);
 
-    await tokenService.createDeviceSession(
-      connection: database,
-      userId: userId,
-      deviceId: deviceId,
-      deviceName: deviceName,
-      refreshToken: jwtToken,
-    );
+    // Device session tracking must not block successful login.
+    // Some deployed databases may lag migrations for device_sessions.
+    try {
+      await tokenService.createDeviceSession(
+        connection: database,
+        userId: userId,
+        deviceId: deviceId,
+        deviceName: deviceName,
+        refreshToken: jwtToken,
+      );
+    } catch (e) {
+      print('[WARN] Device session persistence failed during login: $e');
+    }
 
     return Response.ok(
       jsonEncode({
