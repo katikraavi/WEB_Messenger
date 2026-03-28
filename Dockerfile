@@ -21,6 +21,9 @@ RUN dart pub get
 
 COPY backend/ .
 
+# Generate pubspec.lock for the runtime
+RUN dart pub get --offline || dart pub get
+
 # Stage 3: Runtime - Dart image with nginx
 FROM dart:stable
 
@@ -38,8 +41,12 @@ COPY --from=frontend-builder /app/build/web /usr/share/nginx/html
 
 # Copy backend
 COPY --from=backend-builder /app /app/backend
+COPY --from=backend-builder /root/.pub-cache /root/.pub-cache
 
 WORKDIR /app/backend
+
+# Ensure dependencies are available
+RUN dart pub get || true
 
 # Create startup script
 RUN cat > /start.sh << 'SCRIPT'
