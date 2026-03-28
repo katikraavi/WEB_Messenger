@@ -45,15 +45,25 @@ check_json_endpoint "/health" "200" "healthy"
 
 # API routing sanity checks
 auth_tmp="$(mktemp)"
-auth_code="$(curl -sS -o "$auth_tmp" -w "%{http_code}" "$BASE_URL/api/auth/login")"
-if [[ "$auth_code" == "404" ]]; then
-  echo "FAIL /api/auth/login is not routed to backend (HTTP 404)"
+auth_code="$(curl -sS -o "$auth_tmp" -w "%{http_code}" \
+  -X POST \
+  -H 'Content-Type: application/json' \
+  -d '{}' \
+  "$BASE_URL/api/auth/login")"
+if [[ "$auth_code" == "404" || "$auth_code" == "502" ]]; then
+  echo "FAIL /api/auth/login is not routed to backend (HTTP $auth_code)"
   cat "$auth_tmp"
   rm -f "$auth_tmp"
   exit 1
 fi
 if grep -qi "<!doctype html>" "$auth_tmp"; then
   echo "FAIL /api/auth/login returned HTML fallback instead of backend JSON"
+  cat "$auth_tmp"
+  rm -f "$auth_tmp"
+  exit 1
+fi
+if [[ "$auth_code" != "200" && "$auth_code" != "400" && "$auth_code" != "401" ]]; then
+  echo "FAIL /api/auth/login returned unexpected HTTP $auth_code"
   cat "$auth_tmp"
   rm -f "$auth_tmp"
   exit 1
