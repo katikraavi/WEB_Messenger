@@ -1,7 +1,0 @@
-                  id                  | username |        email        | email_verified 
---------------------------------------+----------+---------------------+----------------
- 46239034-0a9d-40f0-baae-e05bfcb48695 | bob      | bob@example.com     | t
- 33ad2364-3226-4a89-b551-d0ee48dde9ec | charlie  | charlie@example.com | t
- 35ecc950-d02b-442b-8482-fef0b376650f | diane    | diane@test.org      | t
-(3 rows)
-

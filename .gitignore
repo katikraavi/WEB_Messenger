@@ -114,6 +114,15 @@ dist/
 .env.local
 .env.*.local
 
+# Local notes and scratch files
+NEON_CONNECTION.txt
+TESTER_URL.txt
+
+# Accidental shell transcript files
+backend/senger*
+backend/leep 2
+backend/ers verified in database
+
 # Database files
 *.db
 *.sqlite
