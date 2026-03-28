@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'dart:async';
+import 'dart:html' if (dart.library.html) 'dart:html' as html;
 
 /// HTTP Client for connecting to Serverpod backend
 ///
@@ -14,6 +15,26 @@ class ApiClient {
   static late String _baseUrl;
   static late http.Client _httpClient;
   static bool _isHealthy = false;
+  
+  /// Get WebSocket URL for dynamic backend connection
+  /// Converts relative HTTP paths to proper WebSocket URLs
+  static String getWebSocketUrl([String path = '/ws/messages']) {
+    if (kIsWeb) {
+      // On web, use current window location and convert to WebSocket URL
+      final protocol = html.window.location.protocol == 'https:' ? 'wss' : 'ws';
+      final host = html.window.location.host; // includes port if non-standard
+      return '$protocol://$host$path';
+    } else {
+      // For non-web platforms, use the same logic as HTTP but with ws:// protocol
+      const String envBackendUrl = String.fromEnvironment('BACKEND_URL', defaultValue: 'ws://localhost:8081');
+      if (envBackendUrl.startsWith('http://')) {
+        return envBackendUrl.replaceFirst('http://', 'ws://') + path;
+      } else if (envBackendUrl.startsWith('https://')) {
+        return envBackendUrl.replaceFirst('https://', 'wss://') + path;
+      }
+      return 'ws://localhost:8081$path';
+    }
+  }
 
   /// Initialize API client with backend URL
   ///

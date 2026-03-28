@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/foundation.dart';
 import '../../core/services/websocket_service.dart';
+import '../../core/services/api_client.dart';
 import '../../features/chats/providers/receive_messages_provider.dart';
 import '../../features/chats/providers/typing_indicator_provider.dart';
 import '../services/chat_api_service.dart';
@@ -41,11 +42,12 @@ class AppInitializationService {
       
       _riverpodRef = ref;
 
-      // Connect to WebSocket
+      // Connect to WebSocket with dynamic URL based on current deployment
+      final wsUrl = ApiClient.getWebSocketUrl('/ws/messages');
       await webSocketService.connect(
         token: token,
         userId: userId,
-        url: 'ws://localhost:8081/ws/messages',
+        url: wsUrl,
       );
 
 

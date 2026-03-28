@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/message_websocket_service.dart';
+import '../../../core/services/api_client.dart';
 
 /// WebSocket service provider (singleton)
 final messageWebSocketProvider =
@@ -17,10 +18,11 @@ class WebSocketNotifier extends StateNotifier<MessageWebSocketService> {
     required String userId,
   }) async {
     try {
+      final wsUrl = ApiClient.getWebSocketUrl('');
       await state.connect(
         token: token,
         userId: userId,
-        baseUrl: 'ws://localhost:8081',
+        baseUrl: wsUrl,
       );
     } catch (e) {
       rethrow;
