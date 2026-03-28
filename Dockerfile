@@ -1,4 +1,4 @@
-# Stage 1: Build frontend (pointing to localhost backend via reverse proxy)
+# Stage 1: Build frontend with relative API path for nginx reverse proxy
 FROM ghcr.io/cirruslabs/flutter:stable AS frontend-builder
 
 WORKDIR /app
