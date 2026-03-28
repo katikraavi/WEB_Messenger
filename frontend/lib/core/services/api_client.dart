@@ -20,18 +20,20 @@ class ApiClient {
   /// Converts relative HTTP paths to proper WebSocket URLs
   static String getWebSocketUrl([String path = '/ws/messages']) {
     if (kIsWeb) {
-      // On web, use current window location and convert to WebSocket URL
+      // On web, derive WebSocket URL from current window location
+      // https://example.com/ → wss://example.com/ws/messages
+      // http://localhost:3000/ → ws://localhost:3000/ws/messages
       final protocol = html.window.location.protocol == 'https:' ? 'wss' : 'ws';
       final host = html.window.location.host; // includes port if non-standard
       return '$protocol://$host$path';
     } else {
-      // For non-web platforms, use the same logic as HTTP but with ws:// protocol
-      const String envBackendUrl = String.fromEnvironment('BACKEND_URL', defaultValue: 'ws://localhost:8081');
-      if (envBackendUrl.startsWith('http://')) {
-        return envBackendUrl.replaceFirst('http://', 'ws://') + path;
-      } else if (envBackendUrl.startsWith('https://')) {
-        return envBackendUrl.replaceFirst('https://', 'wss://') + path;
+      // For non-web platforms, derive from _baseUrl
+      if (_baseUrl.startsWith('https://')) {
+        return _baseUrl.replaceFirst('https://', 'wss://').replaceAll(RegExp(r'/$'), '') + path;
+      } else if (_baseUrl.startsWith('http://')) {
+        return _baseUrl.replaceFirst('http://', 'ws://').replaceAll(RegExp(r'/$'), '') + path;
       }
+      // Fallback
       return 'ws://localhost:8081$path';
     }
   }
@@ -53,7 +55,15 @@ class ApiClient {
       // For web builds, use environment variable BACKEND_URL (set at build time)
       // Fallback to localhost for local development
       const String envBackendUrl = String.fromEnvironment('BACKEND_URL', defaultValue: 'http://localhost:8081');
-      _baseUrl = envBackendUrl;
+      
+      // If BACKEND_URL is just '/' (relative path), convert to full URL using current window location
+      if (envBackendUrl == '/' || envBackendUrl.isEmpty) {
+        final protocol = html.window.location.protocol;
+        final host = html.window.location.host; // includes port if non-standard
+        _baseUrl = '$protocol//$host';
+      } else {
+        _baseUrl = envBackendUrl;
+      }
     } else if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
       // Android emulator needs to reach WSL2 host where Docker backend is running
       // Using WSL2 host IP: 172.31.195.26
@@ -97,11 +107,14 @@ class ApiClient {
   /// Check if backend health endpoint is responding
   ///
   /// Returns true if /health endpoint responds with 200 and valid JSON
+  /// Check if backend health endpoint is responding
+  ///
+  /// Returns true if /health endpoint responds with 200 and valid JSON
   /// Returns false if connection fails or response is invalid
   static Future<bool> isHealthy() async {
     try {
       final response = await _httpClient
-          .get(Uri.parse('$_baseUrl/health'))
+          .get(Uri.parse(_buildUrl('/health')))
           .timeout(
             const Duration(seconds: 30),
             onTimeout: () => throw TimeoutException('Health check timeout'),
@@ -119,6 +132,26 @@ class ApiClient {
     }
   }
 
+  /// Build proper URL from base URL and endpoint
+  /// Handles both absolute URLs and endpoints correctly
+  static String _buildUrl(String endpoint) {
+    // Handle None/empty case
+    if (_baseUrl.isEmpty) {
+      return endpoint;
+    }
+    
+    // Base URL should always be absolute at this point (http/https)
+    // Remove trailing slash from base URL if present
+    String base = _baseUrl.endsWith('/') ? _baseUrl.substring(0, _baseUrl.length - 1) : _baseUrl;
+    
+    // Ensure endpoint starts with /
+    if (!endpoint.startsWith('/')) {
+      endpoint = '/$endpoint';
+    }
+    
+    return base + endpoint;
+  }
+
   /// Get base URL for backend
   static String getBaseUrl() => _baseUrl;
 
@@ -132,7 +165,7 @@ class ApiClient {
   ///
   /// Example: ApiClient.get('/users') → http://host.docker.internal:8081/users
   static Future<http.Response> get(String endpoint) async {
-    return _httpClient.get(Uri.parse('$_baseUrl$endpoint'));
+    return _httpClient.get(Uri.parse(_buildUrl(endpoint)));
   }
 
   /// Make POST request to backend endpoint
@@ -142,7 +175,7 @@ class ApiClient {
     Object? body,
   }) async {
     return _httpClient.post(
-      Uri.parse('$_baseUrl$endpoint'),
+      Uri.parse(_buildUrl(endpoint)),
       headers: headers,
       body: body,
     );
@@ -155,7 +188,7 @@ class ApiClient {
     Object? body,
   }) async {
     return _httpClient.put(
-      Uri.parse('$_baseUrl$endpoint'),
+      Uri.parse(_buildUrl(endpoint)),
       headers: headers,
       body: body,
     );
@@ -167,7 +200,7 @@ class ApiClient {
     Map<String, String>? headers,
   }) async {
     return _httpClient.delete(
-      Uri.parse('$_baseUrl$endpoint'),
+      Uri.parse(_buildUrl(endpoint)),
       headers: headers,
     );
   }
