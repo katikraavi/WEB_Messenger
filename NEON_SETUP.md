@@ -46,6 +46,14 @@ SMTP_SECURE=true
 BACKEND_URL=https://messenger-backend-XXXXX.onrender.com
 ```
 
+Important:
+
+- Do not use `BACKEND_URL=https://api` or `BACKEND_URL=http://api`.
+- If frontend and backend are on the same Render service/domain, set `BACKEND_URL=/`.
+- If they are separate services, set `BACKEND_URL` to the full backend origin.
+
+If browser console shows `POST https://api/auth/login net::ERR_NAME_NOT_RESOLVED`, frontend is built with an invalid backend URL and must be rebuilt/redeployed.
+
 ## Step-by-Step Setup
 
 ### 1. Create Neon Project

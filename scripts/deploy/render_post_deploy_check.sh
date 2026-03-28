@@ -89,4 +89,19 @@ if ! grep -qi "<html" "$index_tmp"; then
 fi
 rm -f "$index_tmp"
 
+# Frontend bundle sanity: catch known bad host misconfiguration
+# that causes browser DNS errors like ERR_NAME_NOT_RESOLVED.
+js_tmp="$(mktemp)"
+js_code="$(curl -sS -o "$js_tmp" -w "%{http_code}" "$BASE_URL/main.dart.js")"
+if [[ "$js_code" == "200" ]]; then
+  if grep -q "https://api/auth/login" "$js_tmp" || grep -q "http://api/auth/login" "$js_tmp"; then
+    echo "FAIL frontend bundle contains invalid API host (https://api or http://api)"
+    echo "Hint: set BACKEND_URL=/ (same service) or full backend origin (split services) and redeploy."
+    rm -f "$js_tmp"
+    exit 1
+  fi
+  echo "OK   /main.dart.js API host sanity"
+fi
+rm -f "$js_tmp"
+
 echo "PASS Deployment checks succeeded for $BASE_URL"

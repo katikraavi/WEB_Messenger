@@ -19,6 +19,8 @@ class ApiClient {
     defaultValue: '',
   );
 
+  static final RegExp _ipv4Pattern = RegExp(r'^\d{1,3}(\.\d{1,3}){3}4');
+
   static String _defaultBaseUrl() {
     if (kIsWeb) {
       final base = Uri.base;
@@ -28,6 +30,49 @@ class ApiClient {
       }
     }
     return 'http://localhost:8081';
+  }
+
+  static bool _isLikelyWebResolvableHost(String host) {
+    if (host.isEmpty) return false;
+    if (host == 'localhost') return true;
+    if (_ipv4Pattern.hasMatch(host)) return true;
+    // Single-label hosts like "api" often fail in public browser DNS contexts.
+    if (!host.contains('.')) return false;
+    return true;
+  }
+
+  static String _normalizeConfiguredBaseUrl(String rawUrl) {
+    final candidate = rawUrl.trim();
+    if (candidate.isEmpty || candidate == '/') {
+      return _defaultBaseUrl();
+    }
+
+    // Relative paths on web should resolve to same-origin backend.
+    if (candidate.startsWith('/')) {
+      return _defaultBaseUrl();
+    }
+
+    // Support protocol-relative URLs (e.g. //api.example.com).
+    if (candidate.startsWith('//')) {
+      return '${Uri.base.scheme}:$candidate';
+    }
+
+    Uri? parsed = Uri.tryParse(candidate);
+
+    // If scheme is missing and host looks usable, infer current page scheme.
+    if (parsed != null && !parsed.hasScheme && parsed.host.isNotEmpty) {
+      parsed = Uri.tryParse('${Uri.base.scheme}://$candidate');
+    }
+
+    if (parsed == null || (parsed.scheme != 'http' && parsed.scheme != 'https') || parsed.host.isEmpty) {
+      return _defaultBaseUrl();
+    }
+
+    if (kIsWeb && !_isLikelyWebResolvableHost(parsed.host)) {
+      return _defaultBaseUrl();
+    }
+
+    return '${parsed.scheme}://${parsed.authority}';
   }
   
   /// Get WebSocket URL for dynamic backend connection
@@ -66,7 +111,7 @@ class ApiClient {
 
     final configuredBackendUrl = _envBackendUrl.trim();
     if (configuredBackendUrl.isNotEmpty) {
-      _baseUrl = configuredBackendUrl;
+      _baseUrl = _normalizeConfiguredBaseUrl(configuredBackendUrl);
       _isHealthy = await connectToBackend();
       return;
     }
@@ -77,13 +122,7 @@ class ApiClient {
       // Default to same-origin so hosted frontend can call its paired backend
       // without requiring an explicit environment variable.
       const String envBackendUrl = String.fromEnvironment('BACKEND_URL', defaultValue: '/');
-      
-      // If BACKEND_URL is just '/' (relative path), convert to full URL using current window location
-      if (envBackendUrl == '/' || envBackendUrl.isEmpty) {
-        _baseUrl = _defaultBaseUrl();
-      } else {
-        _baseUrl = envBackendUrl;
-      }
+      _baseUrl = _normalizeConfiguredBaseUrl(envBackendUrl);
     } else if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
       // Android emulator needs to reach WSL2 host where Docker backend is running
       // Using WSL2 host IP: 172.31.195.26
@@ -184,7 +223,7 @@ class ApiClient {
   static bool get isConnected => _isHealthy;
 
   /// Set base URL manually (for testing or special configurations)
-  static void setBaseUrl(String url) => _baseUrl = url;
+  static void setBaseUrl(String url) => _baseUrl = _normalizeConfiguredBaseUrl(url);
 
   /// Make GET request to backend endpoint
   ///
