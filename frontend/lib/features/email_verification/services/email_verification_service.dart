@@ -22,7 +22,7 @@ class EmailVerificationService {
   }) async {
     try {
       final response = await httpClient.post(
-        Uri.parse('$baseUrl/auth/verify-email/send'),
+        Uri.parse('$baseUrl/api/auth/verify-email/send'),
         headers: {
           'Content-Type': 'application/json',
           if (authToken != null) 'Authorization': 'Bearer $authToken',
@@ -66,7 +66,7 @@ class EmailVerificationService {
   }) async {
     try {
       final response = await httpClient.post(
-        Uri.parse('$baseUrl/auth/verify-email/confirm'),
+        Uri.parse('$baseUrl/api/auth/verify-email/confirm'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'token': token}),
       );

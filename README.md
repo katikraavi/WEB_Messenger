@@ -6,6 +6,7 @@ A full-stack mobile messaging application built with Flutter, Serverpod backend,
 
 See [quickstart.md](specs/001-messenger-init/quickstart.md) for detailed setup instructions.
 For production rollout guidance, see [DEPLOYMENT.md](DEPLOYMENT.md).
+For fastest Render redeploy, see [RENDER_REDEPLOY.md](RENDER_REDEPLOY.md).
 
 ### Prerequisites
 

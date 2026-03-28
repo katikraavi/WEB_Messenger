@@ -1,6 +1,12 @@
 # Stage 1: Build frontend with relative API path for nginx reverse proxy
 FROM ghcr.io/cirruslabs/flutter:stable AS frontend-builder
 
+ARG BACKEND_URL=/
+ARG APP_ENV=production
+ARG ENABLE_TEST_USERS=false
+ARG BUILD_SHA=unknown
+ARG BUILD_TIME=unknown
+
 WORKDIR /app
 
 COPY frontend/pubspec.yaml ./
@@ -9,7 +15,12 @@ RUN flutter pub get
 COPY frontend/ .
 
 # Build frontend pointing to relative API path (will use same domain via nginx proxy)
-RUN flutter build web --release --dart-define=BACKEND_URL=/
+RUN flutter build web --release \
+    --dart-define=BACKEND_URL=${BACKEND_URL} \
+    --dart-define=APP_ENV=${APP_ENV} \
+    --dart-define=ENABLE_TEST_USERS=${ENABLE_TEST_USERS} \
+    --dart-define=BUILD_SHA=${BUILD_SHA} \
+    --dart-define=BUILD_TIME=${BUILD_TIME}
 
 # Stage 2: Build backend
 FROM dart:stable AS backend-builder

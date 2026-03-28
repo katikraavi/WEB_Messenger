@@ -29,6 +29,56 @@ import 'package:frontend/features/chats/services/chat_notification_settings_serv
 import 'package:flutter/foundation.dart';
 import 'package:frontend/features/email_verification/screens/email_verify_link_screen.dart';
 
+const String _appEnv = String.fromEnvironment(
+  'APP_ENV',
+  defaultValue: 'development',
+);
+const String _buildSha = String.fromEnvironment(
+  'BUILD_SHA',
+  defaultValue: 'local',
+);
+const String _buildTime = String.fromEnvironment(
+  'BUILD_TIME',
+  defaultValue: 'unknown',
+);
+const bool _enableTestUsers = bool.fromEnvironment(
+  'ENABLE_TEST_USERS',
+  defaultValue: false,
+);
+
+String _normalizedAppEnv() {
+  final normalized = _appEnv.trim().toLowerCase();
+  if (normalized.isEmpty) {
+    return 'development';
+  }
+  return normalized;
+}
+
+bool _showTestUsers() {
+  final env = _normalizedAppEnv();
+  if (env == 'production' || env == 'prod') {
+    return false;
+  }
+  return _enableTestUsers;
+}
+
+String _environmentBadgeLabel() {
+  final env = _normalizedAppEnv();
+  switch (env) {
+    case 'prod':
+    case 'production':
+      return 'PROD';
+    case 'stage':
+    case 'staging':
+      return 'STAGING';
+    case 'dev':
+    case 'development':
+      return 'DEV';
+    default:
+      return env.toUpperCase();
+  }
+}
+
 String _displayName(String? value) {
   if (value == null || value.isEmpty) {
     return '';
@@ -215,6 +265,15 @@ class _MessengerAppState extends State<MessengerApp> {
         ),
       ),
       themeMode: ThemeMode.system,
+      builder: (context, child) {
+        final content = child ?? const SizedBox.shrink();
+        return Stack(
+          children: [
+            content,
+            const _EnvironmentBadge(),
+          ],
+        );
+      },
       routes: {'/invitations': (context) => const InvitationsScreen()},
       home: _buildHome(),
     );
@@ -264,6 +323,78 @@ class _LoadingScreen extends StatelessWidget {
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EnvironmentBadge extends StatelessWidget {
+  const _EnvironmentBadge();
+
+  Color _backgroundColor(String envLabel) {
+    if (envLabel == 'PROD') {
+      return const Color(0xFF14532D);
+    }
+    if (envLabel == 'STAGING') {
+      return const Color(0xFF92400E);
+    }
+    return const Color(0xFF1E3A8A);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final envLabel = _environmentBadgeLabel();
+    final shortSha = _buildSha.length > 12 ? _buildSha.substring(0, 12) : _buildSha;
+    final metaText = '$shortSha | $_buildTime';
+
+    return IgnorePointer(
+      child: SafeArea(
+        child: Align(
+          alignment: Alignment.topRight,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 8, right: 8),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: _backgroundColor(envLabel),
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.16),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                child: DefaultTextStyle(
+                  style: const TextStyle(color: Colors.white),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        envLabel,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.6,
+                        ),
+                      ),
+                      Text(
+                        metaText,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -670,7 +801,7 @@ class _AuthenticatedHomeScreenState
   }
 
   Widget _buildDevSwitcher() {
-    if (kReleaseMode) {
+    if (!_showTestUsers()) {
       return const SizedBox.shrink();
     }
 

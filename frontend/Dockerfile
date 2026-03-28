@@ -2,7 +2,7 @@
 FROM ghcr.io/cirruslabs/flutter:stable AS builder
 
 ARG BACKEND_URL
-ENV BACKEND_URL=${BACKEND_URL:-http://localhost:8081}
+ENV BACKEND_URL=${BACKEND_URL:-/}
 
 WORKDIR /app
 

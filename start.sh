@@ -13,7 +13,12 @@ echo "✅ Backend running on http://localhost:8081"
 # Build and serve web
 echo "🏗️  Building web app..."
 cd frontend
-flutter build web --release > /dev/null 2>&1
+flutter build web --release \
+	--dart-define=BACKEND_URL=http://localhost:8081 \
+	--dart-define=APP_ENV=development \
+	--dart-define=ENABLE_TEST_USERS=true \
+	--dart-define=BUILD_SHA=local \
+	--dart-define=BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) > /dev/null 2>&1
 cd build/web
 
 echo "🌐 Starting web server..."

@@ -9,7 +9,12 @@ pkill -f "python3 -m http.server 5000" 2>/dev/null || true
 # Build web
 echo "🏗️  Building web app..."
 cd ~/web-messenger/frontend
-flutter build web --release > /dev/null 2>&1
+flutter build web --release \
+	--dart-define=BACKEND_URL=http://localhost:8081 \
+	--dart-define=APP_ENV=development \
+	--dart-define=ENABLE_TEST_USERS=true \
+	--dart-define=BUILD_SHA=local \
+	--dart-define=BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) > /dev/null 2>&1
 
 # Start server
 cd build/web

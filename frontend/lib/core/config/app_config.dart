@@ -14,10 +14,10 @@ class AppConfig {
   
   /// Get backend URL for web platform
   /// When deployed on Render, uses BACKEND_URL env var injected at build time
-  /// For local development, uses localhost
+  /// For local development, defaults to same-origin.
   static String get backendUrlWeb {
     // This will be replaced at build time by Render's environment variables
-    const String envBackendUrl = String.fromEnvironment('BACKEND_URL', defaultValue: 'http://localhost:8081');
+    const String envBackendUrl = String.fromEnvironment('BACKEND_URL', defaultValue: '/');
     return envBackendUrl;
   }
   

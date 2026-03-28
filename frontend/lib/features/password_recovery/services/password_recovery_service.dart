@@ -19,7 +19,7 @@ class PasswordRecoveryService {
   }) async {
     try {
       final response = await httpClient.post(
-        Uri.parse('$baseUrl/auth/password-reset/request'),
+        Uri.parse('$baseUrl/api/auth/password-reset/request'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email}),
       );
@@ -63,7 +63,7 @@ class PasswordRecoveryService {
   }) async {
     try {
       final response = await httpClient.post(
-        Uri.parse('$baseUrl/auth/password-reset/confirm'),
+        Uri.parse('$baseUrl/api/auth/password-reset/confirm'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'token': token,

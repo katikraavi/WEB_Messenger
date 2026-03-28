@@ -1,0 +1,43 @@
+databases:
+  - name: web-messenger-db
+    databaseName: messenger_db
+    user: messenger_user
+    plan: free
+
+services:
+  - type: web
+    name: web-messenger
+    env: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: SERVERPOD_ENV
+        value: production
+      - key: SERVERPOD_PORT
+        value: "8081"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: web-messenger-db
+          property: connectionString
+      - key: DATABASE_SSL
+        value: "true"
+      - key: ENCRYPTION_MASTER_KEY
+        generateValue: true
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_FROM_EMAIL
+        sync: false
+      - key: SMTP_FROM_NAME
+        value: Mobile Messenger
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_SECURE
+        value: "true"
+      - key: VERBOSE_BACKEND_LOGS
+        value: "false"

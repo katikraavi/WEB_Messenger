@@ -55,7 +55,7 @@ class AuthService {
     try {
       final response = await http
           .post(
-            Uri.parse('$baseUrl/auth/register'),
+            Uri.parse('$baseUrl/api/auth/register'),
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode(request.toJson()),
           )
@@ -136,7 +136,7 @@ class AuthService {
       final deviceId = await _getOrCreateDeviceId();
       final response = await http
           .post(
-            Uri.parse('$baseUrl/auth/login'),
+            Uri.parse('$baseUrl/api/auth/login'),
             headers: {
               'Content-Type': 'application/json',
               'X-Device-ID': deviceId,
@@ -214,7 +214,7 @@ class AuthService {
     try {
       final response = await http
           .get(
-            Uri.parse('$baseUrl/auth/me'),
+            Uri.parse('$baseUrl/api/auth/me'),
             headers: {
               'Content-Type': 'application/json',
               'Authorization': 'Bearer $token',
@@ -246,7 +246,7 @@ class AuthService {
       final deviceId = await _getOrCreateDeviceId();
       final response = await http
           .post(
-            Uri.parse('$baseUrl/auth/logout'),
+            Uri.parse('$baseUrl/api/auth/logout'),
             headers: {
               'Content-Type': 'application/json',
               'Authorization': 'Bearer $token',

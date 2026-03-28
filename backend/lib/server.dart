@@ -220,9 +220,34 @@ Handler _createHandler(
         path = path.substring(0, path.length - 1);
       }
 
+      // Compatibility routing for reverse proxies that only forward /api/*.
+      if (path.startsWith('api/auth/') || path == 'api/auth') {
+        path = path.replaceFirst('api/', '');
+      }
+      if (path.startsWith('api/ws/') || path == 'api/ws') {
+        path = path.replaceFirst('api/', '');
+      }
+
       if (_verboseBackendLogs) {
         print(
             '[DEBUG] Received request: $method /$path (raw: ${request.url.path})');
+      }
+
+      // Root endpoint (public)
+      if (path.isEmpty && method == 'GET') {
+        return Response.ok(
+          jsonEncode({
+            'service': 'messenger-backend',
+            'status': 'healthy',
+            'environment': Platform.environment['SERVERPOD_ENV'] ?? 'development',
+            'timestamp': DateTime.now().toIso8601String(),
+            'endpoints': {
+              'health': '/health',
+              'schema': '/schema',
+            },
+          }),
+          headers: {'Content-Type': 'application/json'},
+        );
       }
 
       // Static file serving for /uploads directory
@@ -316,7 +341,7 @@ Handler _createHandler(
       show('Updating password...', true);
 
       try {
-        const res = await fetch('/auth/password-reset/confirm', {
+        const res = await fetch('/api/auth/password-reset/confirm', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token, newPassword: pw.value }),

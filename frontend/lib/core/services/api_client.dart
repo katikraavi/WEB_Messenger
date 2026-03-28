@@ -52,9 +52,10 @@ class ApiClient {
 
     // Set base URL based on platform
     if (kIsWeb) {
-      // For web builds, use environment variable BACKEND_URL (set at build time)
-      // Fallback to localhost for local development
-      const String envBackendUrl = String.fromEnvironment('BACKEND_URL', defaultValue: 'http://localhost:8081');
+      // For web builds, use BACKEND_URL from build-time define.
+      // Default to same-origin so hosted frontend can call its paired backend
+      // without requiring an explicit environment variable.
+      const String envBackendUrl = String.fromEnvironment('BACKEND_URL', defaultValue: '/');
       
       // If BACKEND_URL is just '/' (relative path), convert to full URL using current window location
       if (envBackendUrl == '/' || envBackendUrl.isEmpty) {

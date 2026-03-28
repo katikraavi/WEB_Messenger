@@ -28,7 +28,12 @@ flutter pub get
 
 echo ""
 echo "🔨 Building web release..."
-flutter build web --release
+flutter build web --release \
+    --dart-define=BACKEND_URL=http://localhost:8081 \
+    --dart-define=APP_ENV=development \
+    --dart-define=ENABLE_TEST_USERS=true \
+    --dart-define=BUILD_SHA=local \
+    --dart-define=BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 echo ""
 echo "════════════════════════════════════════════════════════════════"
