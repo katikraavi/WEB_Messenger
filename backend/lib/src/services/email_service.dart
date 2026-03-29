@@ -390,9 +390,9 @@ This link expires in $expiresIn. For security reasons, you can only use this lin
       for (final bcc in message.bcc) msg.bccRecipients.add(bcc);
 
       await send(msg, smtpServer).timeout(
-        const Duration(seconds: 45),
+        const Duration(seconds: 120),
         onTimeout: () => throw TimeoutException(
-          'SMTP send timed out after 45 seconds',
+          'SMTP send timed out after 120 seconds',
         ),
       );
       print('[✓] Email sent to ${message.to}: ${message.subject}');

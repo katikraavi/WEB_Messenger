@@ -143,7 +143,7 @@ Future<Response> _handleRegister(
       );
       devToken = token; // kept for dev response
       await emailService.sendEmail(emailMsg).timeout(
-            const Duration(seconds: 8),
+        const Duration(seconds: 60),
             onTimeout: () => throw TimeoutException(
               'Verification email send timed out',
             ),
