@@ -42,6 +42,7 @@ services:
       # ── Email (SMTP) ────────────────────────────────────────────────────
       # Local and hosted runs use the same SMTP env keys.
       # Keep values empty to disable SMTP locally, or set real provider values in .env.
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-}
       SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-noreply@local.messenger}

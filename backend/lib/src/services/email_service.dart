@@ -1,14 +1,15 @@
 import 'dart:async';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:mailer/mailer.dart';
 import 'package:mailer/smtp_server.dart';
 
 /// EmailService handles sending transactional emails.
 ///
-/// Configuration comes from environment variables (see docker-compose.yml):
+/// Configuration comes from environment variables:
+///   RESEND_API_KEY  — preferred on hosted (bypasses SMTP port blocking)
 ///   SMTP_HOST, SMTP_PORT, SMTP_FROM_EMAIL, SMTP_FROM_NAME,
-///   SMTP_USER, SMTP_PASSWORD, SMTP_SECURE
-///
-/// Prod: point at any real SMTP provider (SendGrid, Mailgun, Gmail, etc.)
+///   SMTP_USER, SMTP_PASSWORD, SMTP_SECURE  — fallback / local dev
 class EmailService {
   final String? smtpHost;
   final int? smtpPort;
@@ -18,6 +19,7 @@ class EmailService {
   final String? smtpPassword;
   final bool smtpSecure;
   final bool requireConfiguration;
+  final String? resendApiKey;
 
   EmailService({
     this.smtpHost,
@@ -28,6 +30,7 @@ class EmailService {
     this.smtpPassword,
     this.smtpSecure = false,
     this.requireConfiguration = false,
+    this.resendApiKey,
   });
 
   bool get isConfigured => !_isNotConfigured();
@@ -355,18 +358,70 @@ This link expires in $expiresIn. For security reasons, you can only use this lin
   /// 
   /// Returns: True if email was sent successfully
   Future<bool> sendEmail(EmailMessage message) async {
+    // Prefer Resend HTTP API when key is available — bypasses SMTP port blocking
+    if (resendApiKey != null && resendApiKey!.isNotEmpty) {
+      return _sendViaResend(message);
+    }
+
     if (_isNotConfigured()) {
-      // No SMTP configured — log and skip.
-      // In dev mode the verification handler returns the token directly
-      // in the API response, so testing still works without a mail server.
-      print('[EMAIL] No SMTP configured — email NOT sent to ${message.to}');
-      print('[EMAIL] Set SMTP_HOST, SMTP_PORT, SMTP_FROM_EMAIL, SMTP_USER, SMTP_PASSWORD to enable delivery.');
+      print('[EMAIL] No email provider configured — email NOT sent to ${message.to}');
+      print('[EMAIL] Set RESEND_API_KEY (recommended) or SMTP_HOST/PORT/USER/PASSWORD to enable delivery.');
       if (requireConfiguration) {
         throw EmailSendException('Email service not configured for production');
       }
       return true;
     }
 
+    return _sendViaSmtp(message);
+  }
+
+  Future<bool> _sendViaResend(EmailMessage message) async {
+    print('[EMAIL] Sending via Resend API to ${message.to}');
+    try {
+      final fromAddress = senderName != null && senderName!.isNotEmpty
+          ? '$senderName <${senderEmail ?? 'noreply@resend.dev'}>'
+          : (senderEmail ?? 'noreply@resend.dev');
+
+      final response = await http.post(
+        Uri.parse('https://api.resend.com/emails'),
+        headers: {
+          'Authorization': 'Bearer $resendApiKey',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'from': fromAddress,
+          'to': [message.to],
+          if (message.cc.isNotEmpty) 'cc': message.cc,
+          if (message.bcc.isNotEmpty) 'bcc': message.bcc,
+          'subject': message.subject,
+          'html': message.htmlBody,
+          'text': message.plainTextBody,
+        }),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () => throw TimeoutException('Resend API timed out after 30 seconds'),
+      );
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        print('[✓] Email sent via Resend to ${message.to}: ${message.subject}');
+        return true;
+      } else {
+        final body = response.body;
+        print('[EMAIL][ERROR] Resend API error ${response.statusCode}: $body');
+        throw EmailSendException('Resend API error ${response.statusCode}: $body');
+      }
+    } on TimeoutException catch (e) {
+      print('[EMAIL][ERROR] Resend timeout: ${e.message}');
+      throw EmailSendException('Resend timeout: ${e.message}');
+    } on EmailSendException {
+      rethrow;
+    } on Exception catch (e, st) {
+      print('[EMAIL][ERROR] Resend unexpected error: $e\n$st');
+      throw EmailSendException('Resend failed: $e');
+    }
+  }
+
+  Future<bool> _sendViaSmtp(EmailMessage message) async {
     print('[EMAIL] Attempting SMTP: host=$smtpHost port=$smtpPort ssl=$smtpSecure user=${smtpUser ?? "(none)"} passwordSet=${smtpPassword?.isNotEmpty == true} from=$senderEmail to=${message.to}');
     try {
       final smtpServer = SmtpServer(
@@ -395,7 +450,7 @@ This link expires in $expiresIn. For security reasons, you can only use this lin
           'SMTP send timed out after 120 seconds',
         ),
       );
-      print('[✓] Email sent to ${message.to}: ${message.subject}');
+      print('[✓] Email sent via SMTP to ${message.to}: ${message.subject}');
       return true;
     } on TimeoutException catch (e) {
       print('[EMAIL][ERROR] SMTP timeout: ${e.message}');
@@ -411,7 +466,8 @@ This link expires in $expiresIn. For security reasons, you can only use this lin
   }
 
   bool _isNotConfigured() =>
-      smtpHost == null || smtpPort == null || senderEmail == null;
+      (resendApiKey == null || resendApiKey!.isEmpty) &&
+      (smtpHost == null || smtpPort == null || senderEmail == null);
 }
 
 /// Represents an email message to send

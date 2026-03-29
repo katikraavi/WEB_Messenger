@@ -105,6 +105,7 @@ void main() async {
   final smtpSecureRaw = Platform.environment['SMTP_SECURE']?.toLowerCase();
   final smtpSecure = smtpSecureRaw == 'true' ||
       (smtpSecureRaw == null && smtpPort == 465);
+  final resendApiKey = Platform.environment['RESEND_API_KEY'];
   final emailService = EmailService(
     smtpHost: Platform.environment['SMTP_HOST'],
     smtpPort: smtpPort,
@@ -114,13 +115,16 @@ void main() async {
     smtpPassword: Platform.environment['SMTP_PASSWORD'],
     smtpSecure: smtpSecure,
     requireConfiguration: isProduction,
+    resendApiKey: resendApiKey,
   );
-  if (Platform.environment['SMTP_HOST'] != null) {
+  if (resendApiKey != null && resendApiKey.isNotEmpty) {
+    print('[✓] Email: Resend HTTP API (bypasses SMTP port restrictions)');
+  } else if (Platform.environment['SMTP_HOST'] != null) {
     print(
         '[✓] Email: SMTP → ${Platform.environment['SMTP_HOST']}:${Platform.environment['SMTP_PORT'] ?? '?'}');
   } else {
     print(
-        '[INFO] Email: No SMTP configured — tokens returned in API response (dev mode)');
+        '[INFO] Email: No provider configured — tokens returned in API response (dev mode)');
   }
   for (final warning in emailService.getConfigurationWarnings()) {
     print('[WARNING] Email configuration: $warning');
