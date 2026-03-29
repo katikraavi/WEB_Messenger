@@ -81,7 +81,11 @@ Future<Response> sendVerificationEmail(
 
     // Generate token and send email
     final token = await verificationService.createVerificationToken(userId);
-    final frontendUrl = Platform.environment['FRONTEND_URL'] ?? 'http://localhost:5000';
+    final configuredFrontendUrl = Platform.environment['FRONTEND_URL']?.trim();
+    final frontendUrl =
+      (configuredFrontendUrl != null && configuredFrontendUrl.isNotEmpty)
+        ? configuredFrontendUrl
+        : '${request.requestedUri.scheme}://${request.requestedUri.authority}';
     
     // Build verification email
     final emailMessage = emailService.buildVerificationEmail(
@@ -96,7 +100,7 @@ Future<Response> sendVerificationEmail(
 
     final bool isDevelopment = !bool.fromEnvironment('dart.vm.product');
     final successMessage = emailService.isUsingMailhog
-        ? 'Verification email captured in MailHog at http://localhost:8025.'
+      ? 'Verification email captured in MailHog.'
         : 'Verification email accepted by SMTP. If it does not arrive, check spam and verify SMTP sender configuration.';
 
     final responseBody = {

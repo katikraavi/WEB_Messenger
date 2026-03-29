@@ -78,7 +78,11 @@ Future<Response> requestPasswordReset(
     // Generate token and send email
     final token = await passwordResetService.createResetToken(userId);
 
-    final appBaseUrl = Platform.environment['APP_BASE_URL'] ?? 'http://localhost:8081';
+    final configuredAppBaseUrl = Platform.environment['APP_BASE_URL']?.trim();
+    final appBaseUrl =
+      (configuredAppBaseUrl != null && configuredAppBaseUrl.isNotEmpty)
+        ? configuredAppBaseUrl
+        : '${request.requestedUri.scheme}://${request.requestedUri.authority}';
     final resetLink = '$appBaseUrl/reset?token=$token';
     
     // Build password reset email
@@ -93,7 +97,7 @@ Future<Response> requestPasswordReset(
     await emailService.sendEmail(emailMessage);
 
     final successMessage = emailService.isUsingMailhog
-        ? 'Password reset email captured in MailHog at http://localhost:8025.'
+      ? 'Password reset email captured in MailHog.'
         : 'Password reset email request accepted. If it does not arrive, check spam and verify your SMTP sender configuration.';
 
     final responseBody = {

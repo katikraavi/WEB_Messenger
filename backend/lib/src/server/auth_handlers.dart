@@ -123,9 +123,12 @@ Future<Response> _handleRegister(
                   'Verification token creation timed out',
                 ),
               );
-      final appBaseUrl =
-            Platform.environment['FRONTEND_URL'] ?? 'http://localhost:5000';
-          final verificationLink = '$appBaseUrl/verify?token=$token';
+      final configuredFrontendUrl = Platform.environment['FRONTEND_URL']?.trim();
+      final frontendBaseUrl =
+          (configuredFrontendUrl != null && configuredFrontendUrl.isNotEmpty)
+              ? configuredFrontendUrl
+              : '${request.requestedUri.scheme}://${request.requestedUri.authority}';
+      final verificationLink = '$frontendBaseUrl/verify?token=$token';
       final emailMsg = emailService.buildVerificationEmail(
         recipientEmail: email,
         recipientName: username!,
