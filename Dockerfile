@@ -38,9 +38,8 @@ RUN dart pub get --offline || dart pub get
 # Stage 3: Runtime - Dart image with nginx
 FROM dart:stable
 
-# Install security updates and runtime dependencies
+# Install runtime dependencies
 RUN apt-get update \
-    && apt-get -y upgrade \
     && apt-get install -y --no-install-recommends nginx ca-certificates tini \
     && rm -rf /var/lib/apt/lists/* \
     && rm -f /etc/nginx/sites-enabled/default /etc/nginx/conf.d/default.conf

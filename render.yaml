@@ -6,10 +6,10 @@ databases:
 
 services:
   - type: web
-    name: web-messenger
+    name: web-messenger-backend
     env: docker
     plan: free
-    dockerfilePath: ./Dockerfile
+    dockerfilePath: ./backend/Dockerfile
     autoDeploy: true
     healthCheckPath: /health
     envVars:
@@ -45,3 +45,10 @@ services:
         sync: false
       - key: VERBOSE_BACKEND_LOGS
         value: "false"
+
+  - type: web
+    name: web-messenger-frontend
+    env: docker
+    plan: free
+    dockerfilePath: ./frontend/Dockerfile
+    autoDeploy: true

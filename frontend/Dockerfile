@@ -2,7 +2,7 @@
 FROM ghcr.io/cirruslabs/flutter:stable AS builder
 
 ARG BACKEND_URL
-ENV BACKEND_URL=${BACKEND_URL:-/}
+ENV BACKEND_URL=${BACKEND_URL:-https://web-messenger-backend.onrender.com}
 
 WORKDIR /app
 
