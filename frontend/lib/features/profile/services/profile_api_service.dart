@@ -80,7 +80,7 @@ class ProfileApiService {
   Future<UserProfile> fetchProfile(String userId, {String? token}) async {
     try {
       final baseUrl = ApiClient.getBaseUrl();
-      final url = '$baseUrl/profile/view/$userId';
+      final url = '$baseUrl/api/profile/view/$userId';
 
       final headers = <String, String>{'Content-Type': 'application/json'};
 
@@ -142,7 +142,7 @@ class ProfileApiService {
   }) async {
     try {
       final baseUrl = ApiClient.getBaseUrl();
-      final url = '$baseUrl/profile/edit';
+      final url = '$baseUrl/api/profile/edit';
 
       final headers = <String, String>{'Content-Type': 'application/json'};
 
@@ -208,7 +208,7 @@ class ProfileApiService {
   Future<UserProfile> uploadImage(File imageFile, {String? token}) async {
     try {
       final baseUrl = ApiClient.getBaseUrl();
-      final url = '$baseUrl/profile/picture/upload';
+      final url = '$baseUrl/api/profile/picture/upload';
 
       // Create multipart request
       final request = http.MultipartRequest('POST', Uri.parse(url));
@@ -250,7 +250,7 @@ class ProfileApiService {
   }) async {
     try {
       final baseUrl = ApiClient.getBaseUrl();
-      final url = '$baseUrl/profile/picture/upload';
+      final url = '$baseUrl/api/profile/picture/upload';
 
       final request = http.MultipartRequest('POST', Uri.parse(url));
       if (token != null) {
@@ -346,7 +346,7 @@ class ProfileApiService {
   Future<UserProfile> deleteImage({String? token}) async {
     try {
       final baseUrl = ApiClient.getBaseUrl();
-      final url = '$baseUrl/profile/picture';
+      final url = '$baseUrl/api/profile/picture';
 
       final headers = <String, String>{'Content-Type': 'application/json'};
 
