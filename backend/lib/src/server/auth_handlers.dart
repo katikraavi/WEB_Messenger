@@ -113,6 +113,8 @@ Future<Response> _handleRegister(
 
     // Auto-send verification email
     String? devToken;
+    bool emailDeliveryFailed = false;
+    String? emailDeliveryWarning;
     try {
       final token =
           await verificationService.createVerificationToken(userId).timeout(
@@ -146,24 +148,9 @@ Future<Response> _handleRegister(
       print('[Register] Verification email dispatched to $email');
     } catch (emailErr) {
       print('[Register][WARNING] Could not send verification email: $emailErr');
-      // Ensure account is not left behind when verification cannot be delivered.
-      try {
-        await database.execute(
-          'DELETE FROM "users" WHERE id = @id',
-          substitutionValues: {'id': userId},
-        );
-      } catch (cleanupErr) {
-        print(
-            '[Register][WARNING] Failed to rollback user after email failure: $cleanupErr');
-      }
-      return Response(
-        502,
-        body: jsonEncode({
-          'error':
-              'Account created, but verification email failed to send. Check SMTP sender configuration and retry.',
-        }),
-        headers: {'Content-Type': 'application/json'},
-      );
+      emailDeliveryFailed = true;
+      emailDeliveryWarning =
+          'Account created, but verification email failed to send. Use resend verification after login screen opens.';
     }
 
     final bool isDev = !bool.fromEnvironment('dart.vm.product');
@@ -172,6 +159,10 @@ Future<Response> _handleRegister(
       'email': email,
       'username': username,
     };
+    if (emailDeliveryFailed) {
+      responseBody['email_delivery_failed'] = true;
+      responseBody['warning'] = emailDeliveryWarning;
+    }
     if (isDev && devToken != null) {
       responseBody['dev_verification_token'] = devToken;
       responseBody['dev_note'] =

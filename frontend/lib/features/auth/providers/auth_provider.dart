@@ -23,6 +23,7 @@ class AuthProvider extends ChangeNotifier {
   String? _token;
   bool _isLoading = false;
   String? _error;
+  String? _registrationWarning;
   
   final SecureStorageWrapper _secureStorage = SecureStorageWrapper();
 
@@ -31,6 +32,7 @@ class AuthProvider extends ChangeNotifier {
   String? get token => _token;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  String? get registrationWarning => _registrationWarning;
   String? get userId => _user?.userId;
   bool get isAuthenticated => _user != null && _token != null;
 
@@ -81,6 +83,7 @@ class AuthProvider extends ChangeNotifier {
   Future<void> register(RegistrationRequest request) async {
     _isLoading = true;
     _error = null;
+    _registrationWarning = null;
     notifyListeners();
 
     try {
@@ -95,6 +98,7 @@ class AuthProvider extends ChangeNotifier {
       
       // Capture dev token from registration response (only present in dev mode)
       _devVerificationToken = authResponse.devVerificationToken;
+      _registrationWarning = authResponse.warning;
 
       // Note: Token is NOT stored after registration (per spec)
       // User must login to get a token with persistent session
@@ -107,6 +111,7 @@ class AuthProvider extends ChangeNotifier {
       _user = null;
       _token = null;
       _devVerificationToken = null;
+      _registrationWarning = null;
       notifyListeners();
       rethrow;
     }
@@ -204,6 +209,7 @@ class AuthProvider extends ChangeNotifier {
     _token = null;
     _isLoading = false;
     _error = null;
+    _registrationWarning = null;
     notifyListeners();
   }
 

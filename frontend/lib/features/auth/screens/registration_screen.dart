@@ -275,13 +275,25 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         await authProvider.register(request);
 
         if (mounted) {
-          // Show success message
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Account created successfully! Verify your email.'),
-              duration: Duration(seconds: 8),
-            ),
-          );
+          final warning = authProvider.registrationWarning;
+          if (warning != null && warning.trim().isNotEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(warning),
+                backgroundColor: Colors.orange.shade700,
+                duration: const Duration(seconds: 8),
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Account created successfully! Verify your email.',
+                ),
+                duration: Duration(seconds: 8),
+              ),
+            );
+          }
 
           // Navigate to email verification screen with user and email
           if (authProvider.user != null) {
