@@ -6,9 +6,10 @@ import requests
 import json
 import time
 import sys
+import os
 from datetime import datetime
 
-BASE_URL = 'http://localhost:8081'
+BASE_URL = os.getenv('BASE_URL', 'https://web-messenger-backend.onrender.com')
 
 def log(msg):
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")

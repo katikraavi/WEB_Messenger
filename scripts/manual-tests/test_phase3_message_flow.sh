@@ -18,7 +18,7 @@ echo -e "${BLUE}Phase 3 Integration Test - Message Send Flow${NC}"
 echo -e "${BLUE}════════════════════════════════════════════════════════════${NC}"
 
 # Configuration
-API_URL="http://localhost:8081"
+API_URL="${API_URL:-https://web-messenger-backend.onrender.com}"
 DB_USER="messenger_user"
 DB_PASS="messenger_password"
 DB_NAME="messenger_db"

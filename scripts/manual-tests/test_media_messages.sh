@@ -1,7 +1,7 @@
 #!/bin/bash
 # Comprehensive test: text messages, picture messages, video messages
 
-BASE_URL="http://localhost:8081"
+BASE_URL="${BASE_URL:-https://web-messenger-backend.onrender.com}"
 ALICE_EMAIL="testuser1@example.com"
 ALICE_PASSWORD="testuser1pass"
 BOB_EMAIL="testuser2@example.com"

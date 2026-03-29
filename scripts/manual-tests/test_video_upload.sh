@@ -7,7 +7,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-BASE_URL="http://localhost:8081"
+BASE_URL="${BASE_URL:-https://web-messenger-backend.onrender.com}"
 
 echo -e "${YELLOW}🎥 Testing Video Upload to Messenger App${NC}\n"
 

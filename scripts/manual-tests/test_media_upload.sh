@@ -2,7 +2,7 @@
 
 # Test script to verify image and video uploads
 
-BASE_URL="http://localhost:8081"
+BASE_URL="${BASE_URL:-https://web-messenger-backend.onrender.com}"
 BOB_EMAIL="bob@example.com"
 BOB_PASSWORD="bob123"
 

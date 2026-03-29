@@ -2,7 +2,7 @@
 
 # Decryption debugging test - shows what's being decrypted and why it fails
 
-API_URL="http://localhost:8081"
+API_URL="${API_URL:-https://web-messenger-backend.onrender.com}"
 
 # Colors
 GREEN='\033[0;32m'

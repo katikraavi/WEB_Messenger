@@ -8,7 +8,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-API_URL="http://localhost:8081"
+API_URL="${API_URL:-https://web-messenger-backend.onrender.com}"
 
 echo -e "${BLUE}═══════════════════════════════════════════════════════════${NC}"
 echo -e "${BLUE}  ENCRYPTION/DECRYPTION END-TO-END TEST${NC}"

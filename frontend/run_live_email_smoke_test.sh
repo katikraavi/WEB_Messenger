@@ -4,7 +4,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-backend_url="${BACKEND_URL:-http://localhost:8081}"
+backend_url="${BACKEND_URL:-https://web-messenger-backend.onrender.com}"
 health_url="${BACKEND_HEALTH_URL:-$backend_url/health}"
 
 echo "Checking backend health at $health_url"

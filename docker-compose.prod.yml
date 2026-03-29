@@ -43,7 +43,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile.prod
       args:
-        BACKEND_URL: ${BACKEND_URL:-http://localhost:8081}
+        BACKEND_URL: ${BACKEND_URL:-https://web-messenger-backend.onrender.com}
     container_name: messenger-frontend
     ports:
       - "3000:3000"

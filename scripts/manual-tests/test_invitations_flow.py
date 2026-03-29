@@ -7,8 +7,9 @@ Tests: Send → Fetch Pending → Accept
 import requests
 import json
 import sys
+import os
 
-BASE_URL = "http://localhost:8081"
+BASE_URL = os.getenv("BASE_URL", "https://web-messenger-backend.onrender.com")
 ALICE_ID = "bfd3a96a-ab36-442c-9b4e-276050b87678"
 BOB_ID = "b8465fd4-56e0-4f97-9a4f-9e2cb862d444"
 ALICE_TOKEN = "alice_token"

@@ -4,7 +4,7 @@
 
 set -e
 
-API_URL="${API_URL:-http://localhost:8081}"
+API_URL="${API_URL:-https://web-messenger-backend.onrender.com}"
 
  echo "╔════════════════════════════════════════════════════════════╗"
 echo "║ SIMPLE ENCRYPTION/DECRYPTION TEST                         ║"

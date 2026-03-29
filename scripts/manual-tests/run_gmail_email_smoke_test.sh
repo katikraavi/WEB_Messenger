@@ -4,7 +4,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-health_url="${BACKEND_HEALTH_URL:-http://localhost:8081/health}"
+health_url="${BACKEND_HEALTH_URL:-https://web-messenger-backend.onrender.com/health}"
 
 echo "Starting backend with Docker Compose"
 docker compose up -d --build serverpod

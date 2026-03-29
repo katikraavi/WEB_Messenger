@@ -5,7 +5,7 @@
 
 set -e
 
-API_URL="http://localhost:8081"
+API_URL="${API_URL:-https://web-messenger-backend.onrender.com}"
 BACKEND_HEALTH="${API_URL}/health"
 
 echo "🔐 End-to-End Encryption Test"

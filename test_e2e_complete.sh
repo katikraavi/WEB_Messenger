@@ -5,7 +5,7 @@
 
 set -e
 
-API_URL="${API_URL:-http://localhost:8080}"
+API_URL="${API_URL:-https://web-messenger-backend.onrender.com}"
 BACKEND_LOG="/tmp/backend.log"
 
 echo "╔════════════════════════════════════════════════════════════╗"

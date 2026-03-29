@@ -2,7 +2,7 @@
 
 # Test script to send and verify messages
 
-BASE_URL="http://localhost:8081"
+BASE_URL="${BASE_URL:-https://web-messenger-backend.onrender.com}"
 
 # User credentials
 ALICE_EMAIL="alice@example.com"
@@ -97,4 +97,4 @@ echo "===== TEST COMPLETE ====="
 echo "✅ Message flow verified!"
 echo ""
 echo "To see full response:"
-echo "curl -s 'http://localhost:8081/api/chats/$CHAT_ID/messages?limit=10' -H 'Authorization: Bearer $BOB_TOKEN' | jq"
+echo "curl -s 'https://web-messenger-backend.onrender.com/api/chats/$CHAT_ID/messages?limit=10' -H 'Authorization: Bearer $BOB_TOKEN' | jq"

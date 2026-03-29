@@ -15,7 +15,7 @@ echo -e "${BLUE}═════════════════════�
 echo -e "${BLUE}Phase 3 Simple Test - Message Send Flow${NC}"
 echo -e "${BLUE}════════════════════════════════════════════════════════════${NC}"
 
-API_URL="http://localhost:8081"
+API_URL="${API_URL:-https://web-messenger-backend.onrender.com}"
 
 echo -e "\n${YELLOW}[Test 1] Backend Health${NC}"
 HEALTH=$(curl -s "${API_URL}/health" | grep -o "healthy")
