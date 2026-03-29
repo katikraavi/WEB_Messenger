@@ -36,6 +36,12 @@ Create a root `.env` file (or secret manager entries) with these keys:
 - `SMTP_PASSWORD`
 - `SMTP_SECURE`
 
+Recommended values for Gmail:
+
+- `SMTP_PORT=587`
+- `SMTP_SECURE=false` (STARTTLS)
+- Use `SMTP_SECURE=true` only with implicit TLS providers/ports like 465.
+
 ### Optional build metadata keys
 
 - `FRONTEND_BUILD_MODE`

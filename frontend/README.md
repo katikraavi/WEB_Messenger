@@ -150,7 +150,7 @@ What it does:
 - triggers registration email
 - triggers password reset email
 
-If you need real inbox delivery instead of MailHog capture, make sure the repository root `.env` is configured for Gmail SMTP, then start the backend from the repository root with:
+If you need real inbox delivery, make sure the repository root `.env` is configured for Gmail SMTP (or another provider), then start the backend from the repository root with:
 
 ```bash
 docker compose up -d --build
@@ -184,7 +184,7 @@ dart run build_runner watch --delete-conflicting-outputs
 - Firebase is optional in local development; app can run with push disabled.
 - Keep environment-specific behavior documented and explicit.
 - SMTP mode is controlled by the repository-root `.env` file used by Docker Compose.
-- If root `.env` uses MailHog, auth emails are captured locally at `http://localhost:8025`.
+- If `SMTP_HOST`/`SMTP_PORT` are empty, auth emails are skipped locally.
 - If root `.env` uses Gmail SMTP, auth emails are delivered to real inboxes.
 
 ## Email Delivery Notes
@@ -200,8 +200,6 @@ If emails do not arrive:
 For SendGrid specifically:
 - Use a verified sender or domain-authenticated from address
 - Avoid unverified personal inbox from addresses
-
-For local testing, MailHog can be used to inspect outbound messages.
 
 For real delivery to a mailbox visible to testers, configure Gmail SMTP in the repository-root `.env` and start the backend with Docker Compose:
 

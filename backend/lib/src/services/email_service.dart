@@ -8,7 +8,6 @@ import 'package:mailer/smtp_server.dart';
 ///   SMTP_HOST, SMTP_PORT, SMTP_FROM_EMAIL, SMTP_FROM_NAME,
 ///   SMTP_USER, SMTP_PASSWORD, SMTP_SECURE
 ///
-/// Dev: point at Mailhog (mailhog:1025) — web UI at http://localhost:8025
 /// Prod: point at any real SMTP provider (SendGrid, Mailgun, Gmail, etc.)
 class EmailService {
   final String? smtpHost;
@@ -18,6 +17,7 @@ class EmailService {
   final String? smtpUser;
   final String? smtpPassword;
   final bool smtpSecure;
+  final bool requireConfiguration;
 
   EmailService({
     this.smtpHost,
@@ -27,12 +27,10 @@ class EmailService {
     this.smtpUser,
     this.smtpPassword,
     this.smtpSecure = false,
+    this.requireConfiguration = false,
   });
 
   bool get isConfigured => !_isNotConfigured();
-
-  bool get isUsingMailhog =>
-      (smtpHost ?? '').trim().toLowerCase() == 'mailhog';
 
   List<String> getConfigurationWarnings() {
     final warnings = <String>[];
@@ -362,8 +360,8 @@ This link expires in $expiresIn. For security reasons, you can only use this lin
       // In dev mode the verification handler returns the token directly
       // in the API response, so testing still works without a mail server.
       print('[EMAIL] No SMTP configured — email NOT sent to ${message.to}');
-      print('[EMAIL] Set SMTP_HOST env var (or use Mailhog in docker-compose) to send real emails.');
-      if (bool.fromEnvironment('dart.vm.product')) {
+      print('[EMAIL] Set SMTP_HOST, SMTP_PORT, SMTP_FROM_EMAIL, SMTP_USER, SMTP_PASSWORD to enable delivery.');
+      if (requireConfiguration) {
         throw EmailSendException('Email service not configured for production');
       }
       return true;

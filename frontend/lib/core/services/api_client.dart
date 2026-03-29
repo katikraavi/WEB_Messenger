@@ -186,7 +186,10 @@ class ApiClient {
   static String _buildUrl(String endpoint) {
     // Handle None/empty case
     if (_baseUrl.isEmpty) {
-      _baseUrl = _defaultBaseUrl();
+      final configuredBackendUrl = _envBackendUrl.trim();
+      _baseUrl = configuredBackendUrl.isNotEmpty
+          ? _normalizeConfiguredBaseUrl(configuredBackendUrl)
+          : _defaultBaseUrl();
     }
     
     // Base URL should always be absolute at this point (http/https)
@@ -204,7 +207,10 @@ class ApiClient {
   /// Get base URL for backend
   static String getBaseUrl() {
     if (_baseUrl.isEmpty) {
-      _baseUrl = _defaultBaseUrl();
+      final configuredBackendUrl = _envBackendUrl.trim();
+      _baseUrl = configuredBackendUrl.isNotEmpty
+          ? _normalizeConfiguredBaseUrl(configuredBackendUrl)
+          : _defaultBaseUrl();
     }
     return _baseUrl;
   }

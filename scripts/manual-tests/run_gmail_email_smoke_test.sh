@@ -22,5 +22,5 @@ if ! curl --fail --silent --show-error "$health_url" >/dev/null; then
   exit 1
 fi
 
-cd frontend
+cd ../../frontend
 ./run_live_email_smoke_test.sh "$@"

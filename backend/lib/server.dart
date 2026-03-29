@@ -52,6 +52,7 @@ bool get _verboseBackendLogs {
 void main() async {
   final port = int.parse(Platform.environment['SERVERPOD_PORT'] ?? '8081');
   final env = Platform.environment['SERVERPOD_ENV'] ?? 'development';
+  final isProduction = env == 'production';
 
   print('[INFO] Starting Messenger Server (environment: $env)');
 
@@ -100,16 +101,19 @@ void main() async {
 
   // Initialize services
   final tokenService = TokenService();
+  final smtpPort = int.tryParse(Platform.environment['SMTP_PORT'] ?? '');
+  final smtpSecureRaw = Platform.environment['SMTP_SECURE']?.toLowerCase();
+  final smtpSecure = smtpSecureRaw == 'true' ||
+      (smtpSecureRaw == null && smtpPort == 465);
   final emailService = EmailService(
     smtpHost: Platform.environment['SMTP_HOST'],
-    smtpPort: int.tryParse(Platform.environment['SMTP_PORT'] ?? ''),
+    smtpPort: smtpPort,
     senderEmail: Platform.environment['SMTP_FROM_EMAIL'],
     senderName: Platform.environment['SMTP_FROM_NAME'] ?? 'Mobile Messenger',
     smtpUser: Platform.environment['SMTP_USER'],
     smtpPassword: Platform.environment['SMTP_PASSWORD'],
-    smtpSecure:
-        (Platform.environment['SMTP_SECURE'] ?? 'false').toLowerCase() ==
-            'true',
+    smtpSecure: smtpSecure,
+    requireConfiguration: isProduction,
   );
   if (Platform.environment['SMTP_HOST'] != null) {
     print(

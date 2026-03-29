@@ -37,7 +37,7 @@ SMTP_FROM_EMAIL=noreply@yourdomain.com
 SMTP_FROM_NAME=Mobile Messenger
 SMTP_USER=your-email@gmail.com
 SMTP_PASSWORD=your-google-app-password
-SMTP_SECURE=true
+SMTP_SECURE=false
 ```
 
 ## Frontend Environment Variables for Render
@@ -171,7 +171,7 @@ services:
 
 Then run only backend + frontend:
 ```bash
-docker compose up serverpod mailhog
+docker compose up serverpod
 ```
 
 ## Security Best Practices

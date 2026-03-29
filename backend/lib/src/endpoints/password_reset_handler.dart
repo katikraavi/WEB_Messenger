@@ -96,9 +96,8 @@ Future<Response> requestPasswordReset(
     // Send email. This now fails fast when SMTP delivery fails.
     await emailService.sendEmail(emailMessage);
 
-    final successMessage = emailService.isUsingMailhog
-      ? 'Password reset email captured in MailHog.'
-        : 'Password reset email request accepted. If it does not arrive, check spam and verify your SMTP sender configuration.';
+    const successMessage =
+        'Password reset email request accepted. If it does not arrive, check spam and verify your SMTP sender configuration.';
 
     final responseBody = {
       'success': true,

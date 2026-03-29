@@ -39,5 +39,9 @@ services:
         sync: false
       - key: SMTP_SECURE
         value: "false"
+      - key: APP_BASE_URL
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
       - key: VERBOSE_BACKEND_LOGS
         value: "false"

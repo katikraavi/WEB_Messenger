@@ -32,7 +32,6 @@ Wait for all containers to become healthy (roughly 2–5 minutes on first build)
 |---|---|
 | **Web app** | http://localhost:5000 |
 | **Backend API** | http://localhost:8081 |
-| **Email catcher (MailHog)** | http://localhost:8025 |
 
 > `--build` is only required the first time or after code changes. Subsequent runs can use plain `docker compose up`.
 
@@ -60,7 +59,7 @@ This expects either:
 The script then runs the frontend live integration test automatically.
 
 To configure another machine, copy `.env.example` to `.env` and then choose one of these SMTP modes:
-- MailHog for local capture only
+- SMTP disabled locally (empty `SMTP_HOST`/`SMTP_PORT`)
 - Gmail SMTP for real inbox delivery
 
 ## Project Structure
@@ -159,7 +158,7 @@ docker compose restart serverpod
 ./scripts/manual-tests/run_gmail_email_smoke_test.sh
 ```
 
-If your local ignored `.env` is configured for Gmail SMTP, emails will be sent to real inboxes. If `.env` is configured for MailHog (the default), emails are captured at http://localhost:8025.
+If your local ignored `.env` is configured for Gmail SMTP, emails will be sent to real inboxes. If `SMTP_HOST` and `SMTP_PORT` are empty, backend email delivery is skipped locally.
 
 ### Frontend Development
 

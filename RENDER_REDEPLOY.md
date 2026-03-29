@@ -28,7 +28,9 @@ Set these values in the Render web service if not already present:
 - `SMTP_FROM_NAME=Mobile Messenger`
 - `SMTP_USER=<smtp username>`
 - `SMTP_PASSWORD=<smtp password>`
-- `SMTP_SECURE=true`
+- `SMTP_SECURE=false` (for port 587 STARTTLS)
+- `APP_BASE_URL=<your backend public url>`
+- `FRONTEND_URL=<your frontend public url>`
 
 Optional but useful:
 

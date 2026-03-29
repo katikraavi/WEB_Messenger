@@ -98,10 +98,11 @@ Future<Response> sendVerificationEmail(
     // Send email and fail the request if SMTP delivery fails.
     await emailService.sendEmail(emailMessage);
 
-    final bool isDevelopment = !bool.fromEnvironment('dart.vm.product');
-    final successMessage = emailService.isUsingMailhog
-      ? 'Verification email captured in MailHog.'
-        : 'Verification email accepted by SMTP. If it does not arrive, check spam and verify SMTP sender configuration.';
+    final bool isDevelopment =
+      (Platform.environment['SERVERPOD_ENV'] ?? 'development') !=
+      'production';
+    const successMessage =
+      'Verification email accepted by SMTP. If it does not arrive, check spam and verify SMTP sender configuration.';
 
     final responseBody = {
       'success': true,

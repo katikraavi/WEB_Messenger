@@ -63,8 +63,9 @@ echo "SMTP_FROM_EMAIL=noreply@yourdomain.com"
 echo "SMTP_FROM_NAME=Mobile Messenger"
 echo "SMTP_USER=your-email@gmail.com"
 echo "SMTP_PASSWORD=your-app-password"
-echo "SMTP_SECURE=true"
+echo "SMTP_SECURE=false"
 echo "APP_BASE_URL=https://messenger-backend-XXXXX.onrender.com"
+echo "FRONTEND_URL=https://messenger-frontend-XXXXX.onrender.com"
 echo ""
 
 # Step 6: Default values check

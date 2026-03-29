@@ -156,7 +156,9 @@ Future<Response> _handleRegister(
           'Account created, but verification email failed to send. Use resend verification after login screen opens.';
     }
 
-    final bool isDev = !bool.fromEnvironment('dart.vm.product');
+    final bool isDev =
+      (Platform.environment['SERVERPOD_ENV'] ?? 'development') !=
+      'production';
     final responseBody = <String, dynamic>{
       'user_id': userId,
       'email': email,

@@ -38,9 +38,10 @@ RUN dart pub get --offline || dart pub get
 # Stage 3: Runtime - Dart image with nginx
 FROM dart:stable
 
-# Install nginx
+# Install security updates and runtime dependencies
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends nginx \
+    && apt-get -y upgrade \
+    && apt-get install -y --no-install-recommends nginx ca-certificates tini \
     && rm -rf /var/lib/apt/lists/* \
     && rm -f /etc/nginx/sites-enabled/default /etc/nginx/conf.d/default.conf
 
@@ -60,28 +61,29 @@ WORKDIR /app/backend
 RUN dart pub get || true
 
 # Create startup script
-RUN cat > /start.sh << 'SCRIPT'
-#!/bin/sh
-set -e
-
-# Start backend in background with all environment variables passed through
-echo "[INFO] Starting Dart backend on :8081..."
-dart run bin/server.dart &
-BACKEND_PID=$!
-
-# Give backend time to start
-sleep 3
-
-# Start nginx in foreground
-echo "[INFO] Starting nginx reverse proxy on :8080..."
-nginx -g "daemon off;"
-
-# Cleanup if nginx stops
-kill $BACKEND_PID 2>/dev/null || true
-SCRIPT
-
-RUN chmod +x /start.sh
+RUN printf '%s\n' \
+    '#!/bin/sh' \
+    'set -e' \
+    '' \
+    '# Start backend in background with all environment variables passed through' \
+    'echo "[INFO] Starting Dart backend on :8081..."' \
+    'dart run bin/server.dart &' \
+    'BACKEND_PID=$!' \
+    '' \
+    '# Give backend time to start' \
+    'sleep 3' \
+    '' \
+    '# Start nginx in foreground' \
+    'echo "[INFO] Starting nginx reverse proxy on :8080..."' \
+    'nginx -g "daemon off;"' \
+    '' \
+    '# Cleanup if nginx stops' \
+    'kill $BACKEND_PID 2>/dev/null || true' \
+    > /start.sh \
+    && chmod +x /start.sh
 
 EXPOSE 8080
 
+STOPSIGNAL SIGTERM
+ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["/start.sh"]

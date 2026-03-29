@@ -17,7 +17,7 @@ services:
       SMTP_FROM_NAME: ${SMTP_FROM_NAME}
       SMTP_USER: ${SMTP_USER}
       SMTP_PASSWORD: ${SMTP_PASSWORD}
-      SMTP_SECURE: ${SMTP_SECURE:-true}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
       APP_BASE_URL: ${APP_BASE_URL}
     ports:
       - "8081:8081"
