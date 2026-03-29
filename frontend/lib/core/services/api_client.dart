@@ -78,9 +78,18 @@ class ApiClient {
   /// Converts relative HTTP paths to proper WebSocket URLs
   static String getWebSocketUrl([String path = '/ws/messages']) {
     if (kIsWeb) {
-      // On web, derive WebSocket URL from current window location
-      // https://example.com/ → wss://example.com/ws/messages
-      // http://example.com/ → ws://example.com/ws/messages
+      // On web, prefer configured backend URL so split frontend/backend
+      // deployments connect to the backend host (not frontend origin).
+      final configuredBase = getBaseUrl();
+      final baseUri = Uri.tryParse(configuredBase);
+
+      if (baseUri != null && baseUri.host.isNotEmpty) {
+        final protocol = baseUri.scheme == 'https' ? 'wss' : 'ws';
+        final host = baseUri.hasPort ? '${baseUri.host}:${baseUri.port}' : baseUri.host;
+        return '$protocol://$host$path';
+      }
+
+      // Fallback to same-origin if configured base URL is unavailable.
       final protocol = Uri.base.scheme == 'https' ? 'wss' : 'ws';
       final host = Uri.base.hasPort ? '${Uri.base.host}:${Uri.base.port}' : Uri.base.host;
       return '$protocol://$host$path';

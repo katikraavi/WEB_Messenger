@@ -1499,18 +1499,12 @@ Handler _createHandler(
       // WebSocket endpoint for real-time messaging (T034, T035)
       // GET /ws/messages - Upgrade to WebSocket, authenticate, handle real-time events
       if (path == 'ws/messages' && method == 'GET') {
-        try {
-          // Let shelf_web_socket handle the upgrade, pass database for handler to use
-          final wsHandler = WebSocketHandler.createWebSocketHandler(database,
-              request: request);
-          return await wsHandler(request);
-        } catch (e) {
-          print('[WebSocket] ❌ Error in WebSocket handler: $e');
-          return Response.internalServerError(
-            body: jsonEncode({'error': 'WebSocket error: $e'}),
-            headers: {'Content-Type': 'application/json'},
-          );
-        }
+        // Let shelf_web_socket handle the upgrade flow internally.
+        // Do not wrap this in a catch that returns HTTP responses, because
+        // websocket upgrade uses hijack control-flow in shelf.
+        final wsHandler =
+            WebSocketHandler.createWebSocketHandler(database, request: request);
+        return await wsHandler(request);
       }
 
       // GET /api/chats - Fetch active chats for current user
