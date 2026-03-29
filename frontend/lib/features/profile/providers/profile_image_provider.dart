@@ -4,6 +4,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/profile_api_service.dart';
 import '../utils/profile_logger.dart';
+import '../utils/image_validator.dart';
+import '../utils/image_compress_service.dart';
+import '../widgets/cached_profile_image.dart';
+import 'profile_cache_invalidator.dart';
 
 /// State for profile image upload
 class ProfileImageState {
@@ -117,7 +121,7 @@ class ProfileImageNotifier extends StateNotifier<ProfileImageState> {
 
     try {
       if (kIsWeb) {
-        final imageBytes = state.selectedImageBytes;
+        var imageBytes = state.selectedImageBytes;
         if (imageBytes == null || imageBytes.isEmpty) {
           state = state.copyWith(
             isUploading: false,
@@ -128,6 +132,31 @@ class ProfileImageNotifier extends StateNotifier<ProfileImageState> {
 
         state = state.copyWith(uploadProgress: 0.2);
         await Future.delayed(const Duration(milliseconds: 100));
+
+        // Check if image needs compression
+        if (ImageValidator.shouldCompress(imageBytes.length)) {
+          ProfileLogger.logStateChange(
+            'uploadImage',
+            'Image size ${imageBytes.length ~/ 1048576}MB exceeds soft limit - auto-compressing...',
+          );
+          state = state.copyWith(uploadProgress: 0.3);
+          
+          imageBytes = await ImageCompressionService.compressImage(
+            imageBytes: imageBytes,
+            filename: state.selectedImageName ?? 'profile.jpg',
+            targetSize: 5242880, // 5MB
+          );
+          
+          final reduction = ImageCompressionService.getCompressionRatio(
+            state.selectedImageBytes!.length,
+            imageBytes.length,
+          );
+          ProfileLogger.logStateChange(
+            'uploadImage',
+            'Compression complete: ${reduction.toStringAsFixed(1)}% reduction to ${imageBytes.length ~/ 1048576}MB',
+          );
+        }
+
         state = state.copyWith(uploadProgress: 0.5);
         await Future.delayed(const Duration(milliseconds: 100));
 
@@ -159,7 +188,7 @@ class ProfileImageNotifier extends StateNotifier<ProfileImageState> {
         return;
       } else {
         // On mobile, create File from real filesystem path
-        final imageFile = File(state.selectedImagePath!);
+        var imageFile = File(state.selectedImagePath!);
 
         // T146: Verify file exists before upload on mobile
         if (!await imageFile.exists()) {
@@ -174,17 +203,44 @@ class ProfileImageNotifier extends StateNotifier<ProfileImageState> {
           return;
         }
 
-        // T141: Simulate progress updates
         state = state.copyWith(uploadProgress: 0.2);
         await Future.delayed(const Duration(milliseconds: 100));
+
+        // Check if file needs compression and compress if needed
+        var fileSize = await imageFile.length();
+        var imageBytes = await imageFile.readAsBytes();
+        
+        if (ImageValidator.shouldCompress(fileSize)) {
+          ProfileLogger.logStateChange(
+            'uploadImage',
+            'Image size ${fileSize ~/ 1048576}MB exceeds soft limit - auto-compressing...',
+          );
+          state = state.copyWith(uploadProgress: 0.3);
+          
+          imageBytes = await ImageCompressionService.compressImage(
+            imageBytes: imageBytes,
+            filename: state.selectedImageName ?? imageFile.path.split('/').last,
+            targetSize: 5242880, // 5MB
+          );
+          
+          final reduction = ImageCompressionService.getCompressionRatio(
+            fileSize,
+            imageBytes.length,
+          );
+          ProfileLogger.logStateChange(
+            'uploadImage',
+            'Compression complete: ${reduction.toStringAsFixed(1)}% reduction to ${imageBytes.length ~/ 1048576}MB',
+          );
+        }
 
         state = state.copyWith(uploadProgress: 0.5);
         await Future.delayed(const Duration(milliseconds: 100));
 
-        // Call API to upload image
+        // Call API to upload compressed image bytes
         ProfileLogger.logApiRequest('POST', '/api/profile/picture');
-        final updatedProfile = await _apiService.uploadImage(
-          imageFile,
+        final updatedProfile = await _apiService.uploadImageBytes(
+          imageBytes,
+          filename: state.selectedImageName ?? 'profile.jpg',
           token: token,
         );
 

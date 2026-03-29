@@ -179,7 +179,7 @@ enum ValidationError {
       case ValidationError.imageFormatInvalid:
         return 'Only JPEG and PNG formats are supported';
       case ValidationError.imageTooLarge:
-        return 'File must be smaller than 5MB';
+        return 'Image must be smaller than 10MB (will auto-compress if between 5-10MB)';
       case ValidationError.imageDimensionsInvalid:
         return 'Image dimensions must be between 100x100 and 5000x5000 pixels';
       case ValidationError.networkError:

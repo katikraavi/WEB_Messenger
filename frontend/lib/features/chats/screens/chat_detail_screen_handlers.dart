@@ -186,7 +186,6 @@ extension _ChatDetailScreenStateHandlers on _ChatDetailScreenState {
   /// Handle image attachment (T079)
   Future<void> _handleImageAttachment(String token) async {
     try {
-
       // Pick image from device
       final pickedMedia = await MediaPickerService.pickImage();
       if (pickedMedia == null) {
@@ -197,7 +196,7 @@ extension _ChatDetailScreenStateHandlers on _ChatDetailScreenState {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Uploading image...'),
-          duration: Duration(seconds: 30),
+          duration: Duration(seconds: 60),
         ),
       );
 
@@ -207,7 +206,6 @@ extension _ChatDetailScreenStateHandlers on _ChatDetailScreenState {
         pickedMedia: pickedMedia,
         token: token,
       );
-
 
       final currentUserId = currentUserIdFromContext();
       final chatApiService = ChatApiService(baseUrl: ApiClient.getBaseUrl());
@@ -245,22 +243,39 @@ extension _ChatDetailScreenStateHandlers on _ChatDetailScreenState {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Image sent: ${uploadedMedia.originalName ?? uploadedMedia.fileName}',
+            '✅ Image sent: ${uploadedMedia.originalName ?? uploadedMedia.fileName}',
           ),
-          duration: Duration(seconds: 2),
+          duration: const Duration(seconds: 2),
         ),
       );
+    } on TimeoutException catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Upload timeout: $e'),
+            duration: const Duration(seconds: 5),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to upload image: $e')));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to upload image: $e'),
+            duration: const Duration(seconds: 5),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
   /// Handle video attachment (T080)
   Future<void> _handleVideoAttachment(String token) async {
     try {
-
       // Pick video from device
       final pickedMedia = await MediaPickerService.pickVideo();
       if (pickedMedia == null) {
@@ -271,7 +286,7 @@ extension _ChatDetailScreenStateHandlers on _ChatDetailScreenState {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Uploading video...'),
-          duration: Duration(seconds: 60),
+          duration: Duration(seconds: 120),
         ),
       );
 
@@ -281,7 +296,6 @@ extension _ChatDetailScreenStateHandlers on _ChatDetailScreenState {
         pickedMedia: pickedMedia,
         token: token,
       );
-
 
       final currentUserId = currentUserIdFromContext();
       final chatApiService = ChatApiService(baseUrl: ApiClient.getBaseUrl());
@@ -319,15 +333,33 @@ extension _ChatDetailScreenStateHandlers on _ChatDetailScreenState {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Video sent: ${uploadedMedia.originalName ?? uploadedMedia.fileName}',
+            '✅ Video sent: ${uploadedMedia.originalName ?? uploadedMedia.fileName}',
           ),
-          duration: Duration(seconds: 2),
+          duration: const Duration(seconds: 2),
         ),
       );
+    } on TimeoutException catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Upload timeout: $e'),
+            duration: const Duration(seconds: 5),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to upload video: $e')));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to upload video: $e'),
+            duration: const Duration(seconds: 5),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 

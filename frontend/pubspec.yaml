@@ -69,6 +69,7 @@ dependencies:
   # Image processing and validation
   
   # T143: Cached network images for better performance
+  cached_network_image: ^3.4.0
   
   # Permission handling for camera and photo library access
   permission_handler: ^12.0.0

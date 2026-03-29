@@ -105,7 +105,9 @@ class MediaHandlers {
       final result = _extractMultipartFile(bodyBytesList, boundary);
       if (result == null) {
         print('[MediaHandlers] ❌ Failed to extract file from multipart - no valid parts found');
-        return Response(400, body: jsonEncode({'error': 'No file found in multipart data'}));
+        return Response(400, body: jsonEncode({
+          'error': 'No file found in multipart data. Ensure you\'re sending the file in the "file" field with proper multipart/form-data encoding.'
+        }));
       }
       print('[MediaHandlers] ✓ Extracted file: ${result['fileName']} (${(result['fileBytes'] as List<int>).length} bytes)');
 
@@ -152,7 +154,12 @@ class MediaHandlers {
   /// Extract file and metadata from multipart form data
   static Map<String, dynamic>? _extractMultipartFile(List<int> bodyBytes, String boundary) {
     try {
-      final boundaryBytes = utf8.encode('--$boundary');
+      // Trim boundary in case it has extra spaces
+      final trimmedBoundary = boundary.trim();
+      final boundaryBytes = utf8.encode('--$trimmedBoundary');
+      
+      print('[MediaHandlers] Boundary: $trimmedBoundary (bytes: ${String.fromCharCodes(boundaryBytes)})');
+      print('[MediaHandlers] Total body size: ${bodyBytes.length} bytes');
       
       // Find boundaries
       int startIdx = 0;
@@ -162,13 +169,17 @@ class MediaHandlers {
         startIdx += boundaryBytes.length;
       }
 
+      print('[MediaHandlers] Found ${boundaries.length} boundaries');
+
       if (boundaries.length < 2) {
+        print('[MediaHandlers] ❌ Not enough boundaries found (need at least 2)');
         return null;
       }
 
       List<int>? fileBytes;
       String? fileName;
       String? mimeType;
+      int partCount = 0;
 
       // Process all parts, looking for the file and metadata
       for (int i = 0; i < boundaries.length - 1; i++) {
@@ -192,6 +203,7 @@ class MediaHandlers {
         if (headerEnd == -1) {
           headerEnd = _searchBytes(bodyBytes, headerEndLF, partStart);
           if (headerEnd == -1) {
+            print('[MediaHandlers] Part $i: Could not find header end');
             continue;
           }
           headerEnd += 2;
@@ -200,6 +212,7 @@ class MediaHandlers {
         }
 
         if (headerEnd >= partEnd) {
+          print('[MediaHandlers] Part $i: Header end exceeds part end');
           continue;
         }
 
@@ -211,9 +224,13 @@ class MediaHandlers {
         final headers = String.fromCharCodes(bodyBytes.sublist(partStart, headerEnd - 2));
         final bodyContent = bodyBytes.sublist(headerEnd, contentEnd);
         
+        print('[MediaHandlers] Part $i: Headers={${headers.replaceAll('\r\n', ' | ').replaceAll('\n', ' | ')}}');
+        
         // Parse Content-Disposition header to get field name (case-insensitive)
         final dispositionMatch = RegExp(r'content-disposition:.*?name="([^"]*)"', caseSensitive: false).firstMatch(headers);
         final fieldName = dispositionMatch?.group(1);
+
+        print('[MediaHandlers] Part $i: Field name=$fieldName, content size=${bodyContent.length}');
 
         // Check if this is the file part (has filename)
         if (fieldName == 'file' && headers.contains('filename=')) {
@@ -226,30 +243,40 @@ class MediaHandlers {
           mimeType = contentTypeMatch?.group(1)?.trim();
           
           fileBytes = bodyContent;
+          print('[MediaHandlers] Part $i: File detected - name=$fileName, mime=$mimeType, size=${bodyContent.length}');
         } 
         else if (fieldName == 'mime_type') {
           // Extract mime type from form field (fallback if not in file part)
           final uploadedMimeType = String.fromCharCodes(bodyContent).trim();
           if (mimeType == null || mimeType == 'application/octet-stream') {
             mimeType = uploadedMimeType;
+            print('[MediaHandlers] Part $i: Mime type from form field: $mimeType');
           }
         } 
         else if (fieldName == 'file_name') {
           // Extract file name from form field - PREFER THIS over filename param
           final formFileName = String.fromCharCodes(bodyContent).trim();
           fileName = formFileName; // Always use form field if provided
+          print('[MediaHandlers] Part $i: Filename from form field: $fileName');
         }
+        
+        partCount++;
       }
       
+      print('[MediaHandlers] Processed $partCount parts. Found file: ${fileBytes != null}, fileName: $fileName, type: $mimeType');
+      
       if (fileBytes != null && fileBytes.isNotEmpty) {
+        print('[MediaHandlers] ✓ Successfully extracted file (${fileBytes.length} bytes)');
         return {
           'fileBytes': fileBytes,
           'fileName': fileName,
           'mimeType': mimeType,
         };
       }
-    } catch (e) {
-      print('[MediaHandlers] Error parsing multipart: $e');
+      
+      print('[MediaHandlers] ❌ No file bytes found or empty file');
+    } catch (e, st) {
+      print('[MediaHandlers] ❌ Error parsing multipart: $e\n$st');
     }
     
     return null;

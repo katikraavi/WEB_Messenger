@@ -95,19 +95,35 @@ class ImageValidator {
     return null;
   }
 
-  /// Validates image file size (must be ≤5MB)
-  ///
-  /// Returns [ValidationError.imageTooLarge] if file exceeds 5MB, null if valid
+  /// Validates image file size with soft and hard limits
+  /// 
+  /// Soft limit (5MB): Images will be auto-compressed
+  /// Hard limit (10MB): Images will be rejected as truly oversized
+  /// 
+  /// Returns: [ValidationError.imageTooLarge] if > 10MB (hard limit)
+  ///          null otherwise (soft limit images will be compressed)
   ///
   /// Arguments:
   ///   - fileSizeBytes: File size in bytes
   static ValidationError? validateSize(int fileSizeBytes) {
-    if (fileSizeBytes > 5242880) {
-      // 5MB = 5 * 1024 * 1024
+    // Hard limit - reject if extremely large
+    if (fileSizeBytes > 10485760) {
+      // 10MB = 10 * 1024 * 1024
       return ValidationError.imageTooLarge;
     }
 
+    // Images between 5-10MB will be auto-compressed (soft limit)
     return null;
+  }
+
+  /// Check if image should be auto-compressed
+  /// 
+  /// Returns true if file is between 5-10MB (needs compression)
+  /// Returns false if file is under 5MB (already good) or over 10MB (too large)
+  static bool shouldCompress(int fileSizeBytes) {
+    const int softLimit = 5242880; // 5MB
+    const int hardLimit = 10485760; // 10MB
+    return fileSizeBytes > softLimit && fileSizeBytes <= hardLimit;
   }
 
   /// Validates image dimensions (must be 100x100 to 5000x5000 pixels)

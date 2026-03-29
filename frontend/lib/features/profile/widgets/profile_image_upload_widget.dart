@@ -8,9 +8,11 @@ import '../../../core/constants/asset_constants.dart';
 import '../providers/profile_image_provider.dart';
 import '../providers/user_profile_provider.dart';
 import '../providers/profile_form_state_provider.dart';
+import '../providers/profile_cache_invalidator.dart';
 import '../services/image_picker_service.dart';
 import '../widgets/image_picker_permissions_handler.dart';
 import '../widgets/image_upload_progress_widget.dart';
+import '../widgets/cached_profile_image.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../chats/providers/user_profile_provider.dart' as chats_profile_provider;
 
@@ -163,6 +165,12 @@ class ProfileImageUploadWidget extends ConsumerWidget {
                               deletedImageState.error == null &&
                               userId != null &&
                               token != null) {
+                              
+                              // Clear image cache when deleting
+                              if (currentImageUrl != null && currentImageUrl!.isNotEmpty) {
+                                await ProfileImageCacheManager.clearImageCache(currentImageUrl!);
+                              }
+                              
                               // Mark form as dirty so SAVE button is enabled (image was deleted)
                               try {
                                   final profileAsync = ref.read(
@@ -185,10 +193,8 @@ class ProfileImageUploadWidget extends ConsumerWidget {
                                 // If we can't mark it as dirty, continue anyway
                               }
 
-                              // Refresh the userProfileProvider to update profile after delete
-                              await ref.refresh(
-                                userProfileWithTokenProvider((userId!, token)),
-                              );
+                              // Invalidate all profile caches globally to update avatars everywhere
+                              invalidateUserProfileCache(ref, userId!);
 
                               // Also invalidate the chats module's profile provider so chat list avatars update
                               ref.invalidate(
@@ -198,9 +204,7 @@ class ProfileImageUploadWidget extends ConsumerWidget {
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    content: Text(
-                                      'Image deleted successfully!',
-                                    ),
+                                    content: Text('✅ Image deleted successfully!'),
                                   ),
                                 );
                               }
@@ -328,6 +332,21 @@ class ProfileImageUploadWidget extends ConsumerWidget {
           ],
         ),
 
+        // Info about automatic compression
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: Colors.blue.withOpacity(0.1),
+            border: Border.all(color: Colors.blue.withOpacity(0.3)),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: const Text(
+            '💡 Tip: Images up to 10MB are supported. Images between 5-10MB will be automatically compressed for optimal quality while reducing file size.',
+            style: TextStyle(fontSize: 12, color: Colors.black87),
+          ),
+        ),
+
         // Upload progress
         // T142: Enhanced image upload progress display
         if (imageState.isUploading) ...[
@@ -361,8 +380,18 @@ class ProfileImageUploadWidget extends ConsumerWidget {
                   updatedImageState.error == null &&
                   userId != null &&
                   token != null) {
+                
+                // Clear old image cache for the user
+                if (currentImageUrl != null && currentImageUrl!.isNotEmpty) {
+                  await ProfileImageCacheManager.clearImageCache(currentImageUrl!);
+                }
+                
+                // Clear new image cache to force reload
+                if (updatedImageState.uploadedImageUrl != null) {
+                  await ProfileImageCacheManager.clearImageCache(updatedImageState.uploadedImageUrl!);
+                }
+                
                 // Mark form as dirty so SAVE button is enabled (image has changed)
-                // Fetch the current user profile to access the form state notifier
                 try {
                   final profileAsync = ref.read(
                     userProfileWithTokenProvider((userId!, token)),
@@ -374,23 +403,31 @@ class ProfileImageUploadWidget extends ConsumerWidget {
                         .markImageChanged();
                   }
                 } catch (e) {
-                  // If we can't mark it as dirty, continue anyway - profile will still be saved
+                  // If we can't mark it as dirty, continue anyway
                 }
 
-                // Refresh the userProfileProvider to update profile with new image URL
-                await ref.refresh(
-                  userProfileWithTokenProvider((userId!, token)),
-                );
-
-                // Also invalidate the chats module's profile provider so chat list avatars update
+                // Invalidate all profile caches globally to update avatars everywhere
+                invalidateUserProfileCache(ref, userId!);
+                
+                // Also invalidate in chats module for chat list avatars
                 ref.invalidate(
                   chats_profile_provider.userProfileProvider((userId!, token!)),
                 );
 
+                // Update local profile cache for offline support
+                try {
+                  final cachedProfile = await ref.watch(
+                    userProfileWithTokenProvider((userId!, token)).future,
+                  );
+                  // Cache will be handled automatically by profile cache service
+                } catch (e) {
+                  // Ignore cache update failures
+                }
+
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Image uploaded successfully!'),
+                      content: Text('✅ Image uploaded successfully!'),
                     ),
                   );
                 }

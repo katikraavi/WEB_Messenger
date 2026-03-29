@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import 'package:frontend/core/services/api_client.dart';
@@ -175,7 +176,13 @@ class MediaUploadService {
       }
 
       try {
-        final response = await request.send();
+        final response = await request.send().timeout(
+          const Duration(seconds: 120),
+          onTimeout: () => throw TimeoutException(
+            'Upload took too long (120 seconds). Please check your connection and try again.',
+            const Duration(seconds: 120),
+          ),
+        );
         statusCode = response.statusCode;
         responseBody = await response.stream.bytesToString();
       } catch (e) {
@@ -192,8 +199,18 @@ class MediaUploadService {
         }
       } else if (statusCode == 413) {
         throw Exception('File too large (max 50MB)');
+      } else if (statusCode == 400) {
+        try {
+          final error = jsonDecode(responseBody) as Map<String, dynamic>;
+          final message = error['error'] as String?;
+          throw Exception('Upload validation error: $message');
+        } catch (_) {
+          throw Exception('Upload failed: Invalid file or request format');
+        }
       } else if (statusCode == 401) {
         throw Exception('Unauthorized: Invalid or expired token');
+      } else if (statusCode >= 500) {
+        throw Exception('Server error ($statusCode). Please try again later.');
       } else if (statusCode >= 400) {
         try {
           final error = jsonDecode(responseBody) as Map<String, dynamic>;

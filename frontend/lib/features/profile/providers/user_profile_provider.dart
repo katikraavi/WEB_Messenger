@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/features/profile/models/user_profile.dart';
 import 'package:frontend/features/profile/services/profile_api_service.dart';
+import 'profile_cache_invalidator.dart';
 
 /// Riverpod provider for ProfileApiService singleton
 /// 
@@ -40,6 +41,10 @@ final profileApiServiceProvider = Provider((ref) {
 /// Throws: Exception if fetch fails (captured in AsyncValue.error)
 final userProfileProvider = FutureProvider.family<UserProfile, String>(
   (ref, userId) async {
+    // Watch cache invalidators to cascade invalidation
+    ref.watch(profileCacheInvalidatorProvider);
+    ref.watch(profileUserCacheInvalidatorProvider(userId));
+    
     final apiService = ref.watch(profileApiServiceProvider);
     
     try {
@@ -59,6 +64,10 @@ final userProfileProvider = FutureProvider.family<UserProfile, String>(
 final userProfileWithTokenProvider =
     FutureProvider.family<UserProfile, (String userId, String? token)>(
   (ref, params) async {
+    // Watch cache invalidators to cascade invalidation
+    ref.watch(profileCacheInvalidatorProvider);
+    ref.watch(profileUserCacheInvalidatorProvider(params.$1));
+    
     final apiService = ref.watch(profileApiServiceProvider);
 
     try {
