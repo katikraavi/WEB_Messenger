@@ -237,6 +237,9 @@ Handler _createHandler(
       if (path.startsWith('api/ws/') || path == 'api/ws') {
         path = path.replaceFirst('api/', '');
       }
+      if (path.startsWith('api/profile/') || path == 'api/profile') {
+        path = path.replaceFirst('api/', '');
+      }
 
       if (_verboseBackendLogs) {
         print(

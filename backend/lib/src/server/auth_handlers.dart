@@ -60,9 +60,11 @@ Future<Response> _handleRegister(
       );
     }
 
+    final usersTable = await _resolveUsersTable(database);
+
     // Check for duplicate email in database
     final emailCheck = await database.query(
-      'SELECT email FROM "users" WHERE email = @email',
+      'SELECT email FROM ${usersTable.sqlName} WHERE email = @email',
       substitutionValues: {'email': email},
     );
     print(
@@ -77,7 +79,7 @@ Future<Response> _handleRegister(
     }
     // Check for duplicate username in database
     final usernameCheck = await database.query(
-      'SELECT username FROM "users" WHERE username = @username',
+      'SELECT username FROM ${usersTable.sqlName} WHERE username = @username',
       substitutionValues: {'username': username},
     );
     print(
@@ -95,19 +97,33 @@ Future<Response> _handleRegister(
     print(
         '[Register] Creating new user: email=$email, username=$username, userId=$userId');
 
-    // Insert user into database
-    await database.execute(
-      '''INSERT INTO "users" (id, email, username, password_hash, email_verified, created_at)
-         VALUES (@id, @email, @username, @password_hash, @email_verified, @created_at)''',
-      substitutionValues: {
-        'id': userId,
-        'email': email,
-        'username': username,
-        'password_hash': passwordHash,
-        'email_verified': false,
-        'created_at': DateTime.now().toUtc(),
-      },
-    );
+    // Insert user into database.
+    if (usersTable.hasEmailVerified) {
+      await database.execute(
+        '''INSERT INTO ${usersTable.sqlName} (id, email, username, password_hash, email_verified, created_at)
+           VALUES (@id, @email, @username, @password_hash, @email_verified, @created_at)''',
+        substitutionValues: {
+          'id': userId,
+          'email': email,
+          'username': username,
+          'password_hash': passwordHash,
+          'email_verified': false,
+          'created_at': DateTime.now().toUtc(),
+        },
+      );
+    } else {
+      await database.execute(
+        '''INSERT INTO ${usersTable.sqlName} (id, email, username, password_hash, created_at)
+           VALUES (@id, @email, @username, @password_hash, @created_at)''',
+        substitutionValues: {
+          'id': userId,
+          'email': email,
+          'username': username,
+          'password_hash': passwordHash,
+          'created_at': DateTime.now().toUtc(),
+        },
+      );
+    }
 
     print('[Register] Registration successful: userId=$userId');
 
@@ -224,9 +240,11 @@ Future<Response> _handleLogin(
       );
     }
 
+    final usersTable = await _resolveUsersTable(database);
+
     // Query database for user by email
     final result = await database.query(
-      'SELECT id, email, username, password_hash, email_verified FROM "users" WHERE email = @email',
+      'SELECT id, email, username, password_hash${usersTable.hasEmailVerified ? ', email_verified' : ''} FROM ${usersTable.sqlName} WHERE email = @email',
       substitutionValues: {'email': email},
     );
 
@@ -250,7 +268,9 @@ Future<Response> _handleLogin(
       );
     }
 
-    final emailVerified = user['email_verified'] as bool? ?? false;
+    final emailVerified = usersTable.hasEmailVerified
+      ? (user['email_verified'] as bool? ?? false)
+      : true;
     if (!emailVerified) {
       return Response(
         403,
@@ -322,8 +342,9 @@ Future<Response> _handleValidateSession(
       final token = authHeader.substring('Bearer '.length);
       final payload = JwtService.validateToken(token);
 
+      final usersTable = await _resolveUsersTable(database);
       final result = await database.query(
-        'SELECT username, email_verified FROM "users" WHERE id = @id',
+        'SELECT username${usersTable.hasEmailVerified ? ', email_verified' : ''} FROM ${usersTable.sqlName} WHERE id = @id',
         substitutionValues: {'id': payload.userId},
       );
 
@@ -337,7 +358,9 @@ Future<Response> _handleValidateSession(
 
       final userRow = result.first.toColumnMap();
       final username = userRow['username'] as String?;
-      final emailVerified = userRow['email_verified'] as bool? ?? false;
+        final emailVerified = usersTable.hasEmailVerified
+          ? (userRow['email_verified'] as bool? ?? false)
+          : true;
       if (!emailVerified) {
         return Response(
           401,
@@ -537,8 +560,9 @@ Future<Response> _handleAdminDeletePreview(
       );
     }
 
+    final usersTable = await _resolveUsersTable(database);
     final userResult = await database.query(
-      'SELECT id, email, username, email_verified, created_at FROM users WHERE email = @email LIMIT 1',
+      'SELECT id, email, username${usersTable.hasEmailVerified ? ', email_verified' : ''}, created_at FROM ${usersTable.sqlName} WHERE email = @email LIMIT 1',
       substitutionValues: {'email': email},
     );
 
@@ -592,7 +616,9 @@ Future<Response> _handleAdminDeletePreview(
           'id': user['id'],
           'email': user['email'],
           'username': user['username'],
-          'email_verified': user['email_verified'],
+          'email_verified': usersTable.hasEmailVerified
+              ? user['email_verified']
+              : true,
           'created_at': user['created_at'].toString(),
         },
         'related_counts': relatedCounts,
@@ -651,8 +677,9 @@ Future<Response> _handleAdminDeleteUser(
       );
     }
 
+    final usersTable = await _resolveUsersTable(database);
     final userResult = await database.query(
-      'SELECT id, email, username FROM users WHERE email = @email LIMIT 1',
+      'SELECT id, email, username FROM ${usersTable.sqlName} WHERE email = @email LIMIT 1',
       substitutionValues: {'email': email},
     );
 
@@ -682,7 +709,7 @@ Future<Response> _handleAdminDeleteUser(
     );
 
     final deletedUsers = await database.execute(
-      'DELETE FROM users WHERE id = @userId',
+      'DELETE FROM ${usersTable.sqlName} WHERE id = @userId',
       substitutionValues: {'userId': userId},
     );
 
@@ -780,4 +807,68 @@ Future<void> _deleteIfExists(
     'DELETE FROM $table WHERE $column = @userId',
     substitutionValues: {'userId': userId},
   );
+}
+
+class _UsersTableResolution {
+  final String sqlName;
+  final String plainName;
+  final bool hasEmailVerified;
+
+  const _UsersTableResolution({
+    required this.sqlName,
+    required this.plainName,
+    required this.hasEmailVerified,
+  });
+}
+
+Future<_UsersTableResolution> _resolveUsersTable(Connection database) async {
+  final hasUsers = await _relationExists(database, 'users');
+  final hasLegacyUser = hasUsers ? false : await _relationExists(database, '"user"');
+
+  final sqlName = hasUsers
+      ? 'users'
+      : (hasLegacyUser ? '"user"' : 'users');
+  final plainName = hasUsers
+      ? 'users'
+      : (hasLegacyUser ? 'user' : 'users');
+
+  final hasEmailVerified = await _columnExists(
+    database,
+    tableName: plainName,
+    columnName: 'email_verified',
+  );
+
+  return _UsersTableResolution(
+    sqlName: sqlName,
+    plainName: plainName,
+    hasEmailVerified: hasEmailVerified,
+  );
+}
+
+Future<bool> _relationExists(Connection database, String relationName) async {
+  final result = await database.query(
+    "SELECT to_regclass('public.$relationName') IS NOT NULL AS exists",
+  );
+  return (result.first[0] as bool?) ?? false;
+}
+
+Future<bool> _columnExists(
+  Connection database, {
+  required String tableName,
+  required String columnName,
+}) async {
+  final result = await database.query(
+    '''SELECT EXISTS (
+         SELECT 1
+         FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND table_name = @tableName
+           AND column_name = @columnName
+       )''',
+    substitutionValues: {
+      'tableName': tableName,
+      'columnName': columnName,
+    },
+  );
+  return (result.first[0] as bool?) ?? false;
 }
