@@ -6,11 +6,13 @@ class AppConfig {
   static const String appName = 'Mobile Messenger';
   static const String appVersion = '1.0.0';
   
-  // Backend configuration - for web, use environment variable or current host
-  // For deployed web: backend URL from environment, for local: localhost
-  static const String backendUrlAndroid = 'http://host.docker.internal:8081'; // Android emulator
-  static const String backendUrlIOS = 'http://localhost:8081'; // iOS simulator  
-  static const String backendUrlPhysicalDevice = 'http://localhost:8081'; // Linux/macOS/Windows - Docker is accessible via localhost
+    // Backend configuration defaults to hosted backend origin.
+    static const String backendUrlAndroid =
+      'https://web-messenger-backend.onrender.com';
+    static const String backendUrlIOS =
+      'https://web-messenger-backend.onrender.com';
+    static const String backendUrlPhysicalDevice =
+      'https://web-messenger-backend.onrender.com';
   
   /// Get backend URL for web platform
   /// When deployed on Render, uses BACKEND_URL env var injected at build time

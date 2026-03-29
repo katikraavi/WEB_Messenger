@@ -1,10 +1,7 @@
-import 'package:flutter/foundation.dart';
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'dart:convert';
-import '../../features/auth/providers/auth_provider.dart' as auth;
 
 /// WebSocket service (T038)
 /// 
@@ -32,13 +29,13 @@ class WebSocketService {
   /// 
   /// Parameters:
   /// - token: JWT authentication token
-  /// - url: Optional WebSocket URL (defaults to localhost:8081)
+  /// - url: Optional WebSocket URL (defaults to hosted backend)
   /// 
   /// Automatically retries on connection failure
   Future<void> connect({
     required String token,
     required String userId,
-    String url = 'ws://localhost:8081/ws/messages',
+    String url = 'wss://web-messenger-backend.onrender.com/ws/messages',
   }) async {
     if (_isConnecting || _isConnected) {
       return;

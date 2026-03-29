@@ -19,7 +19,7 @@ class ApiClient {
     defaultValue: '',
   );
 
-  static final RegExp _ipv4Pattern = RegExp(r'^\d{1,3}(\.\d{1,3}){3}4');
+  static final RegExp _ipv4Pattern = RegExp(r'^\d{1,3}(\.\d{1,3}){3}$');
 
   static String _defaultBaseUrl() {
     if (kIsWeb) {
@@ -29,12 +29,11 @@ class ApiClient {
         return '${base.scheme}://${base.authority}';
       }
     }
-    return 'http://localhost:8081';
+    return 'https://web-messenger-backend.onrender.com';
   }
 
   static bool _isLikelyWebResolvableHost(String host) {
     if (host.isEmpty) return false;
-    if (host == 'localhost') return true;
     if (_ipv4Pattern.hasMatch(host)) return true;
     // Single-label hosts like "api" often fail in public browser DNS contexts.
     if (!host.contains('.')) return false;
@@ -81,7 +80,7 @@ class ApiClient {
     if (kIsWeb) {
       // On web, derive WebSocket URL from current window location
       // https://example.com/ → wss://example.com/ws/messages
-      // http://localhost:3000/ → ws://localhost:3000/ws/messages
+      // http://example.com/ → ws://example.com/ws/messages
       final protocol = Uri.base.scheme == 'https' ? 'wss' : 'ws';
       final host = Uri.base.hasPort ? '${Uri.base.host}:${Uri.base.port}' : Uri.base.host;
       return '$protocol://$host$path';
@@ -93,7 +92,7 @@ class ApiClient {
         return _baseUrl.replaceFirst('http://', 'ws://').replaceAll(RegExp(r'/$'), '') + path;
       }
       // Fallback
-      return 'ws://localhost:8081$path';
+      return 'wss://web-messenger-backend.onrender.com$path';
     }
   }
 
@@ -101,11 +100,8 @@ class ApiClient {
   ///
   /// Automatically detects platform and sets appropriate backend URL:
   /// - Web (deployed): Uses BACKEND_URL from environment (Render sets this)
-  /// - Web (local dev): http://localhost:8081
-  /// - Android emulator: http://172.31.195.26:8081 (WSL2 host IP for Docker backend)
-  /// - iOS simulator: http://localhost:8081
-  /// - Linux/macOS/Windows: http://localhost:8081
-  /// - Physical device: http://localhost:8081 (configure for your network)
+  /// - Web/local with explicit BACKEND_URL: uses that value
+  /// - Otherwise falls back to hosted backend origin
   static Future<void> initialize() async {
     _httpClient = http.Client();
 
@@ -123,14 +119,8 @@ class ApiClient {
       // without requiring an explicit environment variable.
       const String envBackendUrl = String.fromEnvironment('BACKEND_URL', defaultValue: '/');
       _baseUrl = _normalizeConfiguredBaseUrl(envBackendUrl);
-    } else if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      // Android emulator needs to reach WSL2 host where Docker backend is running
-      // Using WSL2 host IP: 172.31.195.26
-      _baseUrl = 'http://172.31.195.26:8081';
     } else {
-      // For iOS, Linux, macOS, Windows: use localhost
-      // Docker containers are accessible via localhost:8081 on the host
-      _baseUrl = 'http://localhost:8081';
+      _baseUrl = _defaultBaseUrl();
     }
 
     // Try to connect to backend with retry logic

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:postgres/postgres.dart';
 import 'package:uuid/uuid.dart';
 import 'auth_exception.dart';
@@ -33,15 +34,15 @@ class UserAuthService {
   /// Only needed if UserAuthService was created without passing a connection
   Future<void> initialize() async {
     if (_ownsConnection) {
-      _connection = await Connection.open(
-        Endpoint(
-          host: 'localhost',
-          port: 5432,
-          database: 'messenger_db',
-          username: 'messenger_user',
-          password: 'messenger_password',
-        ),
+      _connection = Connection(
+        Platform.environment['DATABASE_HOST'] ?? 'postgres',
+        int.tryParse(Platform.environment['DATABASE_PORT'] ?? '') ?? 5432,
+        Platform.environment['DATABASE_NAME'] ?? 'messenger_db',
+        username: Platform.environment['DATABASE_USER'] ?? 'messenger_user',
+        password:
+            Platform.environment['DATABASE_PASSWORD'] ?? 'messenger_password',
       );
+      await _connection.open();
     }
   }
 

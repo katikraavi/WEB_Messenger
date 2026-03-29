@@ -31,7 +31,7 @@ class DatabaseConnectionConfig {
 
       return DatabaseConnectionConfig(
         host: uri.host.isEmpty
-            ? (environment['DATABASE_HOST'] ?? 'localhost')
+            ? (environment['DATABASE_HOST'] ?? 'postgres')
             : uri.host,
         port: uri.hasPort ? uri.port : 5432,
         database: uri.pathSegments.isNotEmpty
@@ -49,7 +49,7 @@ class DatabaseConnectionConfig {
     }
 
     return DatabaseConnectionConfig(
-      host: environment['DATABASE_HOST'] ?? 'localhost',
+      host: environment['DATABASE_HOST'] ?? 'postgres',
       port: int.tryParse(environment['DATABASE_PORT'] ?? '') ?? 5432,
       database: environment['DATABASE_NAME'] ?? 'messenger_db',
       username: environment['DATABASE_USER'] ?? 'messenger_user',
