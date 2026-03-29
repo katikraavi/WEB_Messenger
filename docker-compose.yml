@@ -44,6 +44,7 @@ services:
       # Keep values empty to disable SMTP locally, or set real provider values in .env.
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
+      ADMIN_DELETE_KEY: ${ADMIN_DELETE_KEY:-}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-}
       SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-noreply@local.messenger}

@@ -403,6 +403,15 @@ Handler _createHandler(
         return await _handleLogout(request, database, tokenService);
       }
 
+      // Admin endpoints (manual user deletion; requires ADMIN_DELETE_KEY)
+      if (path == 'api/admin/users/delete-preview' && method == 'POST') {
+        return await _handleAdminDeletePreview(request, database);
+      }
+
+      if (path == 'api/admin/users/delete' && method == 'POST') {
+        return await _handleAdminDeleteUser(request, database);
+      }
+
       if (path == 'api/auth/sessions' && method == 'GET') {
         return await _handleListDeviceSessions(request, database, tokenService);
       }

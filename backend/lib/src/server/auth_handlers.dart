@@ -515,3 +515,269 @@ Future<Response> _handleRevokeDeviceSession(
     );
   }
 }
+
+Future<Response> _handleAdminDeletePreview(
+  Request request,
+  Connection database,
+) async {
+  try {
+    final keyError = _validateAdminDeleteKey(request);
+    if (keyError != null) {
+      return keyError;
+    }
+
+    final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
+    final email = (body['email'] as String? ?? '').trim().toLowerCase();
+
+    if (email.isEmpty || !email.contains('@')) {
+      return Response(
+        400,
+        body: jsonEncode({'error': 'A valid email is required'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+
+    final userResult = await database.query(
+      'SELECT id, email, username, email_verified, created_at FROM users WHERE email = @email LIMIT 1',
+      substitutionValues: {'email': email},
+    );
+
+    if (userResult.isEmpty) {
+      return Response(
+        404,
+        body: jsonEncode({'error': 'User not found'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+
+    final user = userResult.first.toColumnMap();
+    final userId = user['id'] as String;
+
+    final relatedCounts = <String, int>{
+      'messages_sent': await _countIfExists(
+        database,
+        table: 'messages',
+        column: 'sender_id',
+        userId: userId,
+      ),
+      'message_edits': await _countIfExists(
+        database,
+        table: 'message_edits',
+        column: 'edited_by',
+        userId: userId,
+      ),
+      'device_sessions': await _countIfExists(
+        database,
+        table: 'device_sessions',
+        column: 'user_id',
+        userId: userId,
+      ),
+      'verification_tokens': await _countIfExists(
+        database,
+        table: 'verification_token',
+        column: 'user_id',
+        userId: userId,
+      ),
+      'password_reset_tokens': await _countIfExists(
+        database,
+        table: 'password_reset_token',
+        column: 'user_id',
+        userId: userId,
+      ),
+    };
+
+    return Response.ok(
+      jsonEncode({
+        'user': {
+          'id': user['id'],
+          'email': user['email'],
+          'username': user['username'],
+          'email_verified': user['email_verified'],
+          'created_at': user['created_at'].toString(),
+        },
+        'related_counts': relatedCounts,
+        'required_confirm_phrase': 'DELETE USER',
+      }),
+      headers: {'Content-Type': 'application/json'},
+    );
+  } catch (e, st) {
+    print('[ADMIN][ERROR] Preview delete user failed: $e');
+    print('[ADMIN][ERROR] Stack: $st');
+    return Response(
+      500,
+      body: jsonEncode({'error': 'Server error'}),
+      headers: {'Content-Type': 'application/json'},
+    );
+  }
+}
+
+Future<Response> _handleAdminDeleteUser(
+  Request request,
+  Connection database,
+) async {
+  try {
+    final keyError = _validateAdminDeleteKey(request);
+    if (keyError != null) {
+      return keyError;
+    }
+
+    final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
+    final email = (body['email'] as String? ?? '').trim().toLowerCase();
+    final confirmEmail =
+        (body['confirm_email'] as String? ?? '').trim().toLowerCase();
+    final confirmPhrase = (body['confirm_phrase'] as String? ?? '').trim();
+
+    if (email.isEmpty || !email.contains('@')) {
+      return Response(
+        400,
+        body: jsonEncode({'error': 'A valid email is required'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+
+    if (confirmEmail != email) {
+      return Response(
+        400,
+        body: jsonEncode({'error': 'Confirmation email must exactly match'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+
+    if (confirmPhrase != 'DELETE USER') {
+      return Response(
+        400,
+        body: jsonEncode({'error': 'Invalid confirmation phrase'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+
+    final userResult = await database.query(
+      'SELECT id, email, username FROM users WHERE email = @email LIMIT 1',
+      substitutionValues: {'email': email},
+    );
+
+    if (userResult.isEmpty) {
+      return Response(
+        404,
+        body: jsonEncode({'error': 'User not found'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+
+    final user = userResult.first.toColumnMap();
+    final userId = user['id'] as String;
+
+    // Explicitly remove RESTRICT-linked rows first, then delete user.
+    await _deleteIfExists(
+      database,
+      table: 'message_edits',
+      column: 'edited_by',
+      userId: userId,
+    );
+    await _deleteIfExists(
+      database,
+      table: 'messages',
+      column: 'sender_id',
+      userId: userId,
+    );
+
+    final deletedUsers = await database.execute(
+      'DELETE FROM users WHERE id = @userId',
+      substitutionValues: {'userId': userId},
+    );
+
+    if (deletedUsers <= 0) {
+      return Response(
+        500,
+        body: jsonEncode({'error': 'Delete failed unexpectedly'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+
+    print('[ADMIN] Deleted user id=$userId email=$email');
+
+    return Response.ok(
+      jsonEncode({
+        'deleted': true,
+        'user': {
+          'id': user['id'],
+          'email': user['email'],
+          'username': user['username'],
+        },
+      }),
+      headers: {'Content-Type': 'application/json'},
+    );
+  } catch (e, st) {
+    print('[ADMIN][ERROR] Delete user failed: $e');
+    print('[ADMIN][ERROR] Stack: $st');
+    return Response(
+      500,
+      body: jsonEncode({'error': 'Server error while deleting user'}),
+      headers: {'Content-Type': 'application/json'},
+    );
+  }
+}
+
+Response? _validateAdminDeleteKey(Request request) {
+  final configuredKey = Platform.environment['ADMIN_DELETE_KEY']?.trim();
+  if (configuredKey == null || configuredKey.isEmpty) {
+    return Response(
+      503,
+      body: jsonEncode({
+        'error':
+            'Admin delete endpoint is disabled. Set ADMIN_DELETE_KEY to enable it.',
+      }),
+      headers: {'Content-Type': 'application/json'},
+    );
+  }
+
+  final providedKey = request.headers['x-admin-delete-key']?.trim();
+  if (providedKey == null || providedKey.isEmpty || providedKey != configuredKey) {
+    return Response(
+      401,
+      body: jsonEncode({'error': 'Unauthorized'}),
+      headers: {'Content-Type': 'application/json'},
+    );
+  }
+
+  return null;
+}
+
+Future<bool> _tableExists(Connection database, String table) async {
+  final result = await database.query(
+    'SELECT to_regclass(@tableName) IS NOT NULL AS exists',
+    substitutionValues: {'tableName': 'public.$table'},
+  );
+  return (result.first[0] as bool?) ?? false;
+}
+
+Future<int> _countIfExists(
+  Connection database, {
+  required String table,
+  required String column,
+  required String userId,
+}) async {
+  final exists = await _tableExists(database, table);
+  if (!exists) return 0;
+
+  final result = await database.query(
+    'SELECT COUNT(*)::int AS count FROM $table WHERE $column = @userId',
+    substitutionValues: {'userId': userId},
+  );
+  return (result.first[0] as int?) ?? 0;
+}
+
+Future<void> _deleteIfExists(
+  Connection database, {
+  required String table,
+  required String column,
+  required String userId,
+}) async {
+  final exists = await _tableExists(database, table);
+  if (!exists) return;
+
+  await database.execute(
+    'DELETE FROM $table WHERE $column = @userId',
+    substitutionValues: {'userId': userId},
+  );
+}

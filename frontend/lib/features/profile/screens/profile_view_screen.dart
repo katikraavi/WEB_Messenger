@@ -408,6 +408,8 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
             if (widget.isOwnProfile && token != null) ...[
               const SizedBox(height: 32),
               _ActiveSessionsSection(token: token),
+              const SizedBox(height: 32),
+              const ManualUserDeleteSection(),
             ],
 
             // Invite button (for other profiles)
@@ -714,5 +716,352 @@ class _SessionTile extends StatelessWidget {
     if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
     if (diff.inHours < 24) return '${diff.inHours}h ago';
     return '${diff.inDays}d ago';
+  }
+}
+
+class _DeletePreviewResult {
+  final Map<String, dynamic> user;
+  final Map<String, dynamic> relatedCounts;
+
+  const _DeletePreviewResult({
+    required this.user,
+    required this.relatedCounts,
+  });
+
+  factory _DeletePreviewResult.fromJson(Map<String, dynamic> json) {
+    return _DeletePreviewResult(
+      user: (json['user'] as Map<String, dynamic>? ?? const {}),
+      relatedCounts:
+          (json['related_counts'] as Map<String, dynamic>? ?? const {}),
+    );
+  }
+}
+
+class ManualUserDeleteSection extends StatefulWidget {
+  const ManualUserDeleteSection({super.key});
+
+  @override
+  State<ManualUserDeleteSection> createState() =>
+      _ManualUserDeleteSectionState();
+}
+
+class _ManualUserDeleteSectionState extends State<ManualUserDeleteSection> {
+  static String get _baseUrl => ApiClient.getBaseUrl();
+
+  final TextEditingController _adminKeyController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _confirmEmailController = TextEditingController();
+  final TextEditingController _confirmPhraseController = TextEditingController();
+
+  bool _isPreviewing = false;
+  bool _isDeleting = false;
+  String? _error;
+  _DeletePreviewResult? _preview;
+
+  @override
+  void dispose() {
+    _adminKeyController.dispose();
+    _emailController.dispose();
+    _confirmEmailController.dispose();
+    _confirmPhraseController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _previewDelete() async {
+    final email = _emailController.text.trim().toLowerCase();
+    final adminKey = _adminKeyController.text.trim();
+
+    if (email.isEmpty || !email.contains('@')) {
+      setState(() => _error = 'Enter a valid email first.');
+      return;
+    }
+    if (adminKey.isEmpty) {
+      setState(() => _error = 'Admin delete key is required.');
+      return;
+    }
+
+    setState(() {
+      _isPreviewing = true;
+      _error = null;
+      _preview = null;
+    });
+
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$_baseUrl/api/admin/users/delete-preview'),
+            headers: {
+              'Content-Type': 'application/json',
+              'x-admin-delete-key': adminKey,
+            },
+            body: jsonEncode({'email': email}),
+          )
+          .timeout(const Duration(seconds: 20));
+
+      final body = response.body.isNotEmpty
+          ? jsonDecode(response.body) as Map<String, dynamic>
+          : <String, dynamic>{};
+
+      if (response.statusCode == 200) {
+        if (!mounted) return;
+        setState(() {
+          _preview = _DeletePreviewResult.fromJson(body);
+          _error = null;
+        });
+      } else {
+        final message = body['error']?.toString() ??
+            'Preview failed (${response.statusCode})';
+        if (!mounted) return;
+        setState(() => _error = message);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = 'Network error while previewing delete.');
+    } finally {
+      if (mounted) {
+        setState(() => _isPreviewing = false);
+      }
+    }
+  }
+
+  Future<void> _deleteUser() async {
+    final email = _emailController.text.trim().toLowerCase();
+    final confirmEmail = _confirmEmailController.text.trim().toLowerCase();
+    final confirmPhrase = _confirmPhraseController.text.trim();
+    final adminKey = _adminKeyController.text.trim();
+
+    if (_preview == null) {
+      setState(() => _error = 'Run preview first before deleting.');
+      return;
+    }
+    if (adminKey.isEmpty) {
+      setState(() => _error = 'Admin delete key is required.');
+      return;
+    }
+    if (confirmEmail != email) {
+      setState(() => _error = 'Confirmation email must exactly match target email.');
+      return;
+    }
+    if (confirmPhrase != 'DELETE USER') {
+      setState(() => _error = 'Type DELETE USER exactly to confirm.');
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete user from database?'),
+        content: Text(
+          'This permanently deletes $email and related records. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _isDeleting = true;
+      _error = null;
+    });
+
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$_baseUrl/api/admin/users/delete'),
+            headers: {
+              'Content-Type': 'application/json',
+              'x-admin-delete-key': adminKey,
+            },
+            body: jsonEncode({
+              'email': email,
+              'confirm_email': confirmEmail,
+              'confirm_phrase': confirmPhrase,
+            }),
+          )
+          .timeout(const Duration(seconds: 25));
+
+      final body = response.body.isNotEmpty
+          ? jsonDecode(response.body) as Map<String, dynamic>
+          : <String, dynamic>{};
+
+      if (response.statusCode == 200) {
+        if (!mounted) return;
+        AppFeedbackService.showInfo('User deleted successfully.');
+        setState(() {
+          _preview = null;
+          _confirmEmailController.clear();
+          _confirmPhraseController.clear();
+        });
+      } else {
+        final message = body['error']?.toString() ??
+            'Delete failed (${response.statusCode})';
+        if (!mounted) return;
+        setState(() => _error = message);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = 'Network error while deleting user.');
+    } finally {
+      if (mounted) {
+        setState(() => _isDeleting = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dangerColor = Colors.red.shade700;
+
+    return Card(
+      color: const Color(0xFFFFF7F7),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.red.shade200),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: dangerColor),
+                const SizedBox(width: 8),
+                Text(
+                  'Manual User Delete (Admin)',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: dangerColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Use only for manual tester resets. Requires ADMIN_DELETE_KEY on backend.',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: Colors.red.shade700),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _adminKeyController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Admin delete key',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _emailController,
+              decoration: const InputDecoration(
+                labelText: 'Target email',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerRight,
+              child: OutlinedButton.icon(
+                onPressed: (_isPreviewing || _isDeleting) ? null : _previewDelete,
+                icon: _isPreviewing
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.preview_outlined),
+                label: const Text('Preview'),
+              ),
+            ),
+            if (_preview != null) ...[
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.shade100),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'User: ${_preview!.user['username']} (${_preview!.user['email']})',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Related rows: ${_preview!.relatedCounts.entries.map((e) => '${e.key}=${e.value}').join(', ')}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _confirmEmailController,
+                decoration: const InputDecoration(
+                  labelText: 'Type target email again',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _confirmPhraseController,
+                decoration: const InputDecoration(
+                  labelText: 'Type DELETE USER to confirm',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: dangerColor,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: (_isDeleting || _isPreviewing) ? null : _deleteUser,
+                  icon: _isDeleting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Icon(Icons.delete_forever),
+                  label: const Text('Delete user permanently'),
+                ),
+              ),
+            ],
+            if (_error != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                _error!,
+                style: TextStyle(color: Colors.red.shade700),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 }

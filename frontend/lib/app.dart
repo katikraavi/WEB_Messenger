@@ -15,6 +15,7 @@ import 'package:frontend/features/auth/providers/auth_provider.dart';
 import 'package:frontend/features/auth/screens/auth_flow_screen.dart';
 import 'package:frontend/features/search/screens/search_screen.dart';
 import 'package:frontend/features/profile/screens/profile_view_screen.dart';
+import 'package:frontend/features/profile/screens/admin_user_tools_screen.dart';
 import 'package:frontend/features/invitations/screens/invitations_screen.dart';
 import 'package:frontend/features/invitations/providers/invites_provider.dart';
 import 'package:frontend/features/chats/screens/chat_list_screen.dart';
@@ -745,6 +746,12 @@ class _AuthenticatedHomeScreenState
     );
   }
 
+  Future<void> _openAdminTools(BuildContext context) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const AdminUserToolsScreen()),
+    );
+  }
+
   Future<void> _switchToDevUser(_DevTestUser user) async {
     try {
       await ref.read(messageWebSocketProvider.notifier).disconnect();
@@ -966,6 +973,12 @@ class _AuthenticatedHomeScreenState
           ),
           const SizedBox(height: 18),
           _buildDevSwitcher(),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: () => _openAdminTools(context),
+            icon: const Icon(Icons.admin_panel_settings_outlined),
+            label: const Text('Admin Tools'),
+          ),
           const Spacer(),
           OutlinedButton.icon(
             onPressed: widget.authProvider.isLoading ? null : _logout,
@@ -1107,6 +1120,12 @@ class _AuthenticatedHomeScreenState
               icon: const Icon(Icons.group_add),
               tooltip: 'Create Group Chat',
               onPressed: () => _openCreateGroup(context),
+            ),
+          if (!useWebSidebar && _selectedIndex == 3)
+            IconButton(
+              icon: const Icon(Icons.admin_panel_settings_outlined),
+              tooltip: 'Admin Tools',
+              onPressed: () => _openAdminTools(context),
             ),
           if (!useWebSidebar)
             IconButton(icon: const Icon(Icons.logout), onPressed: _logout),
