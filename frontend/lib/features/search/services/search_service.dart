@@ -78,7 +78,7 @@ class SearchService {
     }
 
     try {
-      final uri = Uri.parse('$baseUrl/search/username').replace(
+      final uri = Uri.parse('$baseUrl/api/search/username').replace(
         queryParameters: {'q': query, 'limit': '20'},
       );
 
@@ -134,7 +134,7 @@ class SearchService {
     }
 
     try {
-      final uri = Uri.parse('$baseUrl/search/email').replace(
+      final uri = Uri.parse('$baseUrl/api/search/email').replace(
         queryParameters: {'q': query, 'limit': '20'},
       );
 

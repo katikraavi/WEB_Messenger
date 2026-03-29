@@ -14,7 +14,7 @@ class ProfileService {
   Future<User?> getProfile(String userId) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/profile/view/$userId'),
+        Uri.parse('$baseUrl/api/profile/view/$userId'),
         headers: _headers(),
       ).timeout(const Duration(seconds: 10));
 
@@ -41,7 +41,7 @@ class ProfileService {
   }) async {
     try {
       final response = await http.patch(
-        Uri.parse('$baseUrl/profile/edit'),
+        Uri.parse('$baseUrl/api/profile/edit'),
         headers: _headers(),
         body: jsonEncode({
           if (username != null) 'username': username,
@@ -67,7 +67,7 @@ class ProfileService {
   Future<String?> uploadProfilePicture(String filePath) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/profile/picture/upload'),
+        Uri.parse('$baseUrl/api/profile/picture/upload'),
         headers: _headers(),
         // In real app, would use MultipartRequest for file upload
       ).timeout(const Duration(seconds: 30));
@@ -87,7 +87,7 @@ class ProfileService {
   Future<void> deleteProfilePicture() async {
     try {
       final response = await http.delete(
-        Uri.parse('$baseUrl/profile/picture'),
+        Uri.parse('$baseUrl/api/profile/picture'),
         headers: _headers(),
       ).timeout(const Duration(seconds: 10));
 

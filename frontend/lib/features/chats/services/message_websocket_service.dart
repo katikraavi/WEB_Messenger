@@ -115,7 +115,7 @@ class MessageWebSocketService {
 
     try {
       _currentUserId = userId;
-      final wsUrl = Uri.parse('$baseUrl/ws/messages?token=$token');
+      final wsUrl = Uri.parse('$baseUrl/api/ws/messages?token=$token');
 
       _webSocket = WebSocketChannel.connect(wsUrl);
 
