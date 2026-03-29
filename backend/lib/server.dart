@@ -106,6 +106,7 @@ void main() async {
   final smtpSecure = smtpSecureRaw == 'true' ||
       (smtpSecureRaw == null && smtpPort == 465);
   final resendApiKey = Platform.environment['RESEND_API_KEY'];
+  final resendFromEmail = Platform.environment['RESEND_FROM_EMAIL'];
   final emailService = EmailService(
     smtpHost: Platform.environment['SMTP_HOST'],
     smtpPort: smtpPort,
@@ -116,6 +117,7 @@ void main() async {
     smtpSecure: smtpSecure,
     requireConfiguration: isProduction,
     resendApiKey: resendApiKey,
+    resendFromEmail: resendFromEmail,
   );
   if (resendApiKey != null && resendApiKey.isNotEmpty) {
     print('[✓] Email: Resend HTTP API (bypasses SMTP port restrictions)');

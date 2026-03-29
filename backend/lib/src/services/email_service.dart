@@ -20,6 +20,7 @@ class EmailService {
   final bool smtpSecure;
   final bool requireConfiguration;
   final String? resendApiKey;
+  final String? resendFromEmail;
 
   EmailService({
     this.smtpHost,
@@ -31,6 +32,7 @@ class EmailService {
     this.smtpSecure = false,
     this.requireConfiguration = false,
     this.resendApiKey,
+    this.resendFromEmail,
   });
 
   bool get isConfigured => !_isNotConfigured();
@@ -378,9 +380,16 @@ This link expires in $expiresIn. For security reasons, you can only use this lin
   Future<bool> _sendViaResend(EmailMessage message) async {
     print('[EMAIL] Sending via Resend API to ${message.to}');
     try {
-      final fromAddress = senderName != null && senderName!.isNotEmpty
-          ? '$senderName <${senderEmail ?? 'noreply@resend.dev'}>'
-          : (senderEmail ?? 'noreply@resend.dev');
+      // Use RESEND_FROM_EMAIL if set; otherwise fall back to onboarding@resend.dev
+      // (gmail.com / personal domains are not accepted as Resend senders without
+      // domain verification — onboarding@resend.dev is Resend's shared test sender).
+      final effectiveFrom = resendFromEmail?.isNotEmpty == true
+          ? resendFromEmail!
+          : 'onboarding@resend.dev';
+      final displayName = senderName?.isNotEmpty == true ? senderName! : null;
+      final fromAddress = displayName != null
+          ? '$displayName <$effectiveFrom>'
+          : effectiveFrom;
 
       final response = await http.post(
         Uri.parse('https://api.resend.com/emails'),
