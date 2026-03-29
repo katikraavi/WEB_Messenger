@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import 'package:frontend/core/services/api_client.dart';
@@ -23,6 +22,7 @@ class AuthException implements Exception {
 /// Handles API communication with the backend for registration, login, and session validation
 class AuthService {
   static const bool _debugLogs = false;
+  static const Duration _authRequestTimeout = Duration(seconds: 30);
   static const String _deviceIdStorageKey = 'device_id';
   static final SecureStorageWrapper _secureStorage = SecureStorageWrapper();
   static const Uuid _uuid = Uuid();
@@ -60,7 +60,7 @@ class AuthService {
             body: jsonEncode(request.toJson()),
           )
           .timeout(
-            const Duration(seconds: 10),
+            _authRequestTimeout,
             onTimeout: () =>
                 throw AuthException('Request timeout - check your connection'),
           );
@@ -144,7 +144,7 @@ class AuthService {
             body: jsonEncode(request.toJson()),
           )
           .timeout(
-            const Duration(seconds: 10),
+            _authRequestTimeout,
             onTimeout: () =>
                 throw AuthException('Request timeout - check your connection'),
           );

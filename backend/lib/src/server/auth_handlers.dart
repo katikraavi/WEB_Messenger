@@ -137,7 +137,12 @@ Future<Response> _handleRegister(
             ' UTC',
       );
       devToken = token; // kept for dev response
-      await emailService.sendEmail(emailMsg);
+      await emailService.sendEmail(emailMsg).timeout(
+            const Duration(seconds: 8),
+            onTimeout: () => throw TimeoutException(
+              'Verification email send timed out',
+            ),
+          );
       print('[Register] Verification email dispatched to $email');
     } catch (emailErr) {
       print('[Register][WARNING] Could not send verification email: $emailErr');
