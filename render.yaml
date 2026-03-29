@@ -38,6 +38,6 @@ services:
       - key: SMTP_PASSWORD
         sync: false
       - key: SMTP_SECURE
-        value: "true"
+        value: "false"
       - key: VERBOSE_BACKEND_LOGS
         value: "false"

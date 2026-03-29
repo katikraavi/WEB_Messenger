@@ -369,6 +369,7 @@ This link expires in $expiresIn. For security reasons, you can only use this lin
       return true;
     }
 
+    print('[EMAIL] Attempting SMTP: host=$smtpHost port=$smtpPort ssl=$smtpSecure user=${smtpUser ?? "(none)"} passwordSet=${smtpPassword?.isNotEmpty == true} from=$senderEmail to=${message.to}');
     try {
       final smtpServer = SmtpServer(
         smtpHost!,
@@ -376,8 +377,8 @@ This link expires in $expiresIn. For security reasons, you can only use this lin
         username: (smtpUser?.isNotEmpty == true) ? smtpUser : null,
         password: (smtpPassword?.isNotEmpty == true) ? smtpPassword : null,
         ssl: smtpSecure,
-        ignoreBadCertificate: !smtpSecure,
-        allowInsecure: !smtpSecure,
+        ignoreBadCertificate: false,
+        allowInsecure: false,
       );
 
       final msg = Message()
@@ -399,11 +400,14 @@ This link expires in $expiresIn. For security reasons, you can only use this lin
       print('[✓] Email sent to ${message.to}: ${message.subject}');
       return true;
     } on TimeoutException catch (e) {
+      print('[EMAIL][ERROR] SMTP timeout: ${e.message}');
       throw EmailSendException('SMTP timeout: ${e.message}');
     } on MailerException catch (e) {
+      print('[EMAIL][ERROR] MailerException: ${e.message} — problems: ${e.problems.map((p) => p.msg).join(', ')}');
       throw EmailSendException(
           'SMTP error: ${e.message} — ${e.problems.map((p) => p.msg).join(', ')}');
-    } on Exception catch (e) {
+    } on Exception catch (e, st) {
+      print('[EMAIL][ERROR] Unexpected error sending email: $e\n$st');
       throw EmailSendException('Failed to send email: $e');
     }
   }
