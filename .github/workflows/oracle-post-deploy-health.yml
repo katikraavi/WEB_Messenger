@@ -1,0 +1,53 @@
+name: Oracle Post-Deploy Health Check
+
+on:
+  workflow_run:
+    workflows: ["Deploy to Oracle VM"]
+    types:
+      - completed
+  workflow_dispatch:
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate deploy workflow result
+        if: github.event_name == 'workflow_run'
+        run: |
+          if [ "${{ github.event.workflow_run.conclusion }}" != "success" ]; then
+            echo "Deploy workflow did not succeed. Skipping health check."
+            exit 1
+          fi
+
+      - name: Wait for service warm-up
+        run: sleep 20
+
+      - name: Check /health endpoint with retries
+        env:
+          APP_URL: ${{ secrets.ORACLE_APP_URL }}
+        run: |
+          set -e
+          if [ -z "$APP_URL" ]; then
+            echo "Missing secret ORACLE_APP_URL"
+            exit 1
+          fi
+
+          HEALTH_URL="${APP_URL%/}/health"
+          echo "Checking $HEALTH_URL"
+
+          for i in $(seq 1 15); do
+            code=$(curl -s -o /tmp/oracle_health.json -w "%{http_code}" "$HEALTH_URL" || true)
+            echo "Attempt $i => HTTP $code"
+
+            if [ "$code" = "200" ]; then
+              echo "Health check passed"
+              cat /tmp/oracle_health.json
+              exit 0
+            fi
+
+            sleep 8
+          done
+
+          echo "Health check failed after retries"
+          exit 1
