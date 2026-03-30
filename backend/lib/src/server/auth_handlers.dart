@@ -326,7 +326,7 @@ Future<Response> _handleLogin(
 
 /// Handle GET /auth/me (protected)
 Future<Response> _handleValidateSession(
-    Request request, Connection database) async {
+  Request request, Connection database, TokenService tokenService) async {
   try {
     final authHeader = request.headers['authorization'];
     if (authHeader == null || !authHeader.startsWith('Bearer ')) {
@@ -341,6 +341,19 @@ Future<Response> _handleValidateSession(
     try {
       final token = authHeader.substring('Bearer '.length);
       final payload = JwtService.validateToken(token);
+
+      final hasActiveSession = await tokenService.hasActiveDeviceSessionForToken(
+        connection: database,
+        userId: payload.userId,
+        token: token,
+      );
+      if (!hasActiveSession) {
+        return Response(
+          401,
+          body: jsonEncode({'error': 'Session expired or revoked'}),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
 
       final usersTable = await _resolveUsersTable(database);
       final result = await database.query(

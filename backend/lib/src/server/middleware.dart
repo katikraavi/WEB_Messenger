@@ -36,18 +36,29 @@ Middleware _corsMiddleware() {
         );
       }
 
-      final response = await innerHandler(request);
-      return response.change(
-        headers: {
-          ...response.headers,
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods':
-              'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-          'Access-Control-Allow-Headers':
-              'Content-Type, Authorization, X-Device-ID',
-          'Access-Control-Allow-Private-Network': 'true',
-        },
-      );
+      try {
+        final response = await innerHandler(request);
+        // Try to apply CORS headers, but skip if the response is from a hijacked request
+        try {
+          return response.change(
+            headers: {
+              ...response.headers,
+              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Methods':
+                  'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+              'Access-Control-Allow-Headers':
+                  'Content-Type, Authorization, X-Device-ID',
+              'Access-Control-Allow-Private-Network': 'true',
+            },
+          );
+        } catch (e) {
+          // If response.change() fails (e.g., hijacked request), return as-is
+          return response;
+        }
+      } catch (e) {
+        // If the inner handler throws (e.g., hijacked request), re-throw
+        rethrow;
+      }
     };
   };
 }

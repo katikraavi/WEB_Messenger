@@ -240,6 +240,26 @@ class TokenService {
     );
   }
 
+  Future<bool> hasActiveDeviceSessionForToken({
+    required Connection connection,
+    required String userId,
+    required String token,
+  }) async {
+    final tokenHash = await _hashRefreshTokenForSession(token);
+    final result = await connection.query(
+      '''SELECT 1
+         FROM device_sessions
+         WHERE user_id = @user_id AND token_hash = @token_hash
+         LIMIT 1''',
+      substitutionValues: {
+        'user_id': userId,
+        'token_hash': tokenHash,
+      },
+    );
+
+    return result.isNotEmpty;
+  }
+
   Future<List<DeviceSession>> listDeviceSessions({
     required Connection connection,
     required String userId,

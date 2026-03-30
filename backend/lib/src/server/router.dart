@@ -90,7 +90,10 @@ Handler _createHandler(
 
       // Render/Neon can occasionally drop long-lived idle DB connections.
       // Before handling DB-backed routes, ensure connection is alive.
+      // Skip for WebSocket upgrades - they have their own connection management
+      final isWebSocketUpgrade = request.headers['upgrade']?.toLowerCase() == 'websocket';
       final requiresDatabase =
+          !isWebSocketUpgrade &&
           !(path.isEmpty ||
               path == 'health' ||
               path == 'schema' ||
@@ -124,7 +127,7 @@ Handler _createHandler(
       }
 
       if (path == 'auth/me' && method == 'GET') {
-        return await _handleValidateSession(request, database);
+        return await _handleValidateSession(request, database, tokenService);
       }
 
       if (path == 'auth/logout' && method == 'POST') {
@@ -139,12 +142,12 @@ Handler _createHandler(
         return await _handleAdminDeleteUser(request, database);
       }
 
-      if (path == 'api/auth/sessions' && method == 'GET') {
+      if (path == 'auth/sessions' && method == 'GET') {
         return await _handleListDeviceSessions(request, database, tokenService);
       }
 
-      if (path.startsWith('api/auth/sessions/') && method == 'DELETE') {
-        final deviceId = path.replaceFirst('api/auth/sessions/', '');
+      if (path.startsWith('auth/sessions/') && method == 'DELETE') {
+        final deviceId = path.replaceFirst('auth/sessions/', '');
         return await _handleRevokeDeviceSession(
             request, database, tokenService, deviceId);
       }
