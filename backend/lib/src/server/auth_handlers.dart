@@ -872,3 +872,27 @@ Future<bool> _columnExists(
   );
   return (result.first[0] as bool?) ?? false;
 }
+
+Future<bool> _ensureDatabaseConnection(Connection database) async {
+  try {
+    await database.query('SELECT 1');
+    return true;
+  } catch (e) {
+    print('[WARN] Database probe failed, attempting reconnect: $e');
+  }
+
+  try {
+    // Best effort cleanup in case the underlying socket is half-open.
+    await database.close();
+  } catch (_) {}
+
+  try {
+    await database.open();
+    await database.query('SELECT 1');
+    print('[INFO] Database reconnect successful');
+    return true;
+  } catch (e) {
+    print('[ERROR] Database reconnect failed: $e');
+    return false;
+  }
+}

@@ -88,6 +88,26 @@ Handler _createHandler(
         );
       }
 
+      // Render/Neon can occasionally drop long-lived idle DB connections.
+      // Before handling DB-backed routes, ensure connection is alive.
+      final requiresDatabase =
+          !(path.isEmpty ||
+              path == 'health' ||
+              path == 'schema' ||
+              path.startsWith('uploads/'));
+      if (requiresDatabase) {
+        final ready = await _ensureDatabaseConnection(database);
+        if (!ready) {
+          return Response(
+            503,
+            body: jsonEncode({
+              'error': 'Database temporarily unavailable. Please retry shortly.'
+            }),
+            headers: {'Content-Type': 'application/json'},
+          );
+        }
+      }
+
       if (path == 'reset' && method == 'GET') {
         return _handlePasswordResetPage(request);
       }
