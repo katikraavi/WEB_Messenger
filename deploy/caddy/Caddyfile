@@ -1,0 +1,6 @@
+{$DOMAIN} {
+    encode gzip zstd
+
+    # Reverse proxy to app container (nginx+backend all-in-one)
+    reverse_proxy app:8080
+}

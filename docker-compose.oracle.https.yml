@@ -1,0 +1,26 @@
+services:
+  app:
+    # With HTTPS enabled, app is only exposed inside Docker network.
+    ports: []
+    expose:
+      - "8080"
+
+  caddy:
+    image: caddy:2
+    container_name: web-messenger-caddy
+    environment:
+      DOMAIN: ${DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:
