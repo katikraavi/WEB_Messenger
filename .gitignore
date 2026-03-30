@@ -174,3 +174,4 @@ specs/
 web-messenger/
 Test_Pictures/
 backend/uploads/
+.env.oracle
