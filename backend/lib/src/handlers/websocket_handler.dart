@@ -117,7 +117,8 @@ class WebSocketHandler {
         case 'message.sent':
           final event = WebSocketEvent(
             type: WebSocketEventType.messageCreated,
-            data: {'userId': userId, ...json['data'] ?? {}},
+            chatId: chatId,
+            data: {'chatId': chatId, 'userId': userId, ...json['data'] ?? {}},
           );
           _webSocketService.broadcastToChat(chatId, event);
           break;
@@ -165,7 +166,9 @@ class WebSocketHandler {
     
     final event = WebSocketEvent(
       type: WebSocketEventType.messageCreated,
+      chatId: chatId,
       data: {
+        'chatId': chatId,
         'type': 'typing_indicator',
         'userId': userId,
         'username': username ?? 'Unknown',
@@ -197,7 +200,9 @@ class WebSocketHandler {
     
     final event = WebSocketEvent(
       type: WebSocketEventType.messageCreated,
+      chatId: chatId,
       data: {
+        'chatId': chatId,
         'type': 'typing_indicator',
         'userId': userId,
         'username': username ?? 'Unknown',

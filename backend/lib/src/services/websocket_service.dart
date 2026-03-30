@@ -32,11 +32,13 @@ enum WebSocketEventType {
 /// Represents a single WebSocket event
 class WebSocketEvent {
   final WebSocketEventType type;
+  final String? chatId;
   final Map<String, dynamic> data;
   final DateTime timestamp;
 
   WebSocketEvent({
     required this.type,
+    this.chatId,
     required this.data,
     DateTime? timestamp,
   }) : timestamp = timestamp ?? DateTime.now();
@@ -44,6 +46,7 @@ class WebSocketEvent {
   /// Convert event to JSON for wire protocol
   Map<String, dynamic> toJson() => {
     'type': type.name,
+    if (chatId != null && chatId!.isNotEmpty) 'chatId': chatId,
     'data': data,
     'timestamp': timestamp.toIso8601String(),
   };
@@ -57,6 +60,7 @@ class WebSocketEvent {
 
     return WebSocketEvent(
       type: type,
+      chatId: json['chatId'] as String?,
       data: json['data'] ?? {},
       timestamp: json['timestamp'] != null 
         ? DateTime.parse(json['timestamp']) 
