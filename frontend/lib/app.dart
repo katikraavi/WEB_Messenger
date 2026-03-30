@@ -248,7 +248,7 @@ class _MessengerAppState extends State<MessengerApp> {
     return MaterialApp(
       navigatorKey: _navigatorKey,
       scaffoldMessengerKey: AppFeedbackService.scaffoldMessengerKey,
-      title: 'Mobile Messenger
+      title: 'Mobile Messenger',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
