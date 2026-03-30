@@ -80,6 +80,14 @@ String _environmentBadgeLabel() {
   }
 }
 
+bool _shouldShowEnvironmentBadge() {
+  final env = _normalizedAppEnv();
+  if (kReleaseMode && (env == 'production' || env == 'prod')) {
+    return false;
+  }
+  return true;
+}
+
 String _displayName(String? value) {
   if (value == null || value.isEmpty) {
     return '';
@@ -240,7 +248,8 @@ class _MessengerAppState extends State<MessengerApp> {
     return MaterialApp(
       navigatorKey: _navigatorKey,
       scaffoldMessengerKey: AppFeedbackService.scaffoldMessengerKey,
-      title: 'Mobile Messenger',
+      title: 'Mobile Messenger
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
@@ -279,7 +288,7 @@ class _MessengerAppState extends State<MessengerApp> {
         return Stack(
           children: [
             boundedContent,
-            const _EnvironmentBadge(),
+            if (_shouldShowEnvironmentBadge()) const _EnvironmentBadge(),
           ],
         );
       },
@@ -360,9 +369,9 @@ class _EnvironmentBadge extends StatelessWidget {
     return IgnorePointer(
       child: SafeArea(
         child: Align(
-          alignment: Alignment.topRight,
+          alignment: Alignment.bottomLeft,
           child: Padding(
-            padding: const EdgeInsets.only(top: 8, right: 8),
+            padding: const EdgeInsets.only(left: 8, bottom: 8),
             child: DecoratedBox(
               decoration: BoxDecoration(
                 color: _backgroundColor(envLabel),
@@ -376,17 +385,17 @@ class _EnvironmentBadge extends StatelessWidget {
                 ],
               ),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                 child: DefaultTextStyle(
                   style: const TextStyle(color: Colors.white),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         envLabel,
                         style: const TextStyle(
-                          fontSize: 11,
+                          fontSize: 10,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0.6,
                         ),
@@ -394,7 +403,7 @@ class _EnvironmentBadge extends StatelessWidget {
                       Text(
                         metaText,
                         style: const TextStyle(
-                          fontSize: 10,
+                          fontSize: 9,
                           fontWeight: FontWeight.w500,
                         ),
                       ),

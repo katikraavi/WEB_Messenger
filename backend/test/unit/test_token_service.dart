@@ -1,5 +1,5 @@
 import 'package:test/test.dart';
-import 'package:backend/src/services/token_service.dart';
+import 'package:messenger_server/src/services/token_service.dart';
 
 void main() {
   group('TokenService', () {

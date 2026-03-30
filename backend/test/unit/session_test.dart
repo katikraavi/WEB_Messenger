@@ -10,18 +10,16 @@ void main() {
           'id': 's1',
           'user_id': 'u1',
           'device_id': 'dev-abc',
+          'device_name': 'Pixel 8',
           'token_hash': 'hmac-sha256-hash',
           'created_at': now,
-          'last_active_at': now,
-          'user_agent': 'Flutter/3.x',
-          'ip_address': '127.0.0.1',
+          'last_seen_at': now,
         };
         final session = DeviceSession.fromMap(map);
         expect(session.id, equals('s1'));
         expect(session.deviceId, equals('dev-abc'));
         expect(session.tokenHash, equals('hmac-sha256-hash'));
-        expect(session.userAgent, equals('Flutter/3.x'));
-        expect(session.ipAddress, equals('127.0.0.1'));
+        expect(session.deviceName, equals('Pixel 8'));
       });
 
       test('toMap round-trips all fields', () {
@@ -30,11 +28,10 @@ void main() {
           id: 's1',
           userId: 'u1',
           deviceId: 'dev-abc',
+          deviceName: 'agent-device',
           tokenHash: 'hash',
           createdAt: now,
-          lastActiveAt: now,
-          userAgent: 'agent',
-          ipAddress: '10.0.0.1',
+          lastSeenAt: now,
         );
         final map = session.toMap();
         expect(map['id'], equals('s1'));
@@ -48,15 +45,13 @@ void main() {
           'id': 's2',
           'user_id': 'u1',
           'device_id': 'dev-xyz',
+          'device_name': null,
           'token_hash': 'h2',
           'created_at': now,
-          'last_active_at': now,
-          'user_agent': null,
-          'ip_address': null,
+          'last_seen_at': now,
         };
         final session = DeviceSession.fromMap(map);
-        expect(session.userAgent, isNull);
-        expect(session.ipAddress, isNull);
+        expect(session.deviceName, isNull);
       });
     });
 

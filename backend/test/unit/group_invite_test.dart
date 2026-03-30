@@ -26,6 +26,7 @@ void main() {
           name: 'Chat',
           createdBy: 'u1',
           createdAt: now,
+          isPublic: false,
         );
         final map = chat.toMap();
         expect(map['id'], equals('g2'));
@@ -57,8 +58,8 @@ void main() {
         final map = {
           'id': 'i1',
           'group_id': 'g1',
-          'invited_by': 'u1',
-          'invited_user_id': 'u2',
+          'sender_id': 'u1',
+          'receiver_id': 'u2',
           'status': 'pending',
           'created_at': now,
         };
@@ -72,8 +73,8 @@ void main() {
         final map = {
           'id': 'i2',
           'group_id': 'g1',
-          'invited_by': 'u1',
-          'invited_user_id': 'u2',
+          'sender_id': 'u1',
+          'receiver_id': 'u2',
           'status': null,
           'created_at': now,
         };

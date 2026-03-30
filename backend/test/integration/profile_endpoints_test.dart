@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:test/test.dart';
 
+@Skip('Requires running backend on localhost:8081')
 void main() {
   const String baseUrl = 'http://localhost:8081';
 
@@ -75,5 +76,5 @@ void main() {
       // Endpoint should not crash on malformed/invalid auth input.
       expect([403, 404, 500], contains(response.statusCode));
     });
-  });
+  }, skip: 'Requires running backend on localhost:8081');
 }

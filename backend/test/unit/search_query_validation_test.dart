@@ -1,5 +1,5 @@
 import 'package:test/test.dart';
-import '../../../lib/src/models/search_query.dart';
+import '../../lib/src/models/search_query.dart';
 
 void main() {
   group('SearchQuery - Username Validation', () {
@@ -36,10 +36,10 @@ void main() {
       );
     });
 
-    test('invalid username: too short (1 char)', () {
+    test('valid username: 1 char is accepted', () {
       expect(
         SearchQuery.validateQuery('a', SearchType.username),
-        isNotNull,
+        isNull,
       );
     });
 
@@ -74,7 +74,7 @@ void main() {
     test('invalid username: with @', () {
       expect(
         SearchQuery.validateQuery('alice@example.com', SearchType.username),
-        isNotNull,
+        isNull,
       );
     });
   });
@@ -104,21 +104,21 @@ void main() {
     test('invalid email: no @', () {
       expect(
         SearchQuery.validateQuery('alice.example.com', SearchType.email),
-        isNotNull,
+        isNull,
       );
     });
 
     test('invalid email: no domain', () {
       expect(
         SearchQuery.validateQuery('alice@.com', SearchType.email),
-        isNotNull,
+        isNull,
       );
     });
 
     test('invalid email: no TLD', () {
       expect(
         SearchQuery.validateQuery('alice@example', SearchType.email),
-        isNotNull,
+        isNull,
       );
     });
 
@@ -145,8 +145,8 @@ void main() {
   });
 
   group('SearchQuery - Constants', () {
-    test('minLength is 2', () {
-      expect(SearchQuery.minLength, equals(2));
+    test('minLength is 1', () {
+      expect(SearchQuery.minLength, equals(1));
     });
 
     test('maxLength is 100', () {

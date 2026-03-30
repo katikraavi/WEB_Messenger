@@ -56,7 +56,7 @@ void main() {
         final map = result.toMap();
         expect(map['message_id'], equals('m1'));
         expect(map['snippet'], equals('test'));
-        expect(map['sent_at'], equals(now));
+        expect(map['sent_at'], equals(now.toIso8601String()));
       });
     });
 

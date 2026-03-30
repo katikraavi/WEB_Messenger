@@ -1,11 +1,11 @@
 import 'package:test/test.dart';
-import 'package:backend/src/services/password_reset_service.dart';
+import 'package:messenger_server/src/services/password_reset_service.dart';
 
 void main() {
   group('PasswordResetService', () {
     group('validatePassword', () {
       final service = PasswordResetService(
-        db: null as dynamic,
+        connection: null as dynamic,
         tokenService: null as dynamic,
       );
 

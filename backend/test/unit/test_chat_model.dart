@@ -6,72 +6,96 @@ void main() {
     test('Chat creation with defaults', () {
       final chat = Chat(
         id: 'chat-123',
+        participant1Id: 'user-1',
+        participant2Id: 'user-2',
+        isParticipant1Archived: false,
+        isParticipant2Archived: false,
         createdAt: DateTime.now(),
-        archivedByUserIds: [],
+        updatedAt: DateTime.now(),
       );
 
       expect(chat.id, 'chat-123');
-      expect(chat.archivedByUserIds, isEmpty);
+      expect(chat.isArchivedForUser('user-1'), isFalse);
     });
 
-    test('isArchivedBy returns true for archived user', () {
+    test('isArchivedForUser returns true for archived user', () {
       final chat = Chat(
         id: 'chat-123',
+        participant1Id: 'user-1',
+        participant2Id: 'user-2',
+        isParticipant1Archived: true,
+        isParticipant2Archived: false,
         createdAt: DateTime.now(),
-        archivedByUserIds: ['user-1', 'user-2'],
+        updatedAt: DateTime.now(),
       );
 
-      expect(chat.isArchivedBy('user-1'), true);
-      expect(chat.isArchivedBy('user-3'), false);
+      expect(chat.isArchivedForUser('user-1'), true);
+      expect(chat.isArchivedForUser('user-3'), false);
     });
 
-    test('archiveFor adds user to archived list', () {
+    test('getArchiveStatus reads per-participant archive flag', () {
       final chat = Chat(
         id: 'chat-123',
+        participant1Id: 'user-1',
+        participant2Id: 'user-2',
+        isParticipant1Archived: true,
+        isParticipant2Archived: false,
         createdAt: DateTime.now(),
-        archivedByUserIds: [],
+        updatedAt: DateTime.now(),
       );
 
-      final archived = chat.archiveFor('user-1');
-      expect(archived.isArchivedBy('user-1'), true);
-      expect(archived.archivedByUserIds, contains('user-1'));
+      expect(chat.getArchiveStatus('user-1'), true);
+      expect(chat.getArchiveStatus('user-2'), false);
     });
 
-    test('archiveFor is idempotent', () {
+    test('isParticipant detects both members', () {
       final chat = Chat(
         id: 'chat-123',
+        participant1Id: 'user-1',
+        participant2Id: 'user-2',
+        isParticipant1Archived: false,
+        isParticipant2Archived: false,
         createdAt: DateTime.now(),
-        archivedByUserIds: ['user-1'],
+        updatedAt: DateTime.now(),
       );
 
-      final archived = chat.archiveFor('user-1');
-      expect(archived.archivedByUserIds.length, 1);
+      expect(chat.isParticipant('user-1'), isTrue);
+      expect(chat.isParticipant('user-2'), isTrue);
+      expect(chat.isParticipant('user-3'), isFalse);
     });
 
-    test('unarchiveFor removes user from archived list', () {
+    test('getOtherId returns opposite participant', () {
       final chat = Chat(
         id: 'chat-123',
+        participant1Id: 'user-1',
+        participant2Id: 'user-2',
+        isParticipant1Archived: false,
+        isParticipant2Archived: false,
         createdAt: DateTime.now(),
-        archivedByUserIds: ['user-1', 'user-2'],
+        updatedAt: DateTime.now(),
       );
 
-      final unarchived = chat.unarchiveFor('user-1');
-      expect(unarchived.isArchivedBy('user-1'), false);
-      expect(unarchived.archivedByUserIds, ['user-2']);
+      expect(chat.getOtherId('user-1'), 'user-2');
+      expect(chat.getOtherId('user-2'), 'user-1');
     });
 
     test('Chat toJson and fromJson work correctly', () {
       final chat = Chat(
         id: 'chat-123',
+        participant1Id: 'user-1',
+        participant2Id: 'user-2',
+        isParticipant1Archived: true,
+        isParticipant2Archived: false,
         createdAt: DateTime.now(),
-        archivedByUserIds: ['user-1'],
+        updatedAt: DateTime.now(),
       );
 
       final json = chat.toJson();
       final restored = Chat.fromJson(json);
 
       expect(restored.id, chat.id);
-      expect(restored.archivedByUserIds, chat.archivedByUserIds);
+      expect(restored.participant1Id, chat.participant1Id);
+      expect(restored.isParticipant1Archived, chat.isParticipant1Archived);
     });
   });
 }
