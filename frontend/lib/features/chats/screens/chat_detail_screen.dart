@@ -23,7 +23,6 @@ import '../widgets/user_avatar_widget.dart';
 import '../services/media_picker_service.dart';
 import '../services/media_upload_service.dart';
 import '../services/message_encryption_service.dart';
-import '../services/audio_recording_service.dart';
 import '../services/chat_notification_settings_service.dart';
 import '../widgets/message_search_bar.dart';
 import '../services/message_search_service.dart';
@@ -89,7 +88,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
 
   // Track whether we've enabled viewer active mode
   bool _viewerActiveEnabled = false;
-  bool _isRecordingAudio = false;
   bool _isChatMuted = false;
   bool _notificationSettingsLoaded = false;
   String? _headerErrorMessage;
@@ -751,9 +749,9 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                   Container(
                     padding: EdgeInsets.fromLTRB(
                       useWideWebLayout ? 12 : 0,
-                      useWideWebLayout ? 8 : 0,
+                      useWideWebLayout ? 8 : 8,
                       useWideWebLayout ? 12 : 0,
-                      useWideWebLayout ? 12 : 0,
+                      useWideWebLayout ? 12 : 24,
                     ),
                     decoration: BoxDecoration(
                       color: useWideWebLayout ? const Color(0xFFF9FBFF) : null,
@@ -816,10 +814,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                       onVideoTap: () {
                         _handleVideoAttachment(token);
                       },
-                      onAudioTap: () {
-                        _handleAudioRecordingTap(token);
-                      },
-                      isRecordingAudio: _isRecordingAudio,
                     ),
                   ),
                 ],
