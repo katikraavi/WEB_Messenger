@@ -47,7 +47,7 @@ class ApiClient {
     // This enables development on emulators/desktop pointing to localhost
     // Production will fall back to the Render backend below
     
-    return 'https://web-messenger-backend.onrender.com';
+    return 'https://web-messenger-cy3r.onrender.com';
   }
 
   static bool _isLikelyWebResolvableHost(String host) {
@@ -119,7 +119,7 @@ class ApiClient {
         return _baseUrl.replaceFirst('http://', 'ws://').replaceAll(RegExp(r'/$'), '') + path;
       }
       // Fallback
-      return 'wss://web-messenger-backend.onrender.com$path';
+      return 'wss://web-messenger-cy3r.onrender.com$path';
     }
   }
 

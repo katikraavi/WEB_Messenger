@@ -35,7 +35,7 @@ class WebSocketService {
   Future<void> connect({
     required String token,
     required String userId,
-    String url = 'wss://web-messenger-backend.onrender.com/ws/messages',
+    String url = 'wss://web-messenger-cy3r.onrender.com/api/ws/messages',
   }) async {
     if (_isConnecting || _isConnected) {
       return;

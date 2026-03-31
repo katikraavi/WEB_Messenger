@@ -108,7 +108,7 @@ class MessageWebSocketService {
   Future<void> connect({
     required String token,
     required String userId,
-    String baseUrl = 'wss://web-messenger-backend.onrender.com',
+    String baseUrl = 'wss://web-messenger-cy3r.onrender.com',
   }) async {
     if (_isConnected) {
       return;
