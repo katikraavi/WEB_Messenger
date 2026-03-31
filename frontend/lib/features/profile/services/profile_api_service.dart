@@ -65,22 +65,32 @@ class ProfileApiService {
     return profile;
   }
 
-  /// Fetches user profile data from backend [T044]
+  /// Fetches user or group profile data from backend [T044]
   ///
   /// Arguments:
-  ///   - userId: User ID to fetch profile for
+  ///   - userId: User ID or group ID (prefixed with "group:") to fetch profile for
   ///   - token: Optional auth token for making the request
   ///
   /// Returns: [UserProfile] object
   ///
   /// Throws: May throw HttpException or FormatException on error
   ///
-  /// HTTP: `GET /api/profile/:userId`
+  /// HTTP: 
+  ///   - User: `GET /api/profile/view/:userId`
+  ///   - Group: `GET /api/groups/:groupId`
   /// Status: 200 = success, 401 = unauthorized, 404 = not found, 500 = server error
   Future<UserProfile> fetchProfile(String userId, {String? token}) async {
     try {
       final baseUrl = ApiClient.getBaseUrl();
-      final url = '$baseUrl/api/profile/view/$userId';
+      
+      // Detect if this is a group ID (prefixed with "group:")
+      final isGroupId = userId.startsWith('group:');
+      final actualId = isGroupId ? userId.substring(6) : userId; // Remove "group:" prefix
+      
+      // Route to correct endpoint based on ID type
+      final url = isGroupId 
+          ? '$baseUrl/api/groups/$actualId'
+          : '$baseUrl/api/profile/view/$userId';
 
       final headers = <String, String>{'Content-Type': 'application/json'};
 
@@ -100,14 +110,20 @@ class ProfileApiService {
       if (response.statusCode == 200) {
         try {
           final jsonBody = jsonDecode(response.body) as Map<String, dynamic>;
-          final profile = UserProfile.fromJson(jsonBody);
+          
+          // For groups, we may need to transform the response to match UserProfile
+          // If the backend returns group data, wrap it appropriately
+          final profile = isGroupId 
+              ? _groupToUserProfile(jsonBody)
+              : UserProfile.fromJson(jsonBody);
+          
           if (debugLogging) {}
           return _ensureAbsoluteImageUrl(profile);
         } catch (e) {
           throw FormatException('Failed to parse profile response: $e');
         }
       } else if (response.statusCode == 404) {
-        throw HttpException('User profile not found (404)');
+        throw HttpException('Profile not found (404)');
       } else if (response.statusCode == 401) {
         throw HttpException('Unauthorized (401)');
       } else {
@@ -118,6 +134,19 @@ class ProfileApiService {
     } catch (e) {
       rethrow;
     }
+  }
+
+  /// Convert group data to UserProfile format for consistent UI handling
+  UserProfile _groupToUserProfile(Map<String, dynamic> groupData) {
+    return UserProfile(
+      id: groupData['id'] as String? ?? '',
+      username: groupData['name'] as String? ?? 'Group',
+      profilePictureUrl: groupData['profilePictureUrl'] as String? ?? 
+                         groupData['groupPictureUrl'] as String?,
+      aboutMe: groupData['description'] as String? ?? '',
+      isPrivateProfile: false, // Groups are typically public
+      createdAt: DateTime.tryParse(groupData['createdAt'] as String? ?? '') ?? DateTime.now(),
+    );
   }
 
   /// Updates user profile information (username, bio, privacy setting) [T063]
