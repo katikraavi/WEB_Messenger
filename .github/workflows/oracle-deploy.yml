@@ -25,4 +25,3 @@ jobs:
             git fetch --all --prune
             git reset --hard origin/main
             ./scripts/deploy/oracle_deploy.sh
-            docker compose --env-file .env.oracle -f docker-compose.oracle.yml ps
