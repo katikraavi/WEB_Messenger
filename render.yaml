@@ -6,17 +6,17 @@ databases:
 
 services:
   - type: web
-    name: web-messenger-backend
+    name: web-messenger
     env: docker
-    plan: free
-    dockerfilePath: ./backend/Dockerfile
+    plan: standard
+    dockerfilePath: ./Dockerfile
     autoDeploy: true
     healthCheckPath: /health
     envVars:
       - key: SERVERPOD_ENV
         value: production
       - key: SERVERPOD_PORT
-        value: "8081"
+        value: "8080"
       - key: DATABASE_URL
         fromDatabase:
           name: web-messenger-db
@@ -24,7 +24,7 @@ services:
       - key: DATABASE_SSL
         value: "true"
       - key: ENCRYPTION_MASTER_KEY
-        generateValue: true
+        sync: false
       - key: RESEND_API_KEY
         sync: false
       - key: RESEND_FROM_EMAIL
@@ -51,10 +51,3 @@ services:
         sync: false
       - key: VERBOSE_BACKEND_LOGS
         value: "false"
-
-  - type: web
-    name: web-messenger-frontend
-    env: docker
-    plan: free
-    dockerfilePath: ./frontend/Dockerfile
-    autoDeploy: true
