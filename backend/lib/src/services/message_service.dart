@@ -578,11 +578,20 @@ class MessageService {
     required String editedByUserId,
   }) async {
     try {
-      // Validate encrypted content format
+      // Validate encrypted content format: supports both new (with ::) and old (plain base64) formats
       try {
-        base64Decode(newEncryptedContent);
+        final parts = newEncryptedContent.split('::');
+        if (parts.length == 3) {
+          // New format: validate each part is base64
+          for (final part in parts) {
+            base64Decode(part);
+          }
+        } else {
+          // Old format: validate entire string is base64
+          base64Decode(newEncryptedContent);
+        }
       } catch (e) {
-        throw ArgumentError('Invalid encrypted content: must be valid Base64');
+        throw ArgumentError('Invalid encrypted content: must be valid Base64 encoding. Error: $e');
       }
 
       final message = await getMessageById(messageId);

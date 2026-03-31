@@ -205,11 +205,29 @@ Future<Response> _handleDeleteChat(
     final isParticipant1 = userId == participant1;
     final otherUserId = isParticipant1 ? participant2 : participant1;
 
-    // Actually DELETE the chat (not archive) so they can send new invitations
+    // Delete all messages in the chat first (should cascade, but be explicit)
+    print('[ChatHandler] 🗑️ Deleting messages for chat: $chatId');
     await database.execute(
+      'DELETE FROM messages WHERE chat_id = @chatId',
+      substitutionValues: {'chatId': chatId},
+    );
+
+    // Delete any pending invites between these two users so they can send new invites
+    print('[ChatHandler] 🗑️ Deleting pending invites between $userId and $otherUserId');
+    await database.execute(
+      '''DELETE FROM invites 
+         WHERE (sender_id = @user1 AND receiver_id = @user2 AND status = 'pending')
+            OR (sender_id = @user2 AND receiver_id = @user1 AND status = 'pending')''',
+      substitutionValues: {'user1': userId, 'user2': otherUserId},
+    );
+
+    // Finally delete the chat itself
+    print('[ChatHandler] 🗑️ Deleting chat: $chatId');
+    final deleteResult = await database.execute(
       'DELETE FROM chats WHERE id = @chatId',
       substitutionValues: {'chatId': chatId},
     );
+    print('[ChatHandler] ✅ Chat deleted. Rows affected: ${deleteResult.affectedRows}');
 
     // Notify the other participant that the chat was deleted
     try {
