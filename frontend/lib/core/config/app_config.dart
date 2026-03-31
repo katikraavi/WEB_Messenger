@@ -20,11 +20,14 @@ class AppConfig {
   static String get backendUrlWeb {
     // Try to get from environment variable first (set at build time)
     const String envBackendUrl = String.fromEnvironment('BACKEND_URL', defaultValue: '');
-    if (envBackendUrl.isNotEmpty && envBackendUrl != '/') {
-      return envBackendUrl;
+    
+    // If BACKEND_URL is empty or '/', use same-origin (for Render/production)
+    if (envBackendUrl.isEmpty || envBackendUrl == '/') {
+      return '';  // Empty string = same-origin via relative paths
     }
-    // Local development default: connect to localhost:8081
-    return 'http://localhost:8081';
+    
+    // Otherwise use the provided URL
+    return envBackendUrl;
   }
   
   // API configuration
