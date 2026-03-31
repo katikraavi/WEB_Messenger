@@ -44,6 +44,7 @@ Future<Response> _handleGetChats(
 Future<Response> _handleGetArchivedChats(
   Request request,
   Connection database,
+  EncryptionService encryptionService,
 ) async {
   if (_verboseBackendLogs) {
     print('[ROUTE MATCH] archived chats route matched');
@@ -65,10 +66,47 @@ Future<Response> _handleGetArchivedChats(
     final chatService = ChatService(database);
     final archivedChats = await chatService.getArchivedChats(userId);
 
+    final groupService = GroupInviteService(
+      connection: database,
+      encryptionService: encryptionService,
+    );
+    final archivedGroups = await groupService.listArchivedGroupsForUser(userId);
+
+    final combinedChatJsonList = <Map<String, dynamic>>[
+      for (final chat in archivedChats) chat.toJson(),
+      for (final group in archivedGroups)
+        {
+          'id': group['id'],
+          'participant_1_id': userId,
+          'participant_2_id': 'group:${group['id']}',
+          'is_participant_1_archived': true,
+          'is_participant_2_archived': true,
+          'created_at': group['createdAt'],
+          'updated_at': group['createdAt'],
+          'last_message_preview': 'Group chat',
+          'last_message_timestamp': group['createdAt'],
+          'chat_type': 'group',
+          'display_name': group['name'],
+          'member_count': group['memberCount'],
+          'participant_names': group['participantNames'],
+          'my_role': group['myRole'],
+        },
+    ];
+
+    combinedChatJsonList.sort((a, b) {
+      final aTime = DateTime.parse(
+        (a['last_message_timestamp'] ?? a['updated_at']) as String,
+      );
+      final bTime = DateTime.parse(
+        (b['last_message_timestamp'] ?? b['updated_at']) as String,
+      );
+      return bTime.compareTo(aTime);
+    });
+
     return Response.ok(
       jsonEncode({
-        'chats': archivedChats.map((c) => c.toJson()).toList(),
-        'total': archivedChats.length,
+        'chats': combinedChatJsonList,
+        'total': combinedChatJsonList.length,
       }),
       headers: {'Content-Type': 'application/json'},
     );
@@ -107,12 +145,43 @@ Future<Response> _handleDeleteChat(
     final payload = JwtService.validateToken(token);
     final userId = payload.userId;
 
-    final chatResult = await database.query(
+    // First check if this is a group chat
+    final groupChatResult = await database.query(
+      r'SELECT created_by FROM group_chats WHERE id = @chatId',
+      substitutionValues: {'chatId': chatId},
+    );
+
+    if (groupChatResult.isNotEmpty) {
+      // It's a group chat
+      final createdBy = groupChatResult[0][0] as String;
+      
+      // Only the group creator can delete the entire group
+      if (userId != createdBy) {
+        return Response(
+          403,
+          body: jsonEncode({
+            'error': 'Unauthorized - only the group creator can delete this group'
+          }),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
+
+      // Delete the group chat (cascade will handle group_members and group_invites)
+      await database.execute(
+        'DELETE FROM group_chats WHERE id = @chatId',
+        substitutionValues: {'chatId': chatId},
+      );
+
+      return Response(204);
+    }
+
+    // Not a group chat, check if it's a single chat
+    final singleChatResult = await database.query(
       r'SELECT participant_1_id, participant_2_id FROM chats WHERE id = @chatId',
       substitutionValues: {'chatId': chatId},
     );
 
-    if (chatResult.isEmpty) {
+    if (singleChatResult.isEmpty) {
       return Response(
         404,
         body: jsonEncode({'error': 'Chat not found'}),
@@ -120,7 +189,7 @@ Future<Response> _handleDeleteChat(
       );
     }
 
-    final row = chatResult[0];
+    final row = singleChatResult[0];
     final participant1 = row[0] as String;
     final participant2 = row[1] as String;
 
@@ -134,14 +203,21 @@ Future<Response> _handleDeleteChat(
     }
 
     final isParticipant1 = userId == participant1;
-    final archiveColumn = isParticipant1
-        ? 'is_participant_1_archived'
-        : 'is_participant_2_archived';
+    final otherUserId = isParticipant1 ? participant2 : participant1;
 
+    // Actually DELETE the chat (not archive) so they can send new invitations
     await database.execute(
-      'UPDATE chats SET $archiveColumn = true WHERE id = @chatId',
+      'DELETE FROM chats WHERE id = @chatId',
       substitutionValues: {'chatId': chatId},
     );
+
+    // Notify the other participant that the chat was deleted
+    try {
+      final wsService = WebSocketService();
+      wsService.notifyChatDeleted(chatId, otherUserId);
+    } catch (e) {
+      print('[ChatHandler] ⚠️ Failed to notify chat deletion: $e');
+    }
 
     return Response(204);
   } on AuthException catch (e) {

@@ -102,6 +102,15 @@ final activeChatListProvider = StreamProvider.family<List<Chat>, String>((ref, t
       } catch (e) {
         // Skip errors (e.g., 403 if user is not a participant in this chat)
       }
+    } else if (event.type == WebSocketEventType.chatDeleted) {
+      // Chat was deleted by the other participant
+      final deletedChatId = event.data['chat_id'] as String?;
+      if (deletedChatId != null) {
+        enrichedChats = enrichedChats.where((chat) => chat.id != deletedChatId).toList();
+        yield enrichedChats;
+        // Show notification to user
+        print('[ActiveChatsProvider] 🗑️ Chat $deletedChatId was deleted by the other participant');
+      }
     }
   }
 });

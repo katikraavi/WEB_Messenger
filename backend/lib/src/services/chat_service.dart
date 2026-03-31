@@ -501,7 +501,40 @@ class ChatService {
     try {
       print('[ChatService] 📌 Archiving chat $chatId for user $userId');
       
-      // First, get the chat to verify the user is a participant
+      // First, try to archive as a group chat
+      final groupResult = await connection.query(
+        '''
+        SELECT id FROM group_members 
+        WHERE group_id = @chatId::UUID AND user_id = @userId::UUID
+        ''',
+        substitutionValues: {'chatId': chatId, 'userId': userId},
+      );
+      
+      if (groupResult.isNotEmpty) {
+        // It's a group chat - archive for this member
+        await connection.execute(
+          '''
+          UPDATE group_members
+          SET is_archived = true
+          WHERE group_id = @chatId::UUID AND user_id = @userId::UUID
+          ''',
+          substitutionValues: {'chatId': chatId, 'userId': userId},
+        );
+        print('[ChatService] ✅ Group chat $chatId archived for user $userId');
+        
+        // Return a dummy chat object for group
+        return Chat(
+          id: chatId,
+          participant1Id: '',
+          participant2Id: '',
+          isParticipant1Archived: false,
+          isParticipant2Archived: false,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+      }
+      
+      // Try single chat
       final chatResult = await connection.query(
         '''
         SELECT participant_1_id, participant_2_id, is_participant_1_archived, is_participant_2_archived
@@ -566,7 +599,40 @@ class ChatService {
     try {
       print('[ChatService] 📌 Unarchiving chat $chatId for user $userId');
       
-      // First, get the chat to verify the user is a participant
+      // First, try to unarchive as a group chat
+      final groupResult = await connection.query(
+        '''
+        SELECT id FROM group_members 
+        WHERE group_id = @chatId::UUID AND user_id = @userId::UUID
+        ''',
+        substitutionValues: {'chatId': chatId, 'userId': userId},
+      );
+      
+      if (groupResult.isNotEmpty) {
+        // It's a group chat - unarchive for this member
+        await connection.execute(
+          '''
+          UPDATE group_members
+          SET is_archived = false
+          WHERE group_id = @chatId::UUID AND user_id = @userId::UUID
+          ''',
+          substitutionValues: {'chatId': chatId, 'userId': userId},
+        );
+        print('[ChatService] ✅ Group chat $chatId unarchived for user $userId');
+        
+        // Return a dummy chat object for group
+        return Chat(
+          id: chatId,
+          participant1Id: '',
+          participant2Id: '',
+          isParticipant1Archived: false,
+          isParticipant2Archived: false,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+      }
+      
+      // Try single chat
       final chatResult = await connection.query(
         '''
         SELECT participant_1_id, participant_2_id

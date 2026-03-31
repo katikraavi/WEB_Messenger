@@ -258,6 +258,57 @@ class GroupInviteService {
            ON gm_all.group_id = gc.id
          LEFT JOIN users u
            ON u.id = gm_all.user_id
+         WHERE gm_me.is_archived = false
+         GROUP BY gc.id, gc.name, gc.created_by, gc.created_at, gc.is_public, gm_me.role
+         ORDER BY gc.created_at DESC''',
+      substitutionValues: {'user_id': userId},
+    );
+
+    final groups = <Map<String, dynamic>>[];
+    for (final row in result) {
+      final encryptedName = row[1] as String? ?? '';
+      final createdBy = row[2] as String? ?? '';
+      final participantNamesRaw = row[7];
+      final participantNames = participantNamesRaw is List
+          ? participantNamesRaw
+                .whereType<String>()
+                .map((name) => name.trim())
+                .where((name) => name.isNotEmpty)
+                .toList()
+          : <String>[];
+      groups.add({
+        'id': row[0] as String,
+        'name': await _safeDecryptGroupName(encryptedName, createdBy),
+        'createdBy': createdBy,
+        'createdAt': (row[3] as DateTime).toIso8601String(),
+        'isPublic': row[4] as bool? ?? false,
+        'myRole': row[5] as String? ?? 'member',
+        'memberCount': (row[6] as int?) ?? 0,
+        'participantNames': participantNames,
+      });
+    }
+    return groups;
+  }
+
+  /// Get archived groups for a user (where is_archived = true for this member)
+  Future<List<Map<String, dynamic>>> listArchivedGroupsForUser(String userId) async {
+    final result = await connection.query(
+      '''SELECT gc.id,
+                gc.name,
+                gc.created_by,
+                gc.created_at,
+                gc.is_public,
+                gm_me.role,
+                COUNT(gm_all.user_id) AS member_count,
+                ARRAY_REMOVE(ARRAY_AGG(u.username ORDER BY gm_all.joined_at), NULL) AS participant_names
+         FROM group_chats gc
+         JOIN group_members gm_me
+           ON gm_me.group_id = gc.id AND gm_me.user_id = @user_id
+         LEFT JOIN group_members gm_all
+           ON gm_all.group_id = gc.id
+         LEFT JOIN users u
+           ON u.id = gm_all.user_id
+         WHERE gm_me.is_archived = true
          GROUP BY gc.id, gc.name, gc.created_by, gc.created_at, gc.is_public, gm_me.role
          ORDER BY gc.created_at DESC''',
       substitutionValues: {'user_id': userId},

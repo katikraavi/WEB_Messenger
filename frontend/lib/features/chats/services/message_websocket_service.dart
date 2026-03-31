@@ -12,6 +12,7 @@ enum WebSocketEventType {
   messageStatusChanged, // Message status updated (sent, delivered, read)
   chatArchived,
   chatUnarchived,
+  chatDeleted, // Chat was deleted by the other participant
   invitationSent, // New invitation sent to user
   invitationAccepted, // User accepted an invitation
   invitationDeclined, // User declined an invitation

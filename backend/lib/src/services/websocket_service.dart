@@ -17,6 +17,7 @@ enum WebSocketEventType {
   // Chat archival events
   chatArchived,
   chatUnarchived,
+  chatDeleted,
 
   // Invitation events
   invitationSent,
@@ -261,6 +262,15 @@ class WebSocketService {
       data: {'user_id': userId, 'chat_id': chatId},
     );
     broadcastToChat(chatId, event);
+  }
+
+  /// Send a chat deletion notification to the other participant
+  void notifyChatDeleted(String chatId, String otherUserId) {
+    final event = WebSocketEvent(
+      type: WebSocketEventType.chatDeleted,
+      data: {'chat_id': chatId},
+    );
+    notifyUser(otherUserId, event);
   }
 
   /// Send ping (keep-alive) to all connections in a chat

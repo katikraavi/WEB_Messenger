@@ -404,7 +404,7 @@ Handler _createHandler(
       }
 
       if (path == 'api/chats/archived' && method == 'GET') {
-        return await _handleGetArchivedChats(request, database);
+        return await _handleGetArchivedChats(request, database, encryptionService);
       }
 
       if (path.startsWith('api/chats/') &&

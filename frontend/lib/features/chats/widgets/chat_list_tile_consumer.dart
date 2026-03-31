@@ -184,6 +184,22 @@ class ChatListTileConsumer extends ConsumerWidget {
                     ],
                   ],
                 ),
+                const SizedBox(width: 8),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.archive_outlined),
+                      tooltip: 'Archive group',
+                      onPressed: onArchive,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, color: Colors.red),
+                      tooltip: 'Delete group',
+                      onPressed: onDelete,
+                    ),
+                  ],
+                ),
               ],
             ),
           ),

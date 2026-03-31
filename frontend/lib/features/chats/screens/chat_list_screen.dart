@@ -12,6 +12,7 @@ import '../widgets/chat_list_tile_consumer.dart';
 import '../widgets/archived_chats_section.dart';
 import '../providers/archived_chats_provider.dart';
 import 'dual_chat_screen.dart';
+import 'create_group_screen.dart';
 import '../../../core/config/web_layout_config.dart';
 import '../../auth/providers/auth_provider.dart' as auth;
 
@@ -44,54 +45,59 @@ class ChatListScreen extends ConsumerWidget {
   }
 
   Widget _buildIntroCard(BuildContext context, List<Chat> chats) {
+    if (chats.isNotEmpty) {
+      return const SizedBox.shrink();
+    }
+    
     return Container(
-      margin: const EdgeInsets.fromLTRB(12, 12, 12, 10),
-      padding: const EdgeInsets.all(18),
+      margin: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFF1D4ED8), Color(0xFF0EA5E9)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.blue.withValues(alpha: 0.16),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+            color: Colors.blue.withValues(alpha: 0.12),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Row(
         children: [
           Container(
-            width: 48,
-            height: 48,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.16),
-              borderRadius: BorderRadius.circular(16),
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.forum_outlined, color: Colors.white),
+            child: const Icon(Icons.forum_outlined, color: Colors.white, size: 20),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Conversations',
+                  'Create your first chat',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
-                  chats.isEmpty
-                      ? 'Start a conversation by sending an invitation.'
-                      : '${chats.length} active chat${chats.length == 1 ? '' : 's'} ready to open.',
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.92)),
+                  'Invite a user or create a group to get started.',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.85),
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
@@ -304,6 +310,36 @@ class ChatListScreen extends ConsumerWidget {
     );
   }
 
+  Future<void> _openCreateGroupFlow(
+    BuildContext context,
+    WidgetRef ref,
+    String token,
+  ) async {
+    final createdGroupId = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (context) => const CreateGroupScreen(),
+      ),
+    );
+
+    if (!context.mounted || createdGroupId == null) {
+      return;
+    }
+
+    if (token.isNotEmpty) {
+      ref.invalidate(chatsProvider(token));
+      ref.invalidate(activeChatListProvider(token));
+    }
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Group created: $createdGroupId'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Get current user ID and token using old provider package
@@ -399,41 +435,69 @@ class ChatListScreen extends ConsumerWidget {
               children: [
                 _buildIntroCard(context, chats),
                 if (showDualPaneEntry)
-                  Container(
-                    margin: const EdgeInsets.fromLTRB(12, 2, 12, 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: const Color(0xFFD8E4FF)),
-                    ),
-                    child: ListTile(
-                      leading: Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEAF2FF),
-                          borderRadius: BorderRadius.circular(14),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFDCE8FF), width: 1),
+                      ),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        leading: Icon(Icons.splitscreen_outlined, size: 20, color: Colors.blue[600]),
+                        title: const Text('Split View', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                        subtitle: const Text('2-4 chats side-by-side', style: TextStyle(fontSize: 12)),
+                        trailing: const Icon(Icons.chevron_right, size: 20),
+                        onTap: () => _openSideBySidePicker(
+                          context,
+                          ref,
+                          token,
+                          currentUserId,
+                          chats,
                         ),
-                        child: const Icon(Icons.splitscreen_outlined),
-                      ),
-                      title: const Text('Open side by side'),
-                      subtitle: const Text(
-                        'Open 2-4 direct or group chats in split view',
-                      ),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () => _openSideBySidePicker(
-                        context,
-                        ref,
-                        token,
-                        currentUserId,
-                        chats,
                       ),
                     ),
                   ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFE8D8FF), width: 1),
+                    ),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      leading: Icon(Icons.group_add, size: 20, color: Colors.purple[600]),
+                      title: const Text('Create Group', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                      subtitle: const Text('New group chat', style: TextStyle(fontSize: 12)),
+                      trailing: const Icon(Icons.chevron_right, size: 20),
+                      onTap: () => _openCreateGroupFlow(
+                        context,
+                        ref,
+                        token,
+                      ),
+                    ),
+                  ),
+                ),
                 ArchivedChatsSection(
                   token: token,
                   currentUserId: currentUserId,
                 ),
+                if (chats.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                    child: Text(
+                      'Chats',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[700],
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ),
                 if (chats.isEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 100),

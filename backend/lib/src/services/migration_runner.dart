@@ -704,6 +704,18 @@ class MigrationRunner {
           DROP TABLE IF EXISTS polls CASCADE;
         ''',
       ),
+      Migration(
+        version: 26,
+        description: 'Add archive support for group chats',
+        upSql: '''
+          ALTER TABLE group_members
+          ADD COLUMN IF NOT EXISTS is_archived BOOLEAN NOT NULL DEFAULT false;
+        ''',
+        downSql: '''
+          ALTER TABLE group_members
+          DROP COLUMN IF EXISTS is_archived;
+        ''',
+      ),
     ]);
   }
 

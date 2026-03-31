@@ -22,13 +22,30 @@ class ApiClient {
   static final RegExp _ipv4Pattern = RegExp(r'^\d{1,3}(\.\d{1,3}){3}$');
 
   static String _defaultBaseUrl() {
+    // Priority 1: Check for environment variable (development)
+    // Use: BACKEND_URL=http://localhost:8081 flutter run
+    // Or: flutter run --dart-define=BACKEND_URL=http://localhost:8081
+    if (_envBackendUrl.isNotEmpty) {
+      return _envBackendUrl;
+    }
+
     if (kIsWeb) {
       final base = Uri.base;
+      // For local development on localhost, always use localhost:8081 backend
+      if (base.host == 'localhost' || base.host == '127.0.0.1') {
+        return 'http://localhost:8081';
+      }
+      // For deployed web apps, use same-origin
       if ((base.scheme == 'http' || base.scheme == 'https') &&
           base.authority.isNotEmpty) {
         return '${base.scheme}://${base.authority}';
       }
     }
+
+    // For non-web platforms (desktop, mobile), check if local backend is available
+    // This enables development on emulators/desktop pointing to localhost
+    // Production will fall back to the Render backend below
+    
     return 'https://web-messenger-backend.onrender.com';
   }
 
@@ -117,6 +134,7 @@ class ApiClient {
     final configuredBackendUrl = _envBackendUrl.trim();
     if (configuredBackendUrl.isNotEmpty) {
       _baseUrl = _normalizeConfiguredBaseUrl(configuredBackendUrl);
+      print('🔌 [ApiClient] Using environment BACKEND_URL: $_baseUrl');
       _isHealthy = await connectToBackend();
       return;
     }
@@ -124,12 +142,13 @@ class ApiClient {
     // Set base URL based on platform
     if (kIsWeb) {
       // For web builds, use BACKEND_URL from build-time define.
-      // Default to same-origin so hosted frontend can call its paired backend
-      // without requiring an explicit environment variable.
-      const String envBackendUrl = String.fromEnvironment('BACKEND_URL', defaultValue: '/');
+      // Default to localhost:8081 for local development
+      const String envBackendUrl = String.fromEnvironment('BACKEND_URL', defaultValue: 'http://localhost:8081');
       _baseUrl = _normalizeConfiguredBaseUrl(envBackendUrl);
+      print('🔌 [ApiClient] Web platform using: $_baseUrl');
     } else {
       _baseUrl = _defaultBaseUrl();
+      print('🔌 [ApiClient] Mobile platform using: $_baseUrl');
     }
 
     // Try to connect to backend with retry logic
@@ -144,48 +163,58 @@ class ApiClient {
     const maxRetries = 5;
     const delays = [100, 500, 2000, 5000, 10000]; // milliseconds
 
+    print('🔌 [ApiClient.connectToBackend] Starting connection with $maxRetries retries...');
+    
     for (int attempt = 0; attempt < maxRetries; attempt++) {
       try {
+        print('🔌 [ApiClient.connectToBackend] Attempt ${attempt + 1}/$maxRetries');
         final isServerHealthy = await isHealthy();
         if (isServerHealthy) {
+          print('✅ [ApiClient.connectToBackend] Connected successfully!');
           return true;
         }
-      } catch (e) {}
+      } catch (e) {
+        print('❌ [ApiClient.connectToBackend] Attempt error: $e');
+      }
 
       // Wait before next retry (except after last attempt)
       if (attempt < maxRetries - 1) {
         final delay = delays[attempt];
+        print('⏳ [ApiClient.connectToBackend] Waiting ${delay}ms before retry...');
         await Future.delayed(Duration(milliseconds: delay));
       }
     }
 
+    print('❌ [ApiClient.connectToBackend] Failed after all retries');
     return false;
   }
 
   /// Check if backend health endpoint is responding
   ///
   /// Returns true if /health endpoint responds with 200 and valid JSON
-  /// Check if backend health endpoint is responding
-  ///
-  /// Returns true if /health endpoint responds with 200 and valid JSON
   /// Returns false if connection fails or response is invalid
   static Future<bool> isHealthy() async {
     try {
+      final url = _buildUrl('/health');
+      print('🔌 [ApiClient.isHealthy] Checking health at: $url');
+      
       final response = await _httpClient
-          .get(Uri.parse(_buildUrl('/health')))
+          .get(Uri.parse(url))
           .timeout(
             const Duration(seconds: 30),
             onTimeout: () => throw TimeoutException('Health check timeout'),
           );
 
+      print('🔌 [ApiClient.isHealthy] Status: ${response.statusCode}');
       if (response.statusCode == 200) {
-        // Parse JSON response
-        // Expected: {"status": "ok", "timestamp": "<ISO8601>", "uptime_ms": <number>}
+        print('✅ [ApiClient.isHealthy] Backend is healthy!');
         return true;
       } else {
+        print('❌ [ApiClient.isHealthy] Bad status: ${response.statusCode}');
         return false;
       }
     } catch (e) {
+      print('❌ [ApiClient.isHealthy] Error: $e');
       return false;
     }
   }
@@ -199,6 +228,7 @@ class ApiClient {
       _baseUrl = configuredBackendUrl.isNotEmpty
           ? _normalizeConfiguredBaseUrl(configuredBackendUrl)
           : _defaultBaseUrl();
+      print('🔌 [ApiClient] Rebuilt _baseUrl: $_baseUrl');
     }
     
     // Base URL should always be absolute at this point (http/https)
@@ -210,7 +240,9 @@ class ApiClient {
       endpoint = '/$endpoint';
     }
     
-    return base + endpoint;
+    final fullUrl = base + endpoint;
+    print('🔌 [ApiClient] Calling: $fullUrl');
+    return fullUrl;
   }
 
   /// Get base URL for backend

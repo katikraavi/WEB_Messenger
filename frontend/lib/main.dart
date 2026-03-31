@@ -16,7 +16,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:frontend/core/platform/fvp_register.dart';
 import 'package:frontend/core/platform/runtime_env.dart';
 
-const bool _suppressConsoleLogs = true;
+const bool _suppressConsoleLogs = false;  // Enabled for debugging connection issues
 const bool _skipEagerMediaInitOnWsl = true;
 
 void main() async {
