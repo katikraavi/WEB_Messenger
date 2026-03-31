@@ -8,11 +8,11 @@ class AppConfig {
   
     // Backend configuration defaults to hosted backend origin.
     static const String backendUrlAndroid =
-      'http://89.168.94.114';
+      'https://web-messenger-backend.onrender.com';
     static const String backendUrlIOS =
-      'http://89.168.94.114';
+      'https://web-messenger-backend.onrender.com';
     static const String backendUrlPhysicalDevice =
-      'http://89.168.94.114';
+      'https://web-messenger-backend.onrender.com';
   
   /// Get backend URL for web platform
   /// When deployed on Render, uses BACKEND_URL env var injected at build time
