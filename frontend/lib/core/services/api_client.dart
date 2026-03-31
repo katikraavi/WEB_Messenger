@@ -23,9 +23,10 @@ class ApiClient {
 
   static String _defaultBaseUrl() {
     // Priority 1: Check for environment variable (development)
+    // BUT if it's just '/' (relative path), skip it and use web detection
     // Use: BACKEND_URL=http://localhost:8081 flutter run
     // Or: flutter run --dart-define=BACKEND_URL=http://localhost:8081
-    if (_envBackendUrl.isNotEmpty) {
+    if (_envBackendUrl.isNotEmpty && _envBackendUrl != '/') {
       return _envBackendUrl;
     }
 
@@ -35,7 +36,7 @@ class ApiClient {
       if (base.host == 'localhost' || base.host == '127.0.0.1') {
         return 'http://localhost:8081';
       }
-      // For deployed web apps, use same-origin
+      // For deployed web apps, use same-origin (e.g., https://web-messenger.onrender.com)
       if ((base.scheme == 'http' || base.scheme == 'https') &&
           base.authority.isNotEmpty) {
         return '${base.scheme}://${base.authority}';
