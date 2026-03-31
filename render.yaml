@@ -4,6 +4,11 @@ databases:
     user: messenger_user
     plan: free
 
+disks:
+  - name: uploads
+    mountPath: /app/backend/uploads
+    sizeGB: 5
+
 services:
   - type: web
     name: web-messenger
@@ -12,6 +17,8 @@ services:
     dockerfilePath: ./Dockerfile
     autoDeploy: true
     healthCheckPath: /health
+    disk:
+      name: uploads
     envVars:
       - key: SERVERPOD_ENV
         value: production
