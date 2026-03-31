@@ -139,13 +139,12 @@ class ProfileApiService {
   /// Convert group data to UserProfile format for consistent UI handling
   UserProfile _groupToUserProfile(Map<String, dynamic> groupData) {
     return UserProfile(
-      id: groupData['id'] as String? ?? '',
+      userId: groupData['id'] as String? ?? '',
       username: groupData['name'] as String? ?? 'Group',
       profilePictureUrl: groupData['profilePictureUrl'] as String? ?? 
                          groupData['groupPictureUrl'] as String?,
       aboutMe: groupData['description'] as String? ?? '',
       isPrivateProfile: false, // Groups are typically public
-      createdAt: DateTime.tryParse(groupData['createdAt'] as String? ?? '') ?? DateTime.now(),
     );
   }
 

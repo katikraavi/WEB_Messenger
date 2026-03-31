@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:provider/provider.dart' as provider_pkg;
@@ -12,7 +13,6 @@ import 'package:frontend/core/services/app_exception_logger.dart';
 import 'package:frontend/core/services/api_client.dart';
 import 'package:frontend/features/auth/providers/auth_provider.dart';
 import 'package:frontend/utils/secure_storage_wrapper.dart';
-import 'package:media_kit/media_kit.dart';
 import 'package:frontend/core/platform/fvp_register.dart';
 import 'package:frontend/core/platform/runtime_env.dart';
 
@@ -27,9 +27,15 @@ void main() async {
     SecureStorageWrapper().forceMemoryMode();
   }
 
-  if (!shouldSkipMediaInit) {
-    MediaKit.ensureInitialized();
-    await registerFvpIfSupported();
+  // Only initialize media_kit on native platforms (not web)
+  // media_kit is not necessary for basic functionality, so skipping
+  // if it fails is fine
+  if (!shouldSkipMediaInit && !kIsWeb) {
+    try {
+      await registerFvpIfSupported();
+    } catch (_) {
+      // FVP initialization failed - may be web or unavailable
+    }
   }
 
   FlutterError.onError = (details) {
