@@ -1,5 +1,6 @@
 import 'package:shelf/shelf.dart';
 import 'dart:convert';
+import 'dart:math';
 import 'package:postgres/postgres.dart';
 
 import '../services/message_service.dart';
@@ -314,12 +315,31 @@ class MessageHandlers {
       // Parse request body
       final bodyString = await request.readAsString();
       print('[MessageHandlers] ✏️ Edit request body: $bodyString');
-      final bodyJson = jsonDecode(bodyString) as Map<String, dynamic>;
-      final newContent = bodyJson['encrypted_content'] as String?;
-
-      if (newContent == null || newContent.isEmpty) {
+      print('[MessageHandlers] ✏️ Body length: ${bodyString.length}');
+      
+      if (bodyString.isEmpty) {
+        print('[MessageHandlers] ✏️ Request body is empty!');
         return Response(400,
-            body: jsonEncode({'error': 'Missing encrypted_content'}));
+            body: jsonEncode({'error': 'Request body is empty'}));
+      }
+      
+      final bodyJson = jsonDecode(bodyString) as Map<String, dynamic>;
+      print('[MessageHandlers] ✏️ Parsed JSON: $bodyJson');
+      print('[MessageHandlers] ✏️ Keys in JSON: ${bodyJson.keys.toList()}');
+      
+      final newContent = bodyJson['encrypted_content'] as String?;
+      print('[MessageHandlers] ✏️ Extracted content: ${newContent?.substring(0, min(50, newContent?.length ?? 0)) ?? 'null'}');
+
+      if (newContent == null) {
+        print('[MessageHandlers] ✏️ encrypted_content is null! Expected key not found.');
+        return Response(400,
+            body: jsonEncode({'error': 'Missing or null encrypted_content', 'received_keys': bodyJson.keys.toList()}));
+      }
+      
+      if (newContent.isEmpty) {
+        print('[MessageHandlers] ✏️ encrypted_content is empty!');
+        return Response(400,
+            body: jsonEncode({'error': 'encrypted_content cannot be empty'}));
       }
 
       // Create message service
