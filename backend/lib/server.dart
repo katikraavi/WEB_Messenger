@@ -93,10 +93,35 @@ void main() async {
     rethrow;
   }
 
-  // Seed test users for development
-  if (env == 'development') {
-    print('[INFO] Seeding test users for development...');
-    await _seedTestUsers(dbConnection);
+  // Seed/verify test users on all environments
+  print('[INFO] Verifying test users...');
+  try {
+    final result = await dbConnection.query(
+      'SELECT COUNT(*) FROM "users" WHERE email IN (\'alice@example.com\', \'bob@example.com\', \'charlie@example.com\', \'diane@test.org\')',
+    );
+    final count = result.first[0] as int;
+    
+    if (count < 4) {
+      print('[INFO] Missing test users, seeding all 4...');
+      await _seedTestUsers(dbConnection);
+    } else {
+      // Check if existing hashes are correct format ($simulated$10$...)
+      final hashCheck = await dbConnection.query(
+        '''SELECT email, password_hash FROM "users" 
+           WHERE email IN ('alice@example.com', 'bob@example.com', 'charlie@example.com', 'diane@test.org')
+           AND password_hash NOT LIKE '\$simulated\$10\$%' ''',
+      );
+      
+      if (hashCheck.isNotEmpty) {
+        print('[WARN] Found ${hashCheck.length} test users with wrong password hash format');
+        print('[INFO] Re-seeding test users to fix password hashes...');
+        await _seedTestUsers(dbConnection);
+      } else {
+        print('[✓] Test users exist with correct password format');
+      }
+    }
+  } catch (e) {
+    print('[WARN] Could not verify test users: $e');
   }
 
   // Initialize services
