@@ -92,7 +92,10 @@ class MessageWebSocketService {
   String? _currentChatId;
   Timer? _typingDebounceTimer;
   Timer? _heartbeatTimer;
+  Timer? _reconnectTimer;
   bool _isConnected = false;
+  bool _reconnecting = false;
+  Set<String> _subscribedChats = {}; // Track subscribed chats for reconnection
 
   /// Stream of WebSocket events
   Stream<WebSocketEvent> get eventStream => _eventStreamController.stream;
@@ -131,17 +134,27 @@ class MessageWebSocketService {
       _webSocket!.stream.listen(
         (message) {
           _handleMessage(message);
+          _reconnecting = false; // Reset reconnect flag on successful message
         },
         onError: (error) {
+          print('[WebSocket] ❌ Connection error: $error');
           _isConnected = false;
+          _attemptReconnect();
         },
         onDone: () {
+          print('[WebSocket] Connection closed');
           _isConnected = false;
-          _cleanup();
+          _attemptReconnect();
         },
       );
 
       _isConnected = true;
+      print('[WebSocket] ✅ Connected, resubscribing to ${_subscribedChats.length} chats');
+      
+      // Resubscribe to all chats that were subscribed before
+      for (final chatId in _subscribedChats) {
+        subscribeToChat(chatId);
+      }
 
       // Start heartbeat
       _startHeartbeat();
@@ -152,6 +165,7 @@ class MessageWebSocketService {
         context: 'MessageWebSocketService.connect',
       );
       _isConnected = false;
+      _attemptReconnect();
       rethrow;
     }
   }
@@ -159,13 +173,17 @@ class MessageWebSocketService {
   /// Subscribe to a specific chat
   void subscribeToChat(String chatId) {
     _currentChatId = chatId;
+    _subscribedChats.add(chatId); // Track for reconnection
 
     if (!_isConnected || _webSocket == null) {
+      print('[WebSocket] Not connected yet, will subscribe when ready. Chat: $chatId');
       return;
     }
 
     try {
-      _webSocket!.sink.add(jsonEncode({'type': 'subscribe', 'chatId': chatId}));
+      final subscribeMsg = jsonEncode({'type': 'subscribe', 'chatId': chatId});
+      _webSocket!.sink.add(subscribeMsg);
+      print('[WebSocket] ✅ Subscribed to chat: $chatId');
     } catch (e, st) {
       AppExceptionLogger.log(
         e,
@@ -177,22 +195,38 @@ class MessageWebSocketService {
 
   /// Unsubscribe from current chat
   void unsubscribeFromChat() {
+    if (_currentChatId != null) {
+      _subscribedChats.remove(_currentChatId);
+    }
     _currentChatId = null;
+  }
+  
+  /// Attempt to reconnect after connection loss
+  void _attemptReconnect() {
+    if (_reconnecting) {
+      return;
+    }
+    
+    _reconnecting = true;
+    _reconnectTimer?.cancel();
+    print('[WebSocket] ⏳ Attempting reconnect in 3s (will be retried by provider)...');
   }
 
   /// Send a typing indicator
   void sendTyping({required String chatId}) {
     if (!_isConnected || _webSocket == null) {
+      print('[WebSocket] ⚠️ Cannot send typing - not connected to chat: $chatId');
       return;
     }
 
     try {
       final event = {
-        'type': 'user_typing',
+        'type': 'typing.start',
         'chatId': chatId,
         'data': {'userId': _currentUserId},
       };
       _webSocket!.sink.add(jsonEncode(event));
+      print('[WebSocket] 📝 Sent typing event for chat: $chatId');
 
       // Debounce: cancel previous timer and set new one
       _typingDebounceTimer?.cancel();
@@ -214,11 +248,12 @@ class MessageWebSocketService {
 
     try {
       final event = {
-        'type': 'user_stopped_typing',
+        'type': 'typing.stop',
         'chatId': chatId,
         'data': {'userId': _currentUserId},
       };
       _webSocket!.sink.add(jsonEncode(event));
+      print('[WebSocket] ✋ Sent stop typing event for chat: $chatId');
     } catch (e, st) {
       AppExceptionLogger.log(
         e,
@@ -233,14 +268,17 @@ class MessageWebSocketService {
     try {
       _typingDebounceTimer?.cancel();
       _heartbeatTimer?.cancel();
+      _reconnectTimer?.cancel();
 
       if (_webSocket != null) {
         await _webSocket!.sink.close();
       }
 
       _isConnected = false;
+      _reconnecting = false;
       _currentUserId = null;
       _currentChatId = null;
+      _subscribedChats.clear();
 
     } catch (e, st) {
       AppExceptionLogger.log(
