@@ -6,6 +6,7 @@ import 'package:postgres/postgres.dart';
 import '../services/profile_service.dart';
 import '../services/jwt_service.dart';
 import '../services/auth_exception.dart';
+import '../services/websocket_service.dart';
 
 const int MAX_FILE_SIZE = 5242880; // 5MB
 
@@ -361,6 +362,21 @@ Future<Response> uploadProfilePicture(Request request) async {
           'status': 404,
         }),
       );
+    }
+
+    // 🔄 Broadcast profile_updated event to all connected users via WebSocket
+    try {
+      final webSocketService = WebSocketService.getInstance();
+      webSocketService.broadcastToAllUsers({
+        'type': 'profile_updated',
+        'userId': userId,
+        'profilePictureUrl': pictureUrl,
+        'timestamp': DateTime.now().toIso8601String(),
+      });
+      print('[ProfileEndpoint] 📡 Broadcast profile_updated for user: $userId');
+    } catch (e) {
+      print('[ProfileEndpoint] ⚠️ Failed to broadcast profile update: $e');
+      // Don't fail the response, user still gets their picture updated
     }
 
     return Response.ok(

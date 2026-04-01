@@ -274,7 +274,15 @@ class MessageWebSocketService {
             chatId: event.chatId ?? '',
             isTyping: isTyping,
           ));
-        } else if (event.type != WebSocketEventType.unknown &&
+        } 
+        // Check if this is a profile_updated event (🖼️ profile picture changed)
+        else if (event.type == WebSocketEventType.messageCreated &&
+                 event.data['type'] == 'profile_updated') {
+          print('[WebSocket] 🖼️ Profile updated event received: userId=${event.data['userId']}');
+          // Emit profile update event to stream for profile cache invalidation
+          _eventStreamController.add(event);
+        }
+        else if (event.type != WebSocketEventType.unknown &&
             event.type != WebSocketEventType.ping &&
             event.type != WebSocketEventType.pong) {
           // Emit real message events to stream (skip ping/pong and unknown)

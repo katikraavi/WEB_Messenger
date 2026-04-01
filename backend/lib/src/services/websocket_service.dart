@@ -89,6 +89,11 @@ class WebSocketService {
     return _instance;
   }
   
+  /// Get singleton instance (static method)
+  static WebSocketService getInstance() {
+    return _instance;
+  }
+  
   /// Map of active WebSocket connections: chatId -> List<connection>
   final Map<String, List<WebSocketChannel>> _activeConnections = {};
 
@@ -280,6 +285,60 @@ class WebSocketService {
       data: {},
     );
     broadcastToChat(chatId, event);
+  }
+
+  /// Emit an event to all registered listeners
+  void _emitEvent(WebSocketEvent event) {
+    final listeners = _eventListeners[event.type];
+    if (listeners != null) {
+      for (final handler in listeners) {
+        try {
+          handler(event);
+        } catch (e) {
+          print('[WebSocket] Error in event listener: $e');
+        }
+      }
+    }
+  }
+
+  /// 🔔 Broadcast an event to ALL connected users (global broadcast)
+  /// 
+  /// Used for system-wide events that affect all users:
+  /// - Profile picture updates (user changed photo)
+  /// - User presence changes
+  /// - Other global notifications
+  /// 
+  /// Parameters:
+  /// - eventData: Map containing event details (type, userId, etc.)
+  void broadcastToAllUsers(Map<String, dynamic> eventData) {
+    if (_userConnections.isEmpty) {
+      print('[WebSocketService] ⚠️ No user connections to broadcast to');
+      return;
+    }
+
+    // Create a WebSocket event wrapper
+    final message = jsonEncode({
+      'type': 'messageCreated',  // Reuse existing type for wire compatibility
+      'data': eventData,
+      'timestamp': DateTime.now().toIso8601String(),
+    });
+
+    int totalSent = 0;
+    final totalUsers = _userConnections.keys.length;
+
+    for (final userId in _userConnections.keys) {
+      final connections = _userConnections[userId] ?? [];
+      for (final channel in connections) {
+        try {
+          channel.sink.add(message);
+          totalSent++;
+        } catch (e) {
+          print('[WebSocketService] ❌ Error sending to user $userId: $e');
+        }
+      }
+    }
+
+    print('[WebSocketService] 📢 Global broadcast sent to $totalUsers users ($totalSent connections): ${eventData['type']}');
   }
 
   /// Emit an event to all registered listeners
