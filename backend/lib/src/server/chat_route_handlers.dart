@@ -227,7 +227,7 @@ Future<Response> _handleDeleteChat(
       'DELETE FROM chats WHERE id = @chatId',
       substitutionValues: {'chatId': chatId},
     );
-    print('[ChatHandler] ✅ Chat deleted. Rows affected: ${deleteResult.affectedRows}');
+    print('[ChatHandler] ✅ Chat deleted. Rows affected: $deleteResult');
 
     // Notify the other participant that the chat was deleted
     try {
