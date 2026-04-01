@@ -1,6 +1,51 @@
 part of '../../server.dart';
 
 
+/// Database connection health check middleware
+/// Ensures connection is alive before processing requests
+/// Attempts automatic recovery on connection failure
+Middleware _databaseHealthCheck(PostgreSQLConnection dbConnection) {
+  return (Handler innerHandler) {
+    return (Request request) async {
+      final path = request.url.path;
+      
+      // Skip health check for /health endpoint to prevent infinite loops
+      if (path == '/health' || path == 'health') {
+        return await innerHandler(request);
+      }
+
+      // Ensure connection is healthy before processing request
+      try {
+        final monitor = dbConnection.getHealthMonitor();
+        if (monitor != null) {
+          final isHealthy = await monitor.ensureConnectionHealthy();
+          if (!isHealthy) {
+            return Response(
+              503, // Service Unavailable
+              body: jsonEncode({
+                'error': 'Database connection temporarily unavailable',
+                'details': 'Server cannot process requests - database offline',
+              }),
+              headers: {'Content-Type': 'application/json'},
+            );
+          }
+        }
+      } catch (e) {
+        print('[ERROR] Health check failed: $e');
+        return Response(
+          503, // Service Unavailable
+          body: jsonEncode({
+            'error': 'Connection health check failed',
+          }),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
+
+      return await innerHandler(request);
+    };
+  };
+}
+
 /// Logging middleware that skips health checks to reduce log noise
 Middleware _logRequestsExceptHealth() {
   return (Handler innerHandler) {

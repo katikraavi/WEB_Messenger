@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'package:uuid/uuid.dart';
 import 'package:postgres/postgres.dart';
 import 'src/database/database_connection_config.dart';
+import 'src/database/connection_health_monitor.dart';
 import 'src/services/token_service.dart';
 import 'src/services/email_service.dart';
 import 'src/services/rate_limit_service.dart';
@@ -92,6 +93,12 @@ void main() async {
     print('[ERROR] Migration failed: $e');
     rethrow;
   }
+
+  // Initialize connection health monitoring
+  print('[INFO] Initializing database connection health monitor...');
+  dbConnection.initializeHealthMonitoring(
+    checkInterval: Duration(seconds: isProduction ? 30 : 60),
+  );
 
   // Seed/verify test users on all environments
   print('[INFO] Verifying test users...');
@@ -203,6 +210,7 @@ void main() async {
 
   // Setup middleware pipeline
   final handler = Pipeline()
+      .addMiddleware(_databaseHealthCheck(dbConnection))
       .addMiddleware(_logRequestsExceptHealth())
       .addMiddleware(_corsMiddleware())
       .addHandler(_createHandler(
