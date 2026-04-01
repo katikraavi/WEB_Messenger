@@ -17,6 +17,8 @@ enum WebSocketEventType {
   invitationAccepted, // User accepted an invitation
   invitationDeclined, // User declined an invitation
   invitationCancelled, // Sender cancelled an invitation
+  groupMemberJoined, // New member joined the group
+  groupMemberLeft, // Member left the group
   ping,
   pong,
   unknown;

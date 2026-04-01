@@ -559,6 +559,51 @@ class ChatApiService {
     }
   }
 
+  /// Batch mark multiple messages as read in a single API call
+  /// This is more efficient than calling updateMessageStatus for each message
+  /// Performance optimization: O(1) API call instead of O(N)
+  Future<void> batchMarkAsRead({
+    required String token,
+    required String chatId,
+    required List<String> messageIds,
+  }) async {
+    if (messageIds.isEmpty) {
+      return;
+    }
+
+    try {
+      final url = Uri.parse('$_baseUrl/api/chats/$chatId/messages/batch-read');
+
+      final body = {'message_ids': messageIds};
+
+      final response = await _httpClient.put(
+        url,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(body),
+      );
+
+      if (response.statusCode == 200) {
+        // Success - messages marked as read
+      } else if (response.statusCode == 401) {
+        throw Exception('Unauthorized: Invalid or expired token');
+      } else if (response.statusCode == 403) {
+        throw Exception('Forbidden: Not a participant in this chat');
+      } else if (response.statusCode == 400) {
+        throw Exception('Bad request: Invalid message IDs');
+      } else if (response.statusCode >= 500) {
+        throw Exception('Server error: ${response.statusCode}');
+      } else {
+        // Non-blocking - status update is best-effort
+      }
+    } catch (e) {
+      // Non-blocking - status update is best-effort, don't rethrow
+      print('[ChatApiService] ⚠️ Batch mark as read error: $e');
+    }
+  }
+
   /// Delete a chat (remove connection)
   ///
   /// Parameters:

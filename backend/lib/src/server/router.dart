@@ -514,6 +514,32 @@ Handler _createHandler(
         }
       }
 
+      // Batch mark messages as read (performance optimization)
+      if (path.startsWith('api/chats/') &&
+          path.endsWith('/messages/batch-read') &&
+          method == 'PUT') {
+        try {
+          final parts = path.split('/');
+          if (parts.length >= 4 &&
+              parts[0] == 'api' &&
+              parts[1] == 'chats' &&
+              parts[3] == 'messages') {
+            return await MessageHandlers.batchMarkAsRead(
+                request, parts[2], database);
+          }
+        } on AuthException {
+          return Response(401,
+              body: jsonEncode({'error': 'Invalid token'}),
+              headers: {'Content-Type': 'application/json'});
+        } catch (e) {
+          print('[MessageHandler] ❌ Error batch marking messages as read: $e');
+          return Response(500,
+              body: jsonEncode(
+                  {'error': 'Failed to batch mark messages as read: $e'}),
+              headers: {'Content-Type': 'application/json'});
+        }
+      }
+
       // --- Media ---
 
       if (path == 'api/media/upload' && method == 'POST') {
