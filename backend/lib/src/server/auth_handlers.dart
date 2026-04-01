@@ -92,7 +92,7 @@ Future<Response> _handleRegister(
         headers: {'Content-Type': 'application/json'},
       );
     }
-    final passwordHash = _hashPassword(password!);
+    final passwordHash = PasswordHasher.hashPassword(password!);
     final userId = const Uuid().v4(); // Just UUID, no prefix
     print(
         '[Register] Creating new user: email=$email, username=$username, userId=$userId');
@@ -260,7 +260,7 @@ Future<Response> _handleLogin(
     final storedHash = user['password_hash'] as String;
 
     // Verify password
-    if (!_verifyPassword(password!, storedHash)) {
+    if (!PasswordHasher.verifyPassword(password!, storedHash)) {
       return Response(
         401,
         body: jsonEncode({'error': 'Invalid email or password'}),

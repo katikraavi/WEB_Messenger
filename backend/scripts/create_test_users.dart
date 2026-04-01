@@ -1,8 +1,10 @@
 #!/usr/bin/env dart
 
 import 'dart:io';
+import 'dart:convert';
 import 'package:postgres/postgres.dart';
 import 'package:uuid/uuid.dart';
+import 'package:crypto/crypto.dart';
 
 /// Test Users Creation Script
 /// 
@@ -235,7 +237,18 @@ void main() async {
   }
 }
 
-/// Simple password hash function (matches server.dart implementation)
+/// Hash password using SHA256 with multiple iterations (simulated bcrypt)
+/// MUST match PasswordHasher implementation from src/services/password_hasher.dart
 String _hashPassword(String password) {
-  return password.hashCode.toRadixString(36);
+  const int bcryptCost = 10;
+  final bytes = utf8.encode(password);
+  var digest = sha256.convert(bytes);
+  
+  // Simulate bcrypt by iterating multiple times
+  for (int i = 0; i < bcryptCost; i++) {
+    digest = sha256.convert(utf8.encode(digest.toString()));
+  }
+  
+  // Return hash in format matching PasswordHasher: $simulated$10$hash
+  return '\$simulated\$10\$${digest.toString()}';
 }
