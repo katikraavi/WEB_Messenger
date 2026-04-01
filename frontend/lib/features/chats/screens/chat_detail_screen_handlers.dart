@@ -144,6 +144,15 @@ extension _ChatDetailScreenStateHandlers on _ChatDetailScreenState {
             messageId: message.id,
             newEncryptedContent: encryptedContent,
           );
+      
+      // Verify editedMessage has required fields before decryption
+      if (editedMessage.encryptedContent.isEmpty) {
+        throw Exception('Server response: empty encrypted_content field');
+      }
+      if (editedMessage.senderId.isEmpty) {
+        throw Exception('Server response: empty sender_id field');
+      }
+      
       final decryptedMessage = await MessageEncryptionService.decryptMessage(
         editedMessage,
         userId: editedMessage.senderId,
@@ -155,6 +164,7 @@ extension _ChatDetailScreenStateHandlers on _ChatDetailScreenState {
         const SnackBar(content: Text('Message edited successfully')),
       );
     } catch (e) {
+      print('❌ Message edit error: $e');
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to edit: $e')));

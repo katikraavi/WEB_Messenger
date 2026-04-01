@@ -41,10 +41,15 @@ class InviteService {
       throw Exception('Users already have an active chat');
     }
 
-    // Validation: Check for existing pending invite
+    // Validation: Check for existing pending invite from same sender
+    // If one exists, delete it to allow re-inviting (handles case where recipient ignored/cleared notification)
     final existingPending = await _getExistingPendingInvite(senderId, recipientId);
     if (existingPending != null) {
-      throw Exception('Pending invitation already exists');
+      // Delete the old pending invite to allow a fresh invite attempt
+      await connection.execute(
+        Sql.named('DELETE FROM invites WHERE id = @inviteId'),
+        parameters: {'inviteId': existingPending.id},
+      );
     }
 
     // Create new invite (FR-003)

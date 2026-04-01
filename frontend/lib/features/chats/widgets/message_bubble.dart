@@ -322,12 +322,17 @@ class MessageBubble extends StatelessWidget {
   }
 
   /// Get bubble background color based on state
+  /// For sent messages: blue if pending/delivered, yellow if read by at least one recipient
   Color _getBubbleColor() {
     if (message.hasError) {
       return Colors.red.shade50;
     }
     if (isSentByUser) {
-      return Colors.blue.shade500;
+      // Check if message has been read by at least one recipient (for group chats)
+      if (message.readCount != null && message.readCount! > 0) {
+        return Colors.amber.shade300; // Yellow for read
+      }
+      return Colors.blue.shade500; // Blue for sent/delivered
     }
     return Colors.grey.shade300;
   }
