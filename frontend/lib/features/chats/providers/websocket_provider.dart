@@ -96,22 +96,17 @@ final profileUpdateListenerEffect = FutureProvider.autoDispose<void>((ref) async
       // Check if this is a profile_updated event
       if (event.data['type'] == 'profile_updated') {
         final userId = event.data['userId'] as String?;
-        final profilePictureUrl = event.data['profilePictureUrl'] as String?;
         
         if (userId != null) {
-          print('[ProfileSync] 🎯 Invalidating profile cache for user $userId');
-          
           // Invalidate this specific user's profile cache
-          invalidateUserProfileCache(ref, userId);
+          ref.read(profileUserCacheInvalidatorProvider(userId).notifier).state++;
           
           // Also invalidate ALL profile-related caches to refresh:
           // - Chat list avatars
           // - Message avatars
           // - Group member lists
           // - Any other avatar displays
-          invalidateAllProfileCaches(ref);
-          
-          print('[ProfileSync] ✅ Profile picture updated for user $userId → $profilePictureUrl');
+          ref.read(profileCacheInvalidatorProvider.notifier).state++;
         }
       }
     },

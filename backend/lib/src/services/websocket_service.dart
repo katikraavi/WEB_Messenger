@@ -341,20 +341,6 @@ class WebSocketService {
     print('[WebSocketService] 📢 Global broadcast sent to $totalUsers users ($totalSent connections): ${eventData['type']}');
   }
 
-  /// Emit an event to all registered listeners
-  void _emitEvent(WebSocketEvent event) {
-    final listeners = _eventListeners[event.type];
-    if (listeners != null) {
-      for (final handler in listeners) {
-        try {
-          handler(event);
-        } catch (e) {
-          print('[WebSocket] Error in event listener: $e');
-        }
-      }
-    }
-  }
-
   /// Close all connections
   Future<void> closeAll() async {
     await _connectionLock.lock(() async {
