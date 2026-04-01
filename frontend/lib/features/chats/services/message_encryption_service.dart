@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:cryptography/cryptography.dart';
 import '../models/message_model.dart';
@@ -55,14 +56,11 @@ class MessageEncryptionService {
     return SecretKey(mac.bytes);
   }
 
-  /// Generates cryptographically secure random bytes using timestamp
+  /// Generates cryptographically secure random bytes using Random.secure()
   static List<int> _generateRandomBytes(int length) {
-    final random = <int>[];
-    for (int i = 0; i < length; i++) {
-      final ms = DateTime.now().microsecond;
-      random.add((ms >> 8) ^ (ms & 0xFF) ^ i);
-    }
-    return random;
+    final random = Random.secure();
+    final values = List<int>.generate(length, (_) => random.nextInt(256));
+    return values;
   }
 
   /// Encrypt plaintext message content using AES-256-GCM

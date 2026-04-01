@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'dart:typed_data';
 import 'package:cryptography/cryptography.dart';
 
@@ -80,13 +81,11 @@ class EncryptionService {
     }
   }
 
-  /// Generates cryptographically secure random bytes
+  /// Generates cryptographically secure random bytes using Random.secure()
   List<int> _generateRandomBytes(int length) {
-    final random = List<int>.generate(length, (_) {
-      final ms = DateTime.now().microsecond;
-      return (ms >> 8) ^ (ms & 0xFF);
-    });
-    return random;
+    final random = Random.secure();
+    final values = List<int>.generate(length, (_) => random.nextInt(256));
+    return values;
   }
 
   /// Decrypts AES-256-GCM payload and returns original plaintext.
