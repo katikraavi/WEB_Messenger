@@ -49,8 +49,17 @@ class MigrationRunner {
         version: 1,
         description: 'Create message_status and invite_status enums',
         upSql: '''
-          CREATE TYPE message_status AS ENUM ('sent', 'delivered', 'read');
-          CREATE TYPE invite_status AS ENUM ('pending', 'accepted', 'declined');
+          DO \$\$ BEGIN
+            IF NOT EXISTS (SELECT FROM pg_type WHERE typname = 'message_status') THEN
+              CREATE TYPE message_status AS ENUM ('sent', 'delivered', 'read');
+            END IF;
+          END \$\$;
+          
+          DO \$\$ BEGIN
+            IF NOT EXISTS (SELECT FROM pg_type WHERE typname = 'invite_status') THEN
+              CREATE TYPE invite_status AS ENUM ('pending', 'accepted', 'declined');
+            END IF;
+          END \$\$;
         ''',
         downSql: '''
           DROP TYPE IF EXISTS invite_status CASCADE;
