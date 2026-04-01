@@ -85,9 +85,9 @@ class MigrationRunner {
             verified_at TIMESTAMP,
             created_at TIMESTAMP DEFAULT NOW()
           );
-          CREATE INDEX idx_users_email ON "users"(email);
-          CREATE INDEX idx_users_username ON "users"(username);
-          CREATE INDEX idx_users_created_at ON "users"(created_at DESC);
+          CREATE INDEX IF NOT EXISTS idx_users_email ON "users"(email);
+          CREATE INDEX IF NOT EXISTS idx_users_username ON "users"(username);
+          CREATE INDEX IF NOT EXISTS idx_users_created_at ON "users"(created_at DESC);
         ''',
         downSql: 'DROP TABLE IF EXISTS "users" CASCADE',
       ),
@@ -100,7 +100,7 @@ class MigrationRunner {
             created_at TIMESTAMP DEFAULT NOW(),
             archived_by_users UUID[] DEFAULT ARRAY[]::UUID[]
           );
-          CREATE INDEX idx_chats_created_at ON chats(created_at);
+          CREATE INDEX IF NOT EXISTS idx_chats_created_at ON chats(created_at);
         ''',
         downSql: 'DROP TABLE IF EXISTS chats CASCADE',
       ),
@@ -115,8 +115,8 @@ class MigrationRunner {
             left_at TIMESTAMP,
             PRIMARY KEY (user_id, chat_id)
           );
-          CREATE INDEX idx_chat_members_user ON chat_members(user_id);
-          CREATE INDEX idx_chat_members_chat ON chat_members(chat_id);
+          CREATE INDEX IF NOT EXISTS idx_chat_members_user ON chat_members(user_id);
+          CREATE INDEX IF NOT EXISTS idx_chat_members_chat ON chat_members(chat_id);
         ''',
         downSql: 'DROP TABLE IF EXISTS chat_members CASCADE',
       ),
@@ -124,7 +124,7 @@ class MigrationRunner {
         version: 5,
         description: 'Create messages table',
         upSql: '''
-          CREATE TABLE messages (
+          CREATE TABLE IF NOT EXISTS messages (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             chat_id UUID NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
             sender_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
@@ -136,9 +136,9 @@ class MigrationRunner {
             edited_at TIMESTAMP,
             CHECK (media_url IS NULL OR media_type IS NOT NULL)
           );
-          CREATE INDEX idx_messages_chat ON messages(chat_id);
-          CREATE INDEX idx_messages_sender ON messages(sender_id);
-          CREATE INDEX idx_messages_created_at ON messages(created_at);
+          CREATE INDEX IF NOT EXISTS idx_messages_chat ON messages(chat_id);
+          CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_id);
+          CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
         ''',
         downSql: 'DROP TABLE IF EXISTS messages CASCADE',
       ),
@@ -155,9 +155,9 @@ class MigrationRunner {
             responded_at TIMESTAMP,
             UNIQUE (sender_id, receiver_id, status)
           );
-          CREATE INDEX idx_invites_sender ON invites(sender_id);
-          CREATE INDEX idx_invites_receiver ON invites(receiver_id);
-          CREATE INDEX idx_invites_status ON invites(status);
+          CREATE INDEX IF NOT EXISTS idx_invites_sender ON invites(sender_id);
+          CREATE INDEX IF NOT EXISTS idx_invites_receiver ON invites(receiver_id);
+          CREATE INDEX IF NOT EXISTS idx_invites_status ON invites(status);
         ''',
         downSql: 'DROP TABLE IF EXISTS invites CASCADE',
       ),
@@ -176,10 +176,10 @@ class MigrationRunner {
             CONSTRAINT expires_after_created CHECK (expires_at > created_at),
             CONSTRAINT used_at_after_created CHECK (used_at IS NULL OR used_at >= created_at)
           );
-          CREATE UNIQUE INDEX idx_verification_token_hash ON verification_token(token_hash);
-          CREATE INDEX idx_verification_token_user_id_created ON verification_token(user_id, created_at DESC);
-          CREATE INDEX idx_verification_token_expires_at ON verification_token(expires_at);
-          CREATE INDEX idx_verification_token_used_at ON verification_token(used_at);
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_verification_token_hash ON verification_token(token_hash);
+          CREATE INDEX IF NOT EXISTS idx_verification_token_user_id_created ON verification_token(user_id, created_at DESC);
+          CREATE INDEX IF NOT EXISTS idx_verification_token_expires_at ON verification_token(expires_at);
+          CREATE INDEX IF NOT EXISTS idx_verification_token_used_at ON verification_token(used_at);
         ''',
         downSql: 'DROP TABLE IF EXISTS verification_token CASCADE',
       ),
@@ -198,10 +198,10 @@ class MigrationRunner {
             CONSTRAINT expires_after_created CHECK (expires_at > created_at),
             CONSTRAINT used_at_after_created CHECK (used_at IS NULL OR used_at >= created_at)
           );
-          CREATE UNIQUE INDEX idx_password_reset_token_hash ON password_reset_token(token_hash);
-          CREATE INDEX idx_password_reset_token_user_id_created ON password_reset_token(user_id, created_at DESC);
-          CREATE INDEX idx_password_reset_token_expires_at ON password_reset_token(expires_at);
-          CREATE INDEX idx_password_reset_token_used_at ON password_reset_token(used_at);
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_password_reset_token_hash ON password_reset_token(token_hash);
+          CREATE INDEX IF NOT EXISTS idx_password_reset_token_user_id_created ON password_reset_token(user_id, created_at DESC);
+          CREATE INDEX IF NOT EXISTS idx_password_reset_token_expires_at ON password_reset_token(expires_at);
+          CREATE INDEX IF NOT EXISTS idx_password_reset_token_used_at ON password_reset_token(used_at);
         ''',
         downSql: 'DROP TABLE IF EXISTS password_reset_token CASCADE',
       ),
@@ -215,8 +215,8 @@ class MigrationRunner {
             attempted_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
             CONSTRAINT email_not_empty CHECK (LENGTH(email) > 0)
           );
-          CREATE INDEX idx_password_reset_attempt_email_time ON password_reset_attempt(email, attempted_at DESC);
-          CREATE INDEX idx_password_reset_attempt_attempted_at ON password_reset_attempt(attempted_at);
+          CREATE INDEX IF NOT EXISTS idx_password_reset_attempt_email_time ON password_reset_attempt(email, attempted_at DESC);
+          CREATE INDEX IF NOT EXISTS idx_password_reset_attempt_attempted_at ON password_reset_attempt(attempted_at);
         ''',
         downSql: 'DROP TABLE IF EXISTS password_reset_attempt CASCADE',
       ),
@@ -288,11 +288,11 @@ class MigrationRunner {
               CHECK (deleted_at IS NULL OR deleted_at >= uploaded_at)
           );
           
-          CREATE UNIQUE INDEX idx_profile_image_user_active_unique ON profile_image(user_id, is_active) WHERE is_active = true;
-          CREATE INDEX idx_profile_image_user_id ON profile_image(user_id);
-          CREATE INDEX idx_profile_image_is_active ON profile_image(is_active);
-          CREATE INDEX idx_profile_image_uploaded_at ON profile_image(uploaded_at DESC);
-          CREATE INDEX idx_profile_image_user_active ON profile_image(user_id, is_active) WHERE is_active = true;
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_profile_image_user_active_unique ON profile_image(user_id, is_active) WHERE is_active = true;
+          CREATE INDEX IF NOT EXISTS idx_profile_image_user_id ON profile_image(user_id);
+          CREATE INDEX IF NOT EXISTS idx_profile_image_is_active ON profile_image(is_active);
+          CREATE INDEX IF NOT EXISTS idx_profile_image_uploaded_at ON profile_image(uploaded_at DESC);
+          CREATE INDEX IF NOT EXISTS idx_profile_image_user_active ON profile_image(user_id, is_active) WHERE is_active = true;
         ''',
         downSql: '''
           DROP TABLE IF EXISTS profile_image CASCADE;
@@ -341,12 +341,12 @@ class MigrationRunner {
           );
           
           -- Index for efficient list query (find all active chats for user sorted by recency)
-          CREATE INDEX idx_chats_participant_1_active 
+          CREATE INDEX IF NOT EXISTS idx_chats_participant_1_active 
           ON chats(participant_1_id, updated_at DESC) 
           WHERE is_participant_1_archived = FALSE;
           
           -- Separate index for participant 2
-          CREATE INDEX idx_chats_participant_2_active 
+          CREATE INDEX IF NOT EXISTS idx_chats_participant_2_active 
           ON chats(participant_2_id, updated_at DESC) 
           WHERE is_participant_2_archived = FALSE;
           
@@ -364,11 +364,11 @@ class MigrationRunner {
           );
           
           -- Index for efficient message history fetch (chat + timestamp for pagination)
-          CREATE INDEX idx_messages_chat_created 
+          CREATE INDEX IF NOT EXISTS idx_messages_chat_created 
           ON messages(chat_id, created_at DESC);
           
           -- Index for user's sent messages (for filtering/analytics)
-          CREATE INDEX idx_messages_sender 
+          CREATE INDEX IF NOT EXISTS idx_messages_sender 
           ON messages(sender_id, created_at DESC);
         ''',
         downSql: '''
