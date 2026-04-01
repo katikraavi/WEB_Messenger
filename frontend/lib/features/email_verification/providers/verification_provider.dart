@@ -204,6 +204,54 @@ class VerificationNotifier extends StateNotifier<VerificationState> {
   Future<bool> verifyEmail({required String token}) async {
     return verifyEmailToken(token: token);
   }
+
+  /// Direct verification without token (for testing/development)
+  Future<bool> directVerifyEmail() async {
+    state = VerificationState(
+      isLoading: true,
+      errorMessage: null,
+      successMessage: null,
+      devToken: state.devToken,
+    );
+
+    try {
+      final userId = await _getUserId();
+      if (userId == null) {
+        throw Exception('Cannot determine user ID for direct verification');
+      }
+
+      final response = await verificationService.directVerifyEmail(userId: userId);
+
+      state = VerificationState(
+        isLoading: false,
+        successMessage: response['message'] as String? ?? 'Email verified successfully!',
+        errorMessage: null,
+        devToken: state.devToken,
+      );
+
+      // Success - trigger navigation after a delay
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      return true;
+    } catch (e) {
+      state = VerificationState(
+        isLoading: false,
+        errorMessage: e.toString(),
+        successMessage: null,
+        devToken: state.devToken,
+      );
+      return false;
+    }
+  }
+
+  Future<String?> _getUserId() async {
+    // Try to get from secure storage
+    try {
+      return await verificationService.getUserIdFromStorage();
+    } catch (_) {
+      return null;
+    }
+  }
 }
 
 /// Provider for the verification notifier

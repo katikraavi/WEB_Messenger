@@ -4,6 +4,7 @@ import 'package:shelf/shelf.dart';
 import '../services/email_service.dart';
 import '../services/rate_limit_service.dart';
 import '../services/password_reset_service.dart';
+import '../services/password_hasher.dart';
 
 /// Handler for initiating password reset
 /// 
@@ -175,7 +176,8 @@ Future<Response> confirmPasswordReset(
       );
     }
 
-    final newPasswordHash = newPassword.hashCode.toRadixString(36);
+    // Use PasswordHasher for consistent password hashing (SHA256 × 10 iterations)
+    final newPasswordHash = PasswordHasher.hashPassword(newPassword);
     final didReset = await passwordResetService.resetPassword(token, newPasswordHash);
     if (!didReset) {
       return Response(

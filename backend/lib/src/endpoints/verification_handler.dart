@@ -180,3 +180,61 @@ Future<Response> verifyEmailToken(
     );
   }
 }
+
+/// Handler for direct email verification (dev/test mode - no token needed)
+/// 
+/// POST /api/auth/verify-email/direct
+/// Request: { "userId": "user-uuid" }
+/// Response: { "success": true, "message": "Email verified directly" }
+Future<Response> directVerifyEmail(
+  Request request,
+  VerificationService verificationService,
+) async {
+  try {
+    // Parse request
+    final body = await request.readAsString();
+    final data = jsonDecode(body) as Map<String, dynamic>;
+    final userId = data['userId'] as String?;
+
+    if (userId == null || userId.isEmpty) {
+      return Response.badRequest(
+        body: jsonEncode({'error': 'User ID is required'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+
+    // Verify the user exists
+    final userResult = await verificationService.connection.query(
+      'SELECT id FROM "users" WHERE id = @userId LIMIT 1',
+      substitutionValues: {'userId': userId},
+    );
+
+    if (userResult.isEmpty) {
+      return Response(
+        404,
+        body: jsonEncode({'error': 'User not found'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+
+    // Mark email as verified directly
+    await verificationService.connection.execute(
+      'UPDATE "users" SET email_verified = TRUE, verified_at = NOW() WHERE id = @userId',
+      substitutionValues: {'userId': userId},
+    );
+
+    return Response.ok(
+      jsonEncode({
+        'success': true,
+        'message': 'Email verified successfully!',
+      }),
+      headers: {'Content-Type': 'application/json'},
+    );
+  } catch (e) {
+    print('[ERROR] directVerifyEmail: $e');
+    return Response.internalServerError(
+      body: jsonEncode({'error': 'Failed to verify email', 'details': e.toString()}),
+      headers: {'Content-Type': 'application/json'},
+    );
+  }
+}

@@ -247,6 +247,10 @@ Handler _createHandler(
         return await verifyEmailToken(request, tokenService, verificationService);
       }
 
+      if (path == 'auth/verify-email/direct' && method == 'POST') {
+        return await directVerifyEmail(request, verificationService);
+      }
+
       if (path == 'auth/password-reset/request' && method == 'POST') {
         return await requestPasswordReset(
             request, emailService, rateLimitService, passwordResetService);
