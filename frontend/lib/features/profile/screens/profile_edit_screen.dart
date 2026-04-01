@@ -354,6 +354,25 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     );
   }
 
+  /// T059: Build privacy toggle for private profile setting
+  Widget _buildPrivacyToggle(WidgetRef ref, ProfileFormState formState) {
+    return Card(
+      child: SwitchListTile(
+        title: const Text(
+          'Private Profile',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+        ),
+        subtitle: const Text('Only contacts can see your profile'),
+        value: formState.isPrivateProfile,
+        onChanged: (value) {
+          ref
+              .read(profileFormStateProvider(widget.profile).notifier)
+              .updatePrivacy(value);
+        },
+      ),
+    );
+  }
+
   /// T061: Save profile with success toast notification
   Future<void> _saveProfile(
     BuildContext context,
