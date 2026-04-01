@@ -279,56 +279,7 @@ class ProfileImageUploadWidget extends ConsumerWidget {
                       },
               ),
             ),
-            const SizedBox(width: 12),
-            Tooltip(
-              message: 'Take photo with camera',
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.camera_alt),
-                label: const Text('Camera'),
-                onPressed: imageState.isUploading
-                    ? null
-                    : () async {
-                        try {
-                          final hasPermission =
-                              await ImagePickerPermissionsHandler.requestCameraPermission(
-                                context,
-                              );
-                          if (!hasPermission) {
-                            return;
-                          }
 
-                          final image =
-                              await ImagePickerService.pickImageFromCamera();
-                          if (image != null) {
-                            final validationError =
-                                await ImagePickerService.validateImageComprehensive(
-                                  image,
-                                );
-                            if (validationError != null) {
-                              if (context.mounted) {
-                                showCopyableErrorSnackBar(
-                                  context,
-                                  validationError.message,
-                                );
-                              }
-                              return;
-                            }
-                            await ref
-                                .read(profileImageProvider.notifier)
-                                .selectImage(
-                                  image.path,
-                                  imageBytes: await image.readAsBytes(),
-                                  imageName: image.name,
-                                );
-                          }
-                        } catch (e) {
-                          if (context.mounted) {
-                            showCopyableErrorSnackBar(context, 'Error: $e');
-                          }
-                        }
-                      },
-              ),
-            ),
           ],
         ),
 

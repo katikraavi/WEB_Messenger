@@ -195,6 +195,10 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
               // T058: Bio text area with character counter
               _buildBioField(ref, formState),
               const SizedBox(height: 24),
+
+              // T059: Privacy toggle
+              _buildPrivacyToggle(ref, formState),
+              const SizedBox(height: 24),
             ],
           ),
         ),
