@@ -166,9 +166,13 @@ class ProfileImageUploadWidget extends ConsumerWidget {
                               userId != null &&
                               token != null) {
                               
-                              // Clear image cache when deleting
+                              // 🗑️ Clear image cache and invalidate EVERYWHERE when deleting
                               if (currentImageUrl != null && currentImageUrl!.isNotEmpty) {
-                                await ProfileImageCacheManager.clearImageCache(currentImageUrl!);
+                                try {
+                                  await ProfileImageCacheManager.clearImageCache(currentImageUrl!);
+                                } catch (e) {
+                                  // Continue if cache clear fails
+                                }
                               }
                               
                               // Mark form as dirty so SAVE button is enabled (image was deleted)
@@ -193,7 +197,11 @@ class ProfileImageUploadWidget extends ConsumerWidget {
                                 // If we can't mark it as dirty, continue anyway
                               }
 
-                              // Invalidate all profile caches globally to update avatars everywhere
+                              // 🔄 Invalidate ALL profile caches to update avatars in:
+                              // - Chat list
+                              // - Search results
+                              // - Message bubbles
+                              // - Group member lists
                               invalidateUserProfileCache(ref, userId!);
 
                               // Also invalidate the chats module's profile provider so chat list avatars update

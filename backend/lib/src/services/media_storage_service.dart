@@ -162,7 +162,10 @@ class MediaStorageService {
       final safeFileName = '$fileId$ext';
       final id = fileId; // Use same UUID for ID and filename
 
-      // Store file data in database (BLOB column)
+      // Store file data in database (BYTEA column)
+      // Convert Uint8List to List<int> for proper PostgreSQL bytea handling
+      final bytesAsList = fileBytes.toList();
+      
       await connection.execute(
         '''
         INSERT INTO media_storage
@@ -175,7 +178,7 @@ class MediaStorageService {
           'fileName': safeFileName,
           'mimeType': mimeType,
           'fileSize': fileBytes.length,
-          'fileData': fileBytes, // Store binary data
+          'fileData': bytesAsList, // Convert to List<int> for proper bytea encoding
           'originalName': fileName,
           'createdAt': DateTime.now().toIso8601String(),
         },

@@ -349,10 +349,39 @@ Future<Response> uploadProfilePicture(Request request) async {
       );
     }
 
-    // Update database with picture URL
+    // 🗑️ DELETE OLD PICTURE FILE IF IT EXISTS
+    try {
+      final currentUser = await profileService.getProfile(userId);
+      if (currentUser != null && currentUser.profilePictureUrl != null && currentUser.profilePictureUrl!.isNotEmpty) {
+        final oldUrl = currentUser.profilePictureUrl!;
+        // Extract file path from URL (e.g., "/uploads/profile_pictures/user_123.jpg" -> "uploads/profile_pictures/user_123.jpg")
+        final oldFilePath = oldUrl.startsWith('/') ? oldUrl.substring(1) : oldUrl;
+        final oldFullPath = oldFilePath;
+        
+        try {
+          final oldFile = File(oldFullPath);
+          if (oldFile.existsSync()) {
+            await oldFile.delete();
+            print('[ProfileEndpoint] 🗑️ Deleted old picture file: $oldFullPath');
+          }
+        } catch (e) {
+          print('[ProfileEndpoint] ⚠️ Failed to delete old picture file: $e');
+          // Continue anyway - don't fail the upload if cleanup fails
+        }
+      }
+    } catch (e) {
+      print('[ProfileEndpoint] ⚠️ Error during old picture cleanup: $e');
+      // Continue anyway - don't fail the upload
+    }
+
+    // Add cache-busting timestamp to force fresh image load
+    final cacheTs = DateTime.now().millisecondsSinceEpoch;
+    final pictureUrlWithCache = '$pictureUrl?v=$cacheTs';
+
+    // Update database with picture URL (including cache buster)
     final updatedUser = await profileService.updateProfilePicture(
       userId: userId,
-      pictureUrl: pictureUrl,
+      pictureUrl: pictureUrlWithCache,
     );
 
     if (updatedUser == null) {
@@ -370,10 +399,10 @@ Future<Response> uploadProfilePicture(Request request) async {
       webSocketService.broadcastToAllUsers({
         'type': 'profile_updated',
         'userId': userId,
-        'profilePictureUrl': pictureUrl,
+        'profilePictureUrl': pictureUrlWithCache,
         'timestamp': DateTime.now().toIso8601String(),
       });
-      print('[ProfileEndpoint] 📡 Broadcast profile_updated for user: $userId');
+      print('[ProfileEndpoint] 📡 Broadcast profile_updated for user: $userId with cache-bust: $cacheTs');
     } catch (e) {
       print('[ProfileEndpoint] ⚠️ Failed to broadcast profile update: $e');
       // Don't fail the response, user still gets their picture updated
@@ -383,7 +412,7 @@ Future<Response> uploadProfilePicture(Request request) async {
       jsonEncode({
         'success': true,
         'message': 'Profile picture uploaded successfully',
-        'profilePictureUrl': pictureUrl,
+        'profilePictureUrl': pictureUrlWithCache,
         'userId': userId,
       }),
       headers: {'Content-Type': 'application/json'},

@@ -54,8 +54,24 @@ class _UserAvatarWidgetState extends State<UserAvatarWidget> {
     if (oldWidget.imageUrl != widget.imageUrl) {
       _useNetworkImage = widget.imageUrl != null && widget.imageUrl!.isNotEmpty;
       _retryCount = 0;
-      _reloadNonce = 0;
+      
+      // 🔄 IMPORTANT: Force cache refresh when URL changes
+      // This handles cache-busting query parameters (?v=timestamp)
+      // If the base URL is the same but parameters change, increment nonce
+      if (_extractBaseUrl(oldWidget.imageUrl) == _extractBaseUrl(widget.imageUrl) &&
+          oldWidget.imageUrl != widget.imageUrl) {
+        _reloadNonce++;
+      } else if (oldWidget.imageUrl != widget.imageUrl) {
+        _reloadNonce = 0;
+      }
     }
+  }
+
+  /// Extract base URL without query parameters for comparison
+  String? _extractBaseUrl(String? url) {
+    if (url == null) return null;
+    final parts = url.split('?');
+    return parts.first;
   }
 
   @override
