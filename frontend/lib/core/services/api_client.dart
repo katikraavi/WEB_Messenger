@@ -94,33 +94,26 @@ class ApiClient {
   
   /// Get WebSocket URL for dynamic backend connection
   /// Converts relative HTTP paths to proper WebSocket URLs
-  static String getWebSocketUrl([String path = '/ws/messages']) {
-    if (kIsWeb) {
-      // On web, prefer configured backend URL so split frontend/backend
-      // deployments connect to the backend host (not frontend origin).
-      final configuredBase = getBaseUrl();
-      final baseUri = Uri.tryParse(configuredBase);
-
-      if (baseUri != null && baseUri.host.isNotEmpty) {
-        final protocol = baseUri.scheme == 'https' ? 'wss' : 'ws';
-        final host = baseUri.hasPort ? '${baseUri.host}:${baseUri.port}' : baseUri.host;
-        return '$protocol://$host$path';
-      }
-
-      // Fallback to same-origin if configured base URL is unavailable.
-      final protocol = Uri.base.scheme == 'https' ? 'wss' : 'ws';
-      final host = Uri.base.hasPort ? '${Uri.base.host}:${Uri.base.port}' : Uri.base.host;
-      return '$protocol://$host$path';
-    } else {
-      // For non-web platforms, derive from _baseUrl
-      if (_baseUrl.startsWith('https://')) {
-        return _baseUrl.replaceFirst('https://', 'wss://').replaceAll(RegExp(r'/$'), '') + path;
-      } else if (_baseUrl.startsWith('http://')) {
-        return _baseUrl.replaceFirst('http://', 'ws://').replaceAll(RegExp(r'/$'), '') + path;
-      }
-      // Fallback
+  static String getWebSocketUrl([String path = '/api/ws/messages']) {
+    final baseUrl = getBaseUrl(); // Use same URL for both web and mobile
+    
+    if (baseUrl.isEmpty) {
+      print('[ApiClient] ⚠️ Base URL not initialized for WebSocket');
       return 'wss://web-messenger-cy3r.onrender.com$path';
     }
+    
+    // Convert HTTP/HTTPS to WS/WSS for all platforms
+    if (baseUrl.startsWith('https://')) {
+      final wsUrl = baseUrl.replaceFirst('https://', 'wss://').replaceAll(RegExp(r'/$'), '') + path;
+      print('[ApiClient] WebSocket URL (HTTPS→WSS): $wsUrl');
+      return wsUrl;
+    } else if (baseUrl.startsWith('http://')) {
+      final wsUrl = baseUrl.replaceFirst('http://', 'ws://').replaceAll(RegExp(r'/$'), '') + path;
+      print('[ApiClient] WebSocket URL (HTTP→WS): $wsUrl');
+      return wsUrl;
+    }
+    // Fallback
+    return 'wss://web-messenger-cy3r.onrender.com$path';
   }
 
   /// Initialize API client with backend URL

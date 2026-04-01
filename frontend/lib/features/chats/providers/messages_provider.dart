@@ -172,6 +172,7 @@ class LocalMessagesNotifier extends StateNotifier<List<Message>> {
         final readCount = event.data['readCount'] as int?;
 
         if (messageId != null && newStatus != null) {
+          print('[Messages] 📬 Status changed: $messageId → $newStatus');
           updateMessageStatus(
             messageId,
             newStatus,

@@ -111,12 +111,18 @@ class MessageWebSocketService {
     String baseUrl = 'wss://web-messenger-cy3r.onrender.com',
   }) async {
     if (_isConnected) {
+      print('[WebSocket] Already connected, skipping reconnect');
       return;
     }
 
     try {
       _currentUserId = userId;
-      final wsUrl = Uri.parse('$baseUrl/api/ws/messages?token=$token');
+      // Ensure proper path format
+      final properly_formatted_url = baseUrl.endsWith('/api/ws/messages') 
+        ? baseUrl 
+        : (baseUrl.endsWith('/') ? '${baseUrl}api/ws/messages' : '$baseUrl/api/ws/messages');
+      final wsUrl = Uri.parse('$properly_formatted_url?token=$token');
+      print('[WebSocket] 🔌 Connecting to: $wsUrl');
 
       _webSocket = WebSocketChannel.connect(wsUrl);
 
