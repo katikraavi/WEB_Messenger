@@ -10,11 +10,13 @@ import '../models/message_model.dart';
 class MessageStatusIndicator extends StatefulWidget {
   final Message message;
   final Duration? animationDuration;
+  final bool isGroupChat;
 
   const MessageStatusIndicator({
     Key? key,
     required this.message,
     this.animationDuration = const Duration(milliseconds: 300),
+    this.isGroupChat = false,
   }) : super(key: key);
 
   @override
@@ -57,7 +59,8 @@ class _MessageStatusIndicatorState extends State<MessageStatusIndicator>
   void didUpdateWidget(MessageStatusIndicator oldWidget) {
     super.didUpdateWidget(oldWidget);
     // If status changed, restart animation
-    if (oldWidget.message.status != widget.message.status) {
+    if (oldWidget.message.status != widget.message.status ||
+        oldWidget.message.readCount != widget.message.readCount) {
       _animationController.reset();
       _animationController.forward();
     }
@@ -74,6 +77,11 @@ class _MessageStatusIndicatorState extends State<MessageStatusIndicator>
     if (widget.message.isSending) {
       // Loading state - show nothing, parent handles spinner
       return const SizedBox.shrink();
+    }
+
+    // For group chats, show read receipt summary instead of status icon
+    if (widget.isGroupChat) {
+      return _buildGroupReceiptSummary();
     }
 
     final status = widget.message.status;

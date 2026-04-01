@@ -249,9 +249,10 @@ class MessageBubble extends StatelessWidget {
                               if (isSentByUser && !message.isSending)
                                 MessageStatusIndicator(
                                   key: ValueKey(
-                                    '${message.id}_${message.status}',
+                                    '${message.id}_${message.status}_${message.readCount}',
                                   ),
                                   message: message,
+                                  isGroupChat: isGroupChat,
                                 ),
                               // Loading spinner if sending
                               if (message.isSending)
