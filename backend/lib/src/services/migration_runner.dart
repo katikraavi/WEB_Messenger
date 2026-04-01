@@ -736,6 +736,20 @@ class MigrationRunner {
           DROP COLUMN IF EXISTS is_archived;
         ''',
       ),
+      Migration(
+        version: 27,
+        description: 'Add file_data column to media_storage for persistent storage',
+        upSql: '''
+          ALTER TABLE IF EXISTS media_storage
+          ADD COLUMN IF NOT EXISTS file_data BYTEA;
+          
+          COMMENT ON COLUMN media_storage.file_data IS 'Binary file content - enables persistence across container restarts on Render';
+        ''',
+        downSql: '''
+          ALTER TABLE IF EXISTS media_storage
+          DROP COLUMN IF EXISTS file_data;
+        ''',
+      ),
     ]);
   }
 
