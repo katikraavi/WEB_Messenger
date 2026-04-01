@@ -328,10 +328,7 @@ class MessageHandlers {
       print('[MessageHandlers] ✏️ Keys in JSON: ${bodyJson.keys.toList()}');
       
       final newContent = bodyJson['encrypted_content'] as String?;
-      final preview = newContent != null 
-        ? newContent.substring(0, min(50, newContent.length))
-        : 'null';
-      print('[MessageHandlers] ✏️ Extracted content: $preview');
+      print('[MessageHandlers] ✏️ Extracted content: ${newContent?.substring(0, min(50, newContent?.length ?? 0)) ?? 'null'}');
 
       if (newContent == null) {
         print('[MessageHandlers] ✏️ encrypted_content is null! Expected key not found.');
@@ -610,6 +607,7 @@ class MessageHandlers {
       // Broadcast status change via WebSocket so other user sees it immediately
       final statusEvent = WebSocketEvent(
         type: WebSocketEventType.messageStatusChanged,
+        chatId: chatId,
         data: {
           'messageId': messageId,
           'newStatus': newStatus,
@@ -638,159 +636,6 @@ class MessageHandlers {
       return Response(500,
           body: jsonEncode(
               {'error': 'Failed to update message status: ${e.toString()}'}));
-    }
-  }
-
-  /// PUT /api/chats/{chatId}/messages/batch-read
-  ///
-  /// Mark multiple messages as read in a single batch operation
-  /// This is more efficient than calling updateMessageStatus for each message
-  ///
-  /// Required headers:
-  /// - Authorization: Bearer <jwt_token>
-  ///
-  /// Request body:
-  /// {
-  ///   "message_ids": ["msg-uuid-1", "msg-uuid-2", "msg-uuid-3"]
-  /// }
-  ///
-  /// Response: 200 OK
-  /// {
-  ///   "count": 3,
-  ///   "messages": [
-  ///     {
-  ///       "messageId": "msg-uuid-1",
-  ///       "status": "read",
-  ///       "aggregateStatus": "read"
-  ///     },
-  ///     ...
-  ///   ]
-  /// }
-  ///
-  /// Errors:
-  /// - 400: Missing message_ids, empty list, invalid format
-  /// - 401: No authorization token or invalid JWT
-  /// - 403: User is not a participant in this chat
-  /// - 500: Server error
-  static Future<Response> batchMarkAsRead(
-    Request request,
-    String chatId,
-    Connection connection,
-  ) async {
-    try {
-      // Get JWT token
-      final authHeader = request.headers['Authorization'];
-      final token = authHeader?.replaceFirst('Bearer ', '');
-      if (token == null || token.isEmpty) {
-        return Response(401, body: jsonEncode({'error': 'Missing token'}));
-      }
-
-      // Extract user ID from token
-      final userId = _extractUserIdFromToken(token);
-      if (userId == null) {
-        return Response(401, body: jsonEncode({'error': 'Invalid token'}));
-      }
-
-      // Check user is in chat
-      final isParticipant =
-          await _isUserChatParticipant(connection, chatId, userId);
-      if (!isParticipant) {
-        return Response(403,
-            body: jsonEncode({'error': 'Not a participant in this chat'}));
-      }
-
-      // Parse request body
-      final bodyString = await request.readAsString();
-      final bodyJson = jsonDecode(bodyString) as Map<String, dynamic>;
-      final messageIds = bodyJson['message_ids'] as List<dynamic>?;
-
-      if (messageIds == null || messageIds.isEmpty) {
-        return Response(400,
-            body: jsonEncode(
-                {'error': 'Missing or empty message_ids array'}));
-      }
-
-      // Validate all IDs are strings
-      final messageIdStrings = <String>[];
-      for (final id in messageIds) {
-        if (id is! String || id.isEmpty) {
-          return Response(400,
-              body: jsonEncode(
-                  {'error': 'All message IDs must be non-empty strings'}));
-        }
-        messageIdStrings.add(id);
-      }
-
-      // Mark all messages as read in a single batch database operation
-      final updatedCount = await connection.execute(
-        '''UPDATE messages 
-           SET status = 'read'
-           WHERE id = ANY(@message_ids) 
-           AND chat_id = @chat_id''',
-        substitutionValues: {
-          'message_ids': messageIdStrings,
-          'chat_id': chatId,
-        },
-      );
-
-      print('[MessageHandlers] ✅ Batch marked $updatedCount messages as read');
-
-      // Get updated messages for response and WebSocket broadcast
-      final updatedMessages = await connection.query(
-        '''SELECT id, status, recipient_count, 
-                  (SELECT COUNT(*) FROM message_receipts 
-                   WHERE message_id = messages.id AND status = 'read')::int as read_count
-           FROM messages 
-           WHERE id = ANY(@message_ids) AND chat_id = @chat_id''',
-        substitutionValues: {
-          'message_ids': messageIdStrings,
-          'chat_id': chatId,
-        },
-      );
-
-      // Prepare response and WebSocket events
-      final messagesList = <Map<String, dynamic>>[];
-
-      for (final row in updatedMessages) {
-        final messageId = row[0] as String;
-        final status = row[1] as String? ?? 'read';
-        final recipientCount = row[2] as int? ?? 1;
-        final readCount = row[3] as int? ?? 0;
-
-        messagesList.add({
-          'messageId': messageId,
-          'status': status,
-          'aggregateStatus': status,
-        });
-
-        // Broadcast status change via WebSocket for each message
-        final statusEvent = WebSocketEvent(
-          type: WebSocketEventType.messageStatusChanged,
-          data: {
-            'messageId': messageId,
-            'newStatus': status,
-            'aggregateStatus': status,
-            'recipientCount': recipientCount,
-            'readCount': readCount,
-            'updatedBy': userId,
-            'timestamp': DateTime.now().toIso8601String(),
-          },
-        );
-        _webSocketService.broadcastToChat(chatId, statusEvent);
-      }
-
-      return Response(200,
-          body: jsonEncode({
-            'count': updatedCount,
-            'messages': messagesList,
-            'timestamp': DateTime.now().toIso8601String(),
-          }),
-          headers: {'Content-Type': 'application/json'});
-    } catch (e) {
-      print('[MessageHandlers] ❌ Batch mark as read error: $e');
-      return Response(500,
-          body: jsonEncode(
-              {'error': 'Failed to batch mark messages as read: ${e.toString()}'}));
     }
   }
 

@@ -133,9 +133,11 @@ extension _ChatDetailScreenStateHandlers on _ChatDetailScreenState {
       final currentUserId = currentUserIdFromContext();
       
       // Encrypt new message content using AES-256-GCM
+      // Use message.senderId (original sender's ID) to ensure consistent key derivation
+      // for all recipients. This must match the userId used by receivers to decrypt.
       final encryptedContent = await MessageEncryptionService.encryptMessage(
         newContent,
-        currentUserId,
+        message.senderId,
       );
       final editedMessage = await ChatApiService(baseUrl: _backendBaseUrl)
           .editMessage(

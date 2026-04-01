@@ -17,8 +17,6 @@ enum WebSocketEventType {
   invitationAccepted, // User accepted an invitation
   invitationDeclined, // User declined an invitation
   invitationCancelled, // Sender cancelled an invitation
-  groupMemberJoined, // New member joined the group
-  groupMemberLeft, // Member left the group
   ping,
   pong,
   unknown;
@@ -257,7 +255,7 @@ class MessageWebSocketService {
         var event = WebSocketEvent.fromJson(json);
 
         // Use current chat ID if not in event
-        if (event.chatId.isEmpty && _currentChatId != null) {
+        if ((event.chatId == null || event.chatId!.isEmpty) && _currentChatId != null) {
           event = WebSocketEvent(
             type: event.type,
             chatId: _currentChatId!,
@@ -273,7 +271,7 @@ class MessageWebSocketService {
           _typingIndicatorsController.add((
             userId: event.data['userId'] as String? ?? '',
             username: event.data['username'] as String? ?? 'Unknown',
-            chatId: event.chatId,
+            chatId: event.chatId ?? '',
             isTyping: isTyping,
           ));
         } else if (event.type != WebSocketEventType.unknown &&

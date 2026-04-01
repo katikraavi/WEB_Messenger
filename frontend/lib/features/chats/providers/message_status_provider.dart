@@ -82,16 +82,18 @@ final autoMarkAsReadProvider =
         return;
       }
 
-      // Batch mark all unread messages as read in a single API call
-      // Performance optimization: Instead of looping through each message and calling updateMessageStatus,
-      // we now send all unread message IDs at once to the batch endpoint
-      final unreadMessageIds = unreadMessages.map((msg) => msg.id).toList();
-      
-      await apiService.batchMarkAsRead(
-        token: token,
-        chatId: chatId,
-        messageIds: unreadMessageIds,
-      );
+      // Mark each unread message as read
+      for (final message in unreadMessages) {
+        try {
+          await apiService.updateMessageStatus(
+            token: token,
+            chatId: chatId,
+            messageId: message.id,
+            newStatus: 'read',
+          );
+        } catch (e) {
+        }
+      }
       
     } catch (e) {
       rethrow;

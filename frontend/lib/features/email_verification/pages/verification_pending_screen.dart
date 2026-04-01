@@ -113,15 +113,6 @@ class _VerificationPendingScreenState
     });
   }
 
-  void _handleDirectVerify() {
-    ref
-        .read(verificationProvider.notifier)
-        .directVerifyEmail()
-        .then((_) {
-      if (mounted) _tokenController.clear();
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final verificationState = ref.watch(verificationProvider);
@@ -357,21 +348,6 @@ class _VerificationPendingScreenState
                     verificationState.isLoading
                         ? 'Verifying...'
                         : 'Verify Email',
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              // Direct verify button (for testing/development)
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: verificationState.isLoading
-                      ? null
-                      : _handleDirectVerify,
-                  icon: const Icon(Icons.done_all),
-                  label: const Text('Verify Directly (Dev)'),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: Colors.green),
                   ),
                 ),
               ),

@@ -350,56 +350,18 @@ Future<Response> _handleAcceptGroupInvite(
       encryptionService: encryptionService,
     );
 
-    // Accept the invite
-    final groupId = await service.acceptGroupInvite(
+    await service.acceptGroupInvite(
       inviteId: inviteId,
       receiverId: payload.userId,
     );
 
-    // Get the new member's username
-    String memberName = 'Someone';
-    try {
-      final result = await database.query(
-        'SELECT username FROM users WHERE id = @user_id LIMIT 1',
-        substitutionValues: {'user_id': payload.userId},
-      );
-      if (result.isNotEmpty) {
-        memberName = result.first[0] as String? ?? memberName;
-      }
-    } catch (_) {}
-
-    // Notify all group members that a new member joined
-    try {
-      final members = await database.query(
-        'SELECT user_id FROM group_members WHERE group_id = @group_id',
-        substitutionValues: {'group_id': groupId},
-      );
-
-      for (final row in members) {
-        final memberId = row[0] as String;
-        if (memberId != payload.userId) {
-          WebSocketService().notifyUser(
-            memberId,
-            WebSocketEvent(
-              type: WebSocketEventType.groupMemberJoined,
-              data: {
-                'groupId': groupId,
-                'newMemberId': payload.userId,
-                'newMemberName': memberName,
-              },
-            ),
-          );
-        }
-      }
-    } catch (_) {}
-
     return Response.ok(
-      jsonEncode({'message': 'Group invite accepted', 'groupId': groupId}),
+      jsonEncode({'message': 'Group invite accepted'}),
       headers: {'Content-Type': 'application/json'},
     );
   } catch (e) {
     return Response(500,
-        body: jsonEncode({'error': 'Server error: ${e.toString()}'}),
+        body: jsonEncode({'error': 'Server error'}),
         headers: {'Content-Type': 'application/json'});
   }
 }

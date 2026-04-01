@@ -10,13 +10,11 @@ import '../models/message_model.dart';
 class MessageStatusIndicator extends StatefulWidget {
   final Message message;
   final Duration? animationDuration;
-  final bool isGroupChat;
 
   const MessageStatusIndicator({
     Key? key,
     required this.message,
     this.animationDuration = const Duration(milliseconds: 300),
-    this.isGroupChat = false,
   }) : super(key: key);
 
   @override
@@ -59,8 +57,7 @@ class _MessageStatusIndicatorState extends State<MessageStatusIndicator>
   void didUpdateWidget(MessageStatusIndicator oldWidget) {
     super.didUpdateWidget(oldWidget);
     // If status changed, restart animation
-    if (oldWidget.message.status != widget.message.status ||
-        oldWidget.message.readCount != widget.message.readCount) {
+    if (oldWidget.message.status != widget.message.status) {
       _animationController.reset();
       _animationController.forward();
     }
@@ -79,11 +76,6 @@ class _MessageStatusIndicatorState extends State<MessageStatusIndicator>
       return const SizedBox.shrink();
     }
 
-    // For group chats, show read receipt summary instead of status icon
-    if (widget.isGroupChat) {
-      return _buildGroupReceiptSummary();
-    }
-
     final status = widget.message.status;
 
     return ScaleTransition(
@@ -98,7 +90,10 @@ class _MessageStatusIndicatorState extends State<MessageStatusIndicator>
   /// Build status icon based on message status
   Widget _buildStatusIcon() {
     final status = _normalizeStatus(widget.message.status);
-    final isRead = status == 'read';
+    final readCount = widget.message.readCount ?? 0;
+    
+    // For group chats, show yellow indicator if any recipient has read the message
+    final isRead = status == 'read' || readCount > 0;
     final isDelivered = status == 'delivered';
 
     if (isRead) {

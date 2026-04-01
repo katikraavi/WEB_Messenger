@@ -49,7 +49,7 @@ dependencies:
   uuid: ^4.0.0
   
   # WebSocket for real-time messaging
-  web_socket_channel: ^3.0.3
+  web_socket_channel: ^2.4.0
   
   # Image picker for camera and gallery
   image_picker: ^1.0.0

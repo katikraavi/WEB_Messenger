@@ -1,7 +1,6 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:frontend/core/services/api_client.dart';
-import 'package:frontend/utils/secure_storage_wrapper.dart';
 
 /// Service for making HTTP requests to email verification endpoints
 class EmailVerificationService {
@@ -96,37 +95,6 @@ class EmailVerificationService {
       return EmailVerificationResponse.error(
         message: 'Network error: ${e.toString()}',
       );
-    }
-  }
-
-  /// Direct verification without token (for development/testing)
-  /// Returns response data for success
-  Future<Map<String, dynamic>> directVerifyEmail({required String userId}) async {
-    try {
-      final response = await httpClient.post(
-        Uri.parse('$baseUrl/api/auth/verify-email/direct'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'userId': userId}),
-      );
-
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body) as Map<String, dynamic>;
-      } else {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        throw Exception(data['error'] ?? 'Direct verification failed');
-      }
-    } catch (e) {
-      throw Exception('Network error: ${e.toString()}');
-    }
-  }
-
-  /// Get user ID from secure storage
-  Future<String?> getUserIdFromStorage() async {
-    try {
-      final storage = SecureStorageWrapper();
-      return await storage.read(key: 'user_id');
-    } catch (_) {
-      return null;
     }
   }
 }

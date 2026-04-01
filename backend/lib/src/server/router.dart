@@ -247,10 +247,6 @@ Handler _createHandler(
         return await verifyEmailToken(request, tokenService, verificationService);
       }
 
-      if (path == 'auth/verify-email/direct' && method == 'POST') {
-        return await directVerifyEmail(request, verificationService);
-      }
-
       if (path == 'auth/password-reset/request' && method == 'POST') {
         return await requestPasswordReset(
             request, emailService, rateLimitService, passwordResetService);
@@ -510,32 +506,6 @@ Handler _createHandler(
           return Response(500,
               body: jsonEncode(
                   {'error': 'Failed to update message status: $e'}),
-              headers: {'Content-Type': 'application/json'});
-        }
-      }
-
-      // Batch mark messages as read (performance optimization)
-      if (path.startsWith('api/chats/') &&
-          path.endsWith('/messages/batch-read') &&
-          method == 'PUT') {
-        try {
-          final parts = path.split('/');
-          if (parts.length >= 4 &&
-              parts[0] == 'api' &&
-              parts[1] == 'chats' &&
-              parts[3] == 'messages') {
-            return await MessageHandlers.batchMarkAsRead(
-                request, parts[2], database);
-          }
-        } on AuthException {
-          return Response(401,
-              body: jsonEncode({'error': 'Invalid token'}),
-              headers: {'Content-Type': 'application/json'});
-        } catch (e) {
-          print('[MessageHandler] ❌ Error batch marking messages as read: $e');
-          return Response(500,
-              body: jsonEncode(
-                  {'error': 'Failed to batch mark messages as read: $e'}),
               headers: {'Content-Type': 'application/json'});
         }
       }

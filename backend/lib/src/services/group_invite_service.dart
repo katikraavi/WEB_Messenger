@@ -94,24 +94,13 @@ class GroupInviteService {
     final now = DateTime.now().toUtc();
     final inviteId = _uuid.v4();
 
-    // Check for existing pending invite to prevent duplicates
-    final existing = await connection.query(
-      '''SELECT id FROM group_invites
-         WHERE group_id = @group_id AND receiver_id = @receiver_id AND status = 'pending'
-         LIMIT 1''',
-      substitutionValues: {
-        'group_id': groupId,
-        'receiver_id': receiverId,
-      },
-    );
-
-    if (existing.isNotEmpty) {
-      throw Exception('User already has a pending invite to this group');
-    }
-
     final result = await connection.query(
       '''INSERT INTO group_invites (id, group_id, sender_id, receiver_id, status, created_at)
          VALUES (@id, @group_id, @sender_id, @receiver_id, @status, @created_at)
+         ON CONFLICT (group_id, receiver_id) DO UPDATE
+         SET sender_id = EXCLUDED.sender_id,
+             status = EXCLUDED.status,
+             created_at = EXCLUDED.created_at
          RETURNING id, group_id, sender_id, receiver_id, status, created_at''',
       substitutionValues: {
         'id': inviteId,
@@ -134,7 +123,7 @@ class GroupInviteService {
     );
   }
 
-  Future<String> acceptGroupInvite({
+  Future<void> acceptGroupInvite({
     required String inviteId,
     required String receiverId,
   }) async {
@@ -158,7 +147,6 @@ class GroupInviteService {
       },
     );
 
-    // Add user to group
     await connection.execute(
       '''INSERT INTO group_members (id, group_id, user_id, role, joined_at)
          VALUES (@id, @group_id, @user_id, @role, @joined_at)
@@ -171,9 +159,6 @@ class GroupInviteService {
         'joined_at': DateTime.now().toUtc(),
       },
     );
-
-    // Return group ID for WebSocket notification
-    return invite.groupId;
   }
 
   Future<void> declineGroupInvite({

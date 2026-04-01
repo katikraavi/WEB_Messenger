@@ -25,10 +25,6 @@ enum WebSocketEventType {
   invitationDeclined,
   invitationCancelled,
   
-  // Group membership events
-  groupMemberJoined,
-  groupMemberLeft,
-  
   // Connection management
   ping,
   pong,
