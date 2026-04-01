@@ -55,12 +55,13 @@ class MediaFile {
 /// 
 /// Handles:
 /// - File upload and validation
-/// - Media compression
-/// - Storage management
+/// - Media storage in database (persistent on Render)
 /// - File retrieval
+/// 
+/// NOTE: Files are now stored in database instead of ephemeral filesystem
+/// This ensures media persists on Render between container restarts
 class MediaStorageService {
   final Connection connection;
-  final String uploadDir;
   
   static const int maxFileSize = 52428800; // 50MB in bytes
   static const List<String> allowedMimeTypes = [
@@ -81,22 +82,7 @@ class MediaStorageService {
 
   MediaStorageService({
     required this.connection,
-    this.uploadDir = './uploads/media',
-  }) {
-    _ensureUploadDirExists();
-  }
-
-  /// Ensure upload directory exists
-  void _ensureUploadDirExists() {
-    final dir = Directory(uploadDir);
-    if (!dir.existsSync()) {
-      dir.createSync(recursive: true);
-    }
-  }
-
-  /// Validate file before upload (T067)
-  /// 
-  /// Checks:
+  });
   /// - File size <= 50MB
   /// - MIME type is allowed
   /// - File extension matches MIME type
@@ -147,7 +133,9 @@ class MediaStorageService {
     }
   }
 
-  /// Upload media file (T068)
+  /// Upload media file to database (T068)
+  /// 
+  /// Stores file data as BLOB in database for persistence on Render
   /// 
   /// Parameters:
   /// - fileBytes: Raw file data
@@ -172,21 +160,14 @@ class MediaStorageService {
       final fileId = Uuid().v4();
       final ext = path.extension(fileName);
       final safeFileName = '$fileId$ext';
-      final filePath = '$uploadDir/$safeFileName';
+      final id = fileId; // Use same UUID for ID and filename
 
-      // Write file to disk
-      final file = File(filePath);
-      await file.writeAsBytes(fileBytes);
-
-      // Store metadata in database
-      final mediaId = Uuid();
-      final id = mediaId.v4();
-
+      // Store file data in database (BLOB column)
       await connection.execute(
         '''
         INSERT INTO media_storage
-        (id, uploader_id, file_name, mime_type, file_size_bytes, file_path, original_name)
-        VALUES (@id, @uploaderId, @fileName, @mimeType, @fileSize, @filePath, @originalName)
+        (id, uploader_id, file_name, mime_type, file_size_bytes, file_data, original_name, created_at)
+        VALUES (@id, @uploaderId, @fileName, @mimeType, @fileSize, @fileData, @originalName, @createdAt)
         ''',
         substitutionValues: {
           'id': id,
@@ -194,12 +175,13 @@ class MediaStorageService {
           'fileName': safeFileName,
           'mimeType': mimeType,
           'fileSize': fileBytes.length,
-          'filePath': filePath,
+          'fileData': fileBytes, // Store binary data
           'originalName': fileName,
+          'createdAt': DateTime.now().toIso8601String(),
         },
       );
 
-      print('[MediaStorageService] ✓ File uploaded: $id by $uploaderId');
+      print('[MediaStorageService] ✓ File uploaded to DB: $id by $uploaderId (${fileBytes.length} bytes)');
 
       return MediaFile(
         id: id,
@@ -207,7 +189,7 @@ class MediaStorageService {
         fileName: safeFileName,
         mimeType: mimeType,
         fileSizeBytes: fileBytes.length,
-        filePath: filePath,
+        filePath: '/api/media/$id', // Return database-based path
         originalName: fileName,
         createdAt: DateTime.now(),
       );
@@ -222,7 +204,7 @@ class MediaStorageService {
     try {
       final result = await connection.query(
         '''
-        SELECT id, uploader_id, file_name, mime_type, file_size_bytes, file_path, original_name, created_at
+        SELECT id, uploader_id, file_name, mime_type, file_size_bytes, original_name, created_at
         FROM media_storage
         WHERE id = @mediaId
         ''',
@@ -238,9 +220,9 @@ class MediaStorageService {
         fileName: row[2] as String,
         mimeType: row[3] as String?,
         fileSizeBytes: row[4] as int,
-        filePath: row[5] as String,
-        originalName: row[6] as String?,
-        createdAt: row[7] as DateTime,
+        filePath: '/api/media/${row[0]}', // Database-based path
+        originalName: row[5] as String?,
+        createdAt: DateTime.parse(row[6] as String),
       );
     } catch (e) {
       print('[MediaStorageService] ❌ Error getting media: $e');
@@ -248,20 +230,31 @@ class MediaStorageService {
     }
   }
 
-  /// Download file bytes from storage
+  /// Download file bytes from database
   Future<Uint8List> downloadFile(String mediaId) async {
     try {
-      final media = await getMediaById(mediaId);
-      if (media == null) {
+      final result = await connection.query(
+        '''
+        SELECT file_data, file_name
+        FROM media_storage
+        WHERE id = @mediaId
+        ''',
+        substitutionValues: {'mediaId': mediaId},
+      );
+
+      if (result.isEmpty) {
         throw ArgumentError('Media not found: $mediaId');
       }
 
-      final file = File(media.filePath);
-      if (!file.existsSync()) {
-        throw Exception('File not found on disk: ${media.filePath}');
+      final row = result.first;
+      final fileData = row[0];
+      
+      if (fileData == null) {
+        throw Exception('File data is null for media: $mediaId');
       }
 
-      return await file.readAsBytes();
+      print('[MediaStorageService] ✓ Downloaded media $mediaId (${(fileData as List).length} bytes)');
+      return Uint8List.fromList(fileData as List<int>);
     } catch (e) {
       print('[MediaStorageService] ❌ Download error: $e');
       rethrow;
