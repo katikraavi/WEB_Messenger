@@ -1,15 +1,5 @@
 part of '../../server.dart';
 
-String _hashPassword(String password) {
-  // Simple hash for demo (in production use bcrypt package)
-  return password.hashCode.toRadixString(36);
-}
-
-/// Verify password against hash
-bool _verifyPassword(String password, String hash) {
-  return _hashPassword(password) == hash;
-}
-
 /// Serve static files from the uploads directory
 Response _serveStaticFile(Request request, String path) {
   try {
@@ -240,7 +230,8 @@ Future<void> _seedTestUsers(PostgreSQLConnection database) async {
       final email = user['email'] as String;
       final password = user['password'] as String;
       final normalizedEmail = email.toLowerCase();
-      final passwordHash = _hashPassword(password);
+      // Use PasswordHasher to match the authentication service logic
+      final passwordHash = PasswordHasher.hashPassword(password);
 
       // Check if user already exists
       final existing = await database.query(

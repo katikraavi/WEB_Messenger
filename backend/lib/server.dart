@@ -13,6 +13,7 @@ import 'src/services/migration_runner.dart';
 import 'src/services/jwt_service.dart';
 import 'src/services/auth_exception.dart';
 import 'src/services/password_reset_service.dart';
+import 'src/services/password_hasher.dart';
 import 'src/services/chat_service.dart';
 import 'src/services/encryption_service.dart';
 import 'src/services/group_invite_service.dart';
