@@ -233,7 +233,14 @@ class Message {
           status == other.status &&
           isDeleted == other.isDeleted &&
           isSending == other.isSending &&
-          error == other.error;
+          error == other.error &&
+          decryptedContent == other.decryptedContent &&
+          editedAt == other.editedAt &&
+          encryptedContent == other.encryptedContent &&
+          mediaUrl == other.mediaUrl &&
+          senderId == other.senderId &&
+          chatId == other.chatId &&
+          createdAt == other.createdAt;
 
   @override
   int get hashCode =>
@@ -241,5 +248,12 @@ class Message {
       status.hashCode ^
       isDeleted.hashCode ^
       isSending.hashCode ^
-      error.hashCode;
+      error.hashCode ^
+      decryptedContent.hashCode ^
+      editedAt.hashCode ^
+      encryptedContent.hashCode ^
+      mediaUrl.hashCode ^
+      senderId.hashCode ^
+      chatId.hashCode ^
+      createdAt.hashCode;
 }

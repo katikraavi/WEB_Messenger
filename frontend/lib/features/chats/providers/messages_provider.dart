@@ -185,7 +185,7 @@ class LocalMessagesNotifier extends StateNotifier<List<Message>> {
         final message = Message.fromJson(event.data);
         final decryptedMessage = await MessageEncryptionService.decryptMessage(
           message,
-          userId: currentUserId,
+          userId: message.senderId, // Decrypt with sender's ID (message was encrypted by sender)
         );
         upsertMessage(decryptedMessage);
       } else if (event.type == WebSocketEventType.messageDeleted) {
