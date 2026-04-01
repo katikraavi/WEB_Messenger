@@ -29,6 +29,7 @@ import 'package:frontend/features/chats/services/message_websocket_service.dart'
 import 'package:frontend/features/chats/services/chat_notification_settings_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:frontend/features/email_verification/screens/email_verify_link_screen.dart';
+import 'package:frontend/features/password_recovery/pages/password_reset_screen.dart';
 
 const String _appEnv = String.fromEnvironment(
   'APP_ENV',
@@ -156,6 +157,7 @@ class _MessengerAppState extends State<MessengerApp> {
   bool _isInitializing = true;
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   String? _deepLinkVerifyToken;
+  String? _deepLinkResetToken;
 
   @override
   void initState() {
@@ -168,10 +170,18 @@ class _MessengerAppState extends State<MessengerApp> {
   void _detectVerifyToken() {
     if (kIsWeb) {
       final uri = Uri.base;
+      // Check for email verification link
       if (uri.path.contains('/verify')) {
         final token = uri.queryParameters['token'];
         if (token != null && token.isNotEmpty) {
           _deepLinkVerifyToken = token;
+        }
+      }
+      // Check for password reset link
+      if (uri.path.contains('/reset')) {
+        final token = uri.queryParameters['token'];
+        if (token != null && token.isNotEmpty) {
+          _deepLinkResetToken = token;
         }
       }
     }
@@ -311,6 +321,13 @@ class _MessengerAppState extends State<MessengerApp> {
       return EmailVerifyLinkScreen(
         token: _deepLinkVerifyToken!,
         onDone: () => setState(() => _deepLinkVerifyToken = null),
+      );
+    }
+
+    if (_deepLinkResetToken != null) {
+      return _PasswordResetModal(
+        token: _deepLinkResetToken!,
+        onDone: () => setState(() => _deepLinkResetToken = null),
       );
     }
 
@@ -1351,6 +1368,35 @@ class _SearchTab extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+/// Modal overlay for password reset
+/// Shows password reset form when user clicks reset link from email
+class _PasswordResetModal extends StatelessWidget {
+  final String token;
+  final VoidCallback onDone;
+
+  const _PasswordResetModal({
+    required this.token,
+    required this.onDone,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 500),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: PasswordResetScreen(
+              token: token,
+              onSuccess: onDone,
+            ),
           ),
         ),
       ),
