@@ -95,7 +95,7 @@ class MigrationRunner {
         version: 3,
         description: 'Create chats table',
         upSql: '''
-          CREATE TABLE chats (
+          CREATE TABLE IF NOT EXISTS chats (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             created_at TIMESTAMP DEFAULT NOW(),
             archived_by_users UUID[] DEFAULT ARRAY[]::UUID[]
@@ -108,7 +108,7 @@ class MigrationRunner {
         version: 4,
         description: 'Create chat_members table',
         upSql: '''
-          CREATE TABLE chat_members (
+          CREATE TABLE IF NOT EXISTS chat_members (
             user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             chat_id UUID NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
             joined_at TIMESTAMP DEFAULT NOW(),
@@ -146,7 +146,7 @@ class MigrationRunner {
         version: 6,
         description: 'Create invites table',
         upSql: '''
-          CREATE TABLE invites (
+          CREATE TABLE IF NOT EXISTS invites (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             sender_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             receiver_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -165,7 +165,7 @@ class MigrationRunner {
         version: 7,
         description: 'Create verification_token table for email verification',
         upSql: '''
-          CREATE TABLE verification_token (
+          CREATE TABLE IF NOT EXISTS verification_token (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             token_hash VARCHAR(255) NOT NULL UNIQUE,
@@ -187,7 +187,7 @@ class MigrationRunner {
         version: 8,
         description: 'Create password_reset_token table for password recovery',
         upSql: '''
-          CREATE TABLE password_reset_token (
+          CREATE TABLE IF NOT EXISTS password_reset_token (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             token_hash VARCHAR(255) NOT NULL UNIQUE,
@@ -209,7 +209,7 @@ class MigrationRunner {
         version: 9,
         description: 'Create password_reset_attempt table for rate limiting',
         upSql: '''
-          CREATE TABLE password_reset_attempt (
+          CREATE TABLE IF NOT EXISTS password_reset_attempt (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             email VARCHAR(255) NOT NULL,
             attempted_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -324,7 +324,7 @@ class MigrationRunner {
           DROP TABLE IF EXISTS chats CASCADE;
           
           -- Create chats table with participant-based design and per-user archive support
-          CREATE TABLE chats (
+          CREATE TABLE IF NOT EXISTS chats (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             participant_1_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             participant_2_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -351,7 +351,7 @@ class MigrationRunner {
           WHERE is_participant_2_archived = FALSE;
           
           -- Create messages table with encrypted content (end-to-end encrypted)
-          CREATE TABLE messages (
+          CREATE TABLE IF NOT EXISTS messages (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             chat_id UUID NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
             sender_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -389,9 +389,11 @@ class MigrationRunner {
           ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE;
           
           -- Add foreign key constraint for recipient (nullable for backwards compatibility)
-          ALTER TABLE messages
-          ADD CONSTRAINT fk_messages_recipient FOREIGN KEY (recipient_id) 
-            REFERENCES users(id) ON DELETE CASCADE;
+          DO \$\$ BEGIN
+            ALTER TABLE messages
+            ADD CONSTRAINT fk_messages_recipient FOREIGN KEY (recipient_id) 
+              REFERENCES users(id) ON DELETE CASCADE;
+          EXCEPTION WHEN duplicate_object THEN NULL; END \$\$;
           
           -- Add index for recipient status queries (find unread messages for a user)
           CREATE INDEX IF NOT EXISTS idx_messages_recipient_status 
@@ -402,14 +404,18 @@ class MigrationRunner {
           ON messages(is_deleted);
           
           -- Add constraint to ensure edited_at is after created_at
-          ALTER TABLE messages
-          ADD CONSTRAINT check_edited_after_created 
-            CHECK (edited_at IS NULL OR edited_at >= created_at);
+          DO \$\$ BEGIN
+            ALTER TABLE messages
+            ADD CONSTRAINT check_edited_after_created 
+              CHECK (edited_at IS NULL OR edited_at >= created_at);
+          EXCEPTION WHEN duplicate_object THEN NULL; END \$\$;
           
           -- Add constraint to ensure deleted_at is after created_at
-          ALTER TABLE messages
-          ADD CONSTRAINT check_deleted_after_created 
-            CHECK (deleted_at IS NULL OR deleted_at >= created_at);
+          DO \$\$ BEGIN
+            ALTER TABLE messages
+            ADD CONSTRAINT check_deleted_after_created 
+              CHECK (deleted_at IS NULL OR deleted_at >= created_at);
+          EXCEPTION WHEN duplicate_object THEN NULL; END \$\$;
         ''',
         downSql: '''
           -- Remove new columns and constraints from messages table
@@ -669,8 +675,13 @@ class MigrationRunner {
         ''',
         downSql: '''
           ALTER TABLE messages
-          ADD CONSTRAINT messages_chat_id_fkey
-          FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE;
+          DROP CONSTRAINT IF EXISTS messages_chat_id_fkey;
+          
+          DO \\$\\$ BEGIN
+            ALTER TABLE messages
+            ADD CONSTRAINT messages_chat_id_fkey
+            FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE;
+          EXCEPTION WHEN duplicate_object THEN NULL; END \\$\\$;
         ''',
       ),
       Migration(
