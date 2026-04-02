@@ -419,10 +419,10 @@ class MessageBubble extends StatelessWidget {
       resolved = '$resolved/download';
     }
 
-    // Protected backend media on web needs token query fallback.
-    // Native/mobile keeps using authenticated client APIs.
-    if (kIsWeb &&
-        authToken != null &&
+    // Add auth token for protected backend media on ALL platforms
+    // Image.network() doesn't use authenticated HTTP clients, so token must be in URL
+    // FIX for mobile media display: was only adding token for web, now adds for mobile too
+    if (authToken != null &&
         authToken!.isNotEmpty &&
         resolved.contains('/api/media/') &&
         resolved.contains('/download')) {
