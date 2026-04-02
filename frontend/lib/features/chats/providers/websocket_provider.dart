@@ -80,35 +80,45 @@ final typingIndicatorsProvider =
 /// 🖼️ Effect: Listen for profile_updated events and invalidate avatar caches
 /// 
 /// When a user changes their profile picture:
+/// 🖼️ Effect: Listen for profile_updated events and invalidate avatar caches (FIXED VERSION)
+/// 
+/// When a user changes their profile picture:
 /// 1. Backend broadcasts profile_updated event via WebSocket
-/// 2. This effect intercepts the event
+/// 2. This LISTENER intercepts EVERY event (not just the first!)
 /// 3. Invalidates the user's profile cache
 /// 4. All watching widgets (chat list, avatars, etc.) refresh automatically
 /// 
 /// This ensures profile pictures update in real-time across all screens.
-final profileUpdateListenerEffect = FutureProvider.autoDispose<void>((ref) async {
-  final eventStream = ref.watch(messageEventStreamProvider);
+/// 
+/// CRITICAL FIX: Using continuous stream listening instead of FutureProvider.when()
+/// - The old FutureProvider.when() only listened to the first event
+/// - Now we use a StreamProvider that continuously listens to all events
+/// - This was why chat list avatars weren't updating after the first profile change
+final profileUpdateListenerEffect = StreamProvider.autoDispose<void>((ref) async* {
+  // Get WebSocket service to listen to all events
+  final webSocketService = ref.watch(messageWebSocketProvider);
   
-  await eventStream.when(
-    loading: () async {},
-    error: (err, stack) async {},
-    data: (event) async {
-      // Check if this is a profile_updated event
-      if (event.data['type'] == 'profile_updated') {
-        final userId = event.data['userId'] as String?;
+  // Get cache invalidators for invalidation
+  final profileCacheInvalidator = profileCacheInvalidatorProvider;
+  final profileUserCacheInvalidator = profileUserCacheInvalidatorProvider;
+  
+  // Stream all WebSocket events and react to profile updates
+  await for (final event in webSocketService.eventStream) {
+    // Check if this is a profile_updated event
+    if (event.data['type'] == 'profile_updated') {
+      final userId = event.data['userId'] as String?;
+      
+      if (userId != null) {
+        // Invalidate this specific user's profile cache
+        ref.read(profileUserCacheInvalidator(userId).notifier).state++;
         
-        if (userId != null) {
-          // Invalidate this specific user's profile cache
-          ref.read(profileUserCacheInvalidatorProvider(userId).notifier).state++;
-          
-          // Also invalidate ALL profile-related caches to refresh:
-          // - Chat list avatars
-          // - Message avatars
-          // - Group member lists
-          // - Any other avatar displays
-          ref.read(profileCacheInvalidatorProvider.notifier).state++;
-        }
+        // Also invalidate ALL profile-related caches to refresh:
+        // - Chat list avatars
+        // - Message avatars
+        // - Group member lists
+        // - Any other avatar displays
+        ref.read(profileCacheInvalidator.notifier).state++;
       }
-    },
-  );
+    }
+  }
 });
