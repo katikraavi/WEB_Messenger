@@ -415,10 +415,10 @@ class MessageBubble extends StatelessWidget {
       resolved = '$resolved/download';
     }
 
-    // Protected backend media on web needs token query fallback.
-    // Native/mobile keeps using authenticated client APIs.
-    if (kIsWeb &&
-        authToken != null &&
+    // Add auth token for protected backend media
+    // - Web: Uses query parameter (for <img> and <video> tags without custom headers)
+    // - Mobile: Also uses query parameter (VideoPlayerController doesn't support headers)
+    if (authToken != null &&
         authToken!.isNotEmpty &&
         resolved.contains('/api/media/') &&
         resolved.contains('/download')) {
@@ -975,9 +975,8 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
         _aspectRatio = ratio;
       }
 
-      controller.addListener(() {
-        if (mounted) setState(() {});
-      });
+      // Don't add generic listener - it causes excessive rebuilds
+      // Progress timer handles UI updates
       _startProgressTimer();
 
       if (!mounted) return;
@@ -985,6 +984,7 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
         _initialized = true;
       });
     } catch (e) {
+      print('[VideoPlayer] Initialization failed: $e');
       widget.onError();
       if (!mounted) return;
       setState(() {
