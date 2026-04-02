@@ -36,10 +36,14 @@ class ProfileApiService {
 
   static final FirebaseStorage _storage = FirebaseStorage.instance;
 
-  /// Helper method to ensure profile picture URLs are absolute
+  /// Helper method to ensure profile picture URLs are absolute with cache-busting
   ///
   /// Converts relative URLs like `/uploads/profile_pictures/...` to absolute URLs
   /// like `http://localhost:8081/uploads/profile_pictures/...`
+  /// 
+  /// Adds cache-busting query parameter `?v=<timestamp>` so that when profile
+  /// picture updates, the URL changes, forcing Image.network() to bypass cache
+  /// and fetch the new version. This ensures profile picture changes sync across devices.
   ///
   /// This is needed because Image.network() requires full URLs with http scheme
   UserProfile _ensureAbsoluteImageUrl(UserProfile profile) {
@@ -48,18 +52,31 @@ class ProfileApiService {
       return profile;
     }
 
-    final imageUrl = profile.profilePictureUrl!;
+    var imageUrl = profile.profilePictureUrl!;
 
-    // If URL already has http scheme, return as-is
+    // If URL already has http scheme, add cache-buster if needed
     if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-      return profile;
+      // Already absolute - add cache-buster if not already present
+      if (!imageUrl.contains('?v=') && profile.updatedAt != null) {
+        final cacheBuster = profile.updatedAt!.millisecondsSinceEpoch;
+        imageUrl = '$imageUrl?v=$cacheBuster';
+      }
+      return profile.copyWith(profilePictureUrl: imageUrl);
     }
 
     // If URL is relative, prepend the base URL
     if (imageUrl.startsWith('/')) {
       final baseUrl = ApiClient.getBaseUrl();
       final cleanBaseUrl = baseUrl.replaceAll(RegExp(r'/api$'), '');
-      final absoluteUrl = cleanBaseUrl + imageUrl;
+      var absoluteUrl = cleanBaseUrl + imageUrl;
+      
+      // Add cache-buster query parameter based on updatedAt timestamp
+      // This forces Image.network() to refetch when profile picture changes
+      if (profile.updatedAt != null) {
+        final cacheBuster = profile.updatedAt!.millisecondsSinceEpoch;
+        absoluteUrl = '$absoluteUrl?v=$cacheBuster';
+      }
+      
       if (debugLogging) {}
       return profile.copyWith(profilePictureUrl: absoluteUrl);
     }
