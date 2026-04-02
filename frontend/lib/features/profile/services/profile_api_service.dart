@@ -1,6 +1,6 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -295,8 +295,58 @@ class ProfileApiService {
       final downloadUrl = await ref.getDownloadURL();
       return _saveProfilePictureUrl(downloadUrl, token: token);
     } catch (e) {
+      // Web Firebase Storage may fail when CORS is not configured.
+      // Fallback to legacy backend multipart endpoint.
+      if (kIsWeb) {
+        return _uploadProfileImageViaBackend(
+          imageBytes,
+          filename: filename,
+          token: token,
+        );
+      }
       rethrow;
     }
+  }
+
+  Future<UserProfile> _uploadProfileImageViaBackend(
+    Uint8List imageBytes, {
+    required String filename,
+    String? token,
+  }) async {
+    final baseUrl = ApiClient.getBaseUrl();
+    final url = '$baseUrl/api/profile/picture/upload';
+
+    final request = http.MultipartRequest('POST', Uri.parse(url));
+    if (token != null && token.isNotEmpty) {
+      request.headers['Authorization'] = 'Bearer $token';
+    }
+
+    request.files.add(
+      http.MultipartFile.fromBytes('image', imageBytes, filename: filename),
+    );
+
+    final response = await request.send().timeout(
+      const Duration(seconds: 60),
+      onTimeout: () => throw HttpException('Upload timeout after 60 seconds'),
+    );
+
+    final responseBody = await response.stream.bytesToString();
+    if (response.statusCode == 200) {
+      final jsonBody = jsonDecode(responseBody) as Map<String, dynamic>;
+      return _ensureAbsoluteImageUrl(
+        UserProfile(
+          userId: jsonBody['userId'] as String? ?? 'unknown',
+          username: '',
+          profilePictureUrl: jsonBody['profilePictureUrl'] as String?,
+          aboutMe: '',
+          isDefaultProfilePicture: false,
+        ),
+      );
+    }
+
+    throw HttpException(
+      'Failed to upload image: HTTP ${response.statusCode}. $responseBody',
+    );
   }
 
   String _mimeTypeForExtension(String ext) {

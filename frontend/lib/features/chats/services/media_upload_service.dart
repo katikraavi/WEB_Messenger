@@ -188,8 +188,86 @@ class MediaUploadService {
         createdAt: DateTime.now().toUtc(),
       );
     } catch (e) {
+      // Web Firebase Storage may fail when bucket CORS is not configured yet.
+      // Fallback to backend upload to keep messaging functional.
+      if (kIsWeb) {
+        return _uploadMediaViaBackend(pickedMedia: pickedMedia, token: token);
+      }
       rethrow;
     }
+  }
+
+  Future<UploadedMedia> _uploadMediaViaBackend({
+    required PickedMediaFile pickedMedia,
+    required String token,
+  }) async {
+    final url = Uri.parse('$_baseUrl/api/media/upload');
+
+    final mimeParts = pickedMedia.mimeType.split('/');
+    final mediaType = http.MediaType(mimeParts[0], mimeParts[1]);
+
+    final request = http.MultipartRequest('POST', url)
+      ..headers.addAll({'Authorization': 'Bearer $token'})
+      ..fields['mime_type'] = pickedMedia.mimeType
+      ..fields['file_name'] = pickedMedia.name;
+
+    if (pickedMedia.bytes != null) {
+      request.files.add(
+        http.MultipartFile(
+          'file',
+          Stream.value(pickedMedia.bytes!),
+          pickedMedia.bytes!.length,
+          filename: pickedMedia.name,
+          contentType: mediaType,
+        ),
+      );
+    } else {
+      if (pickedMedia.path.isEmpty) {
+        throw Exception('Invalid media file path: ${pickedMedia.path}');
+      }
+
+      final file = File(pickedMedia.path);
+      if (!await file.exists()) {
+        throw Exception('Media file not found at ${pickedMedia.path}');
+      }
+
+      final fileLength = await file.length();
+      request.files.add(
+        http.MultipartFile(
+          'file',
+          file.openRead(),
+          fileLength,
+          filename: pickedMedia.name,
+          contentType: mediaType,
+        ),
+      );
+    }
+
+    final response = await request.send().timeout(
+      const Duration(seconds: 120),
+      onTimeout: () => throw TimeoutException(
+        'Upload took too long (120 seconds). Please check your connection and try again.',
+        const Duration(seconds: 120),
+      ),
+    );
+
+    final statusCode = response.statusCode;
+    final responseBody = await response.stream.bytesToString();
+
+    if (statusCode == 201) {
+      final mediaData = jsonDecode(responseBody) as Map<String, dynamic>;
+      return UploadedMedia.fromJson(mediaData);
+    }
+
+    if (statusCode == 413) {
+      throw Exception('File too large (max 50MB)');
+    }
+
+    if (statusCode == 401) {
+      throw Exception('Unauthorized: Invalid or expired token');
+    }
+
+    throw Exception('Upload failed: $statusCode');
   }
 
   /// Attach uploaded media to message (T075)
