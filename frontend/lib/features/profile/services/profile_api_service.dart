@@ -305,16 +305,15 @@ class ProfileApiService {
       final downloadUrl = await ref.getDownloadURL();
       return _saveProfilePictureUrl(downloadUrl, token: token);
     } catch (e) {
-      // Web Firebase Storage may fail when CORS is not configured.
-      // Fallback to legacy backend multipart endpoint.
-      if (kIsWeb) {
-        return _uploadProfileImageViaBackend(
-          imageBytes,
-          filename: filename,
-          token: token,
-        );
-      }
-      rethrow;
+      // Firebase Storage may fail on mobile if bucket/rules not configured.
+      // Fallback to backend upload to keep profile functionality working.
+      // This applies to both web and mobile - always try backend as fallback.
+      print('[ProfileApiService] Firebase upload failed: $e. Trying backend upload...');
+      return _uploadProfileImageViaBackend(
+        imageBytes,
+        filename: filename,
+        token: token,
+      );
     }
   }
 
