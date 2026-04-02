@@ -2,6 +2,9 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:uuid/uuid.dart';
 import 'package:frontend/features/profile/models/user_profile.dart';
 import 'package:frontend/core/services/api_client.dart';
 
@@ -28,11 +31,10 @@ class ProfileApiService {
   /// Minimum time between uploads to prevent rapid-fire requests [T135]
   static const Duration uploadDebounceTime = Duration(seconds: 1);
 
-  /// Track last upload time for rapid-fire protection [T135]
-  DateTime? _lastUploadTime;
-
   /// Enable debug logging [T147]
   static const bool debugLogging = true;
+
+  static final FirebaseStorage _storage = FirebaseStorage.instance;
 
   /// Helper method to ensure profile picture URLs are absolute
   ///
@@ -235,36 +237,12 @@ class ProfileApiService {
   /// Status: 200 = success, 400 = validation error, 401 = unauthorized, 413 = file too large, 500 = server error
   Future<UserProfile> uploadImage(File imageFile, {String? token}) async {
     try {
-      final baseUrl = ApiClient.getBaseUrl();
-      final url = '$baseUrl/api/profile/picture/upload';
-
-      // Create multipart request
-      final request = http.MultipartRequest('POST', Uri.parse(url));
-
-      // Add authorization header if token provided
-      if (token != null) {
-        request.headers['Authorization'] = 'Bearer $token';
-      }
-
-      final stream = http.ByteStream(imageFile.openRead());
-      final length = await imageFile.length();
-      final multipartFile = http.MultipartFile(
-        'image',
-        stream,
-        length,
+      final bytes = await imageFile.readAsBytes();
+      return uploadImageBytes(
+        bytes,
         filename: imageFile.path.split('/').last,
+        token: token,
       );
-      request.files.add(multipartFile);
-
-      // Send the request
-      final response = await request.send().timeout(
-        const Duration(seconds: 60),
-        onTimeout: () {
-          throw HttpException('Upload timeout after 60 seconds');
-        },
-      );
-
-      return _handleUploadResponse(response);
     } catch (e) {
       rethrow;
     }
@@ -277,87 +255,110 @@ class ProfileApiService {
     String? token,
   }) async {
     try {
-      final baseUrl = ApiClient.getBaseUrl();
-      final url = '$baseUrl/api/profile/picture/upload';
-
-      final request = http.MultipartRequest('POST', Uri.parse(url));
-      if (token != null) {
-        request.headers['Authorization'] = 'Bearer $token';
+      if (token == null || token.isEmpty) {
+        throw HttpException('Unauthorized (401) - Please log in again');
       }
 
-      request.files.add(
-        http.MultipartFile.fromBytes('image', imageBytes, filename: filename),
+      if (Firebase.apps.isEmpty) {
+        throw HttpException('Firebase is not initialized');
+      }
+
+      final ext = filename.contains('.')
+          ? filename.split('.').last.toLowerCase()
+          : 'jpg';
+      final mimeType = _mimeTypeForExtension(ext);
+      if (!mimeType.startsWith('image/')) {
+        throw HttpException('Invalid image format for profile picture');
+      }
+
+      final uploadId = const Uuid().v4();
+      final storagePath = 'profile_pictures/$uploadId.$ext';
+
+      final metadata = SettableMetadata(
+        contentType: mimeType,
+        customMetadata: {
+          'originalName': filename,
+          'uploadedVia': 'profile',
+        },
       );
 
-      final response = await request.send().timeout(
-        const Duration(seconds: 60),
-        onTimeout: () => throw HttpException('Upload timeout after 60 seconds'),
-      );
+      final ref = _storage.ref().child(storagePath);
+      await ref
+          .putData(imageBytes, metadata)
+          .timeout(
+            const Duration(seconds: 90),
+            onTimeout: () => throw HttpException(
+              'Upload timeout after 90 seconds',
+            ),
+          );
 
-      return _handleUploadResponse(response);
+      final downloadUrl = await ref.getDownloadURL();
+      return _saveProfilePictureUrl(downloadUrl, token: token);
     } catch (e) {
       rethrow;
     }
   }
 
-  /// Parse upload response and return updated profile [T079]
-  Future<UserProfile> _handleUploadResponse(
-    http.StreamedResponse response,
-  ) async {
-    final responseBody = await response.stream.bytesToString();
+  String _mimeTypeForExtension(String ext) {
+    switch (ext) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      case 'gif':
+        return 'image/gif';
+      default:
+        return 'application/octet-stream';
+    }
+  }
 
+  Future<UserProfile> _saveProfilePictureUrl(
+    String pictureUrl, {
+    required String token,
+  }) async {
+    final baseUrl = ApiClient.getBaseUrl();
+    final url = '$baseUrl/api/profile/picture/url';
+
+    final response = await http
+        .post(
+          Uri.parse(url),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({'profilePictureUrl': pictureUrl}),
+        )
+        .timeout(
+          networkTimeout,
+          onTimeout: () => throw HttpException(
+            'Request timeout after ${networkTimeout.inSeconds}s',
+          ),
+        );
+
+    final responseBody = response.body;
     if (response.statusCode == 200) {
-      try {
-        final jsonBody = jsonDecode(responseBody);
-
-        // Check if this is an upload response (has profilePictureUrl and userId)
-        if (jsonBody.containsKey('profilePictureUrl') &&
-            !jsonBody.containsKey('username')) {
-          // This is an upload response, not a full profile
-          final uploadResponse = jsonBody as Map<String, dynamic>;
-
-          return _ensureAbsoluteImageUrl(
-            UserProfile(
-              userId: uploadResponse['userId'] as String? ?? 'unknown',
-              username: '', // Will be ignored by caller
-              profilePictureUrl: uploadResponse['profilePictureUrl'] as String?,
-              aboutMe: '',
-              isDefaultProfilePicture: false,
-            ),
-          );
-        }
-
-        // Otherwise, try to parse as a full profile response
-        final profileData = jsonBody['profile'] ?? jsonBody['data'] ?? jsonBody;
-        return _ensureAbsoluteImageUrl(
-          UserProfile.fromJson(profileData as Map<String, dynamic>),
-        );
-      } catch (e) {
-        throw FormatException(
-          'Failed to parse profile response: $e',
-          responseBody,
-        );
-      }
-    } else if (response.statusCode == 400) {
-      // Validation error (format, size, dimensions)
-      throw HttpException(
-        'Validation error: ${response.statusCode}. ${responseBody.isNotEmpty ? responseBody : 'Invalid image format or size'}',
-      );
-    } else if (response.statusCode == 401) {
-      throw HttpException('Unauthorized (401) - Please log in again');
-    } else if (response.statusCode == 413) {
-      throw HttpException(
-        'File too large (413) - Image must be smaller than 5MB',
-      );
-    } else if (response.statusCode == 500) {
-      throw HttpException(
-        'Server error (500) - Unable to process image. Please try again.',
-      );
-    } else {
-      throw HttpException(
-        'Failed to upload image: HTTP ${response.statusCode}. Response: $responseBody',
+      final jsonBody = jsonDecode(responseBody) as Map<String, dynamic>;
+      return _ensureAbsoluteImageUrl(
+        UserProfile(
+          userId: jsonBody['userId'] as String? ?? 'unknown',
+          username: '',
+          profilePictureUrl: jsonBody['profilePictureUrl'] as String?,
+          aboutMe: '',
+          isDefaultProfilePicture: false,
+        ),
       );
     }
+
+    if (response.statusCode == 401) {
+      throw HttpException('Unauthorized (401) - Please log in again');
+    }
+
+    throw HttpException(
+      'Failed to save profile picture URL: HTTP ${response.statusCode}. $responseBody',
+    );
   }
 
   /// Deletes the profile picture (reverts to default avatar)

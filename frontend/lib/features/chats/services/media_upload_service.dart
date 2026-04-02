@@ -3,6 +3,9 @@ import 'dart:io';
 import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:uuid/uuid.dart';
 import 'package:frontend/core/services/api_client.dart';
 import 'media_picker_service.dart';
 
@@ -82,10 +85,16 @@ class UploadedMedia {
 class MediaUploadService {
   final http.Client _httpClient;
   final String _baseUrl;
+  final FirebaseStorage _storage;
 
-  MediaUploadService({http.Client? httpClient, String? baseUrl})
+  MediaUploadService({
+    http.Client? httpClient,
+    String? baseUrl,
+    FirebaseStorage? storage,
+  })
     : _httpClient = httpClient ?? http.Client(),
-      _baseUrl = baseUrl ?? ApiClient.getBaseUrl();
+      _baseUrl = baseUrl ?? ApiClient.getBaseUrl(),
+      _storage = storage ?? FirebaseStorage.instance;
 
   /// Upload media file (T074)
   ///
@@ -97,7 +106,7 @@ class MediaUploadService {
   ///
   /// Throws: Exception if upload fails
   ///
-  /// Note: Videos are streamed from disk to avoid loading entire file into memory
+  /// Uploads directly to Firebase Storage to avoid backend memory/disk pressure.
   Future<UploadedMedia> uploadMedia({
     required PickedMediaFile pickedMedia,
     required String token,
@@ -109,9 +118,9 @@ class MediaUploadService {
       }
 
 
-      final url = Uri.parse('$_baseUrl/api/media/upload');
-      late int statusCode;
-      late String responseBody;
+      if (Firebase.apps.isEmpty) {
+        throw Exception('Firebase is not initialized');
+      }
 
       // Validate MIME type format for both image and video
       if (pickedMedia.mimeType.isEmpty) {
@@ -129,98 +138,55 @@ class MediaUploadService {
         );
       }
 
-      final mediaType = http.MediaType(mimeParts[0], mimeParts[1]);
+      final uploadId = Uuid().v4();
+      final originalExt = pickedMedia.name.contains('.')
+          ? pickedMedia.name.split('.').last.toLowerCase()
+          : 'bin';
+      final storagePath = 'chat_media/$uploadId.$originalExt';
 
-      // Both image and video uploads use multipart/form-data
-      final request = http.MultipartRequest('POST', url)
-        ..headers.addAll({'Authorization': 'Bearer $token'})
-        ..fields['mime_type'] = pickedMedia.mimeType
-        ..fields['file_name'] = pickedMedia.name;
+      final metadata = SettableMetadata(
+        contentType: pickedMedia.mimeType,
+        customMetadata: {
+          'originalName': pickedMedia.name,
+          'uploadedVia': 'chat_media',
+        },
+      );
 
+      final ref = _storage.ref().child(storagePath);
+
+      UploadTask task;
       if (pickedMedia.bytes != null) {
-        // Image upload: add bytes directly
-        request.files.add(
-          http.MultipartFile(
-            'file',
-            Stream.value(pickedMedia.bytes!),
-            pickedMedia.bytes!.length,
-            filename: pickedMedia.name,
-            contentType: mediaType,
-          ),
-        );
+        task = ref.putData(pickedMedia.bytes!, metadata);
       } else {
-        // Video upload: stream from file
         if (pickedMedia.path.isEmpty) {
-          throw Exception('Invalid video file path: ${pickedMedia.path}');
+          throw Exception('Invalid media file path: ${pickedMedia.path}');
         }
-
         final file = File(pickedMedia.path);
-
         if (!await file.exists()) {
-          throw Exception('Video file not found at ${pickedMedia.path}');
+          throw Exception('Media file not found at ${pickedMedia.path}');
         }
-
-
-        final fileLength = await file.length();
-        final fileStream = file.openRead();
-
-        request.files.add(
-          http.MultipartFile(
-            'file',
-            fileStream,
-            fileLength,
-            filename: pickedMedia.name,
-            contentType: mediaType,
-          ),
-        );
+        task = ref.putFile(file, metadata);
       }
 
-      try {
-        final response = await request.send().timeout(
-          const Duration(seconds: 120),
-          onTimeout: () => throw TimeoutException(
-            'Upload took too long (120 seconds). Please check your connection and try again.',
-            const Duration(seconds: 120),
-          ),
-        );
-        statusCode = response.statusCode;
-        responseBody = await response.stream.bytesToString();
-      } catch (e) {
-        rethrow;
-      }
+      await task.timeout(
+        const Duration(seconds: 180),
+        onTimeout: () => throw TimeoutException(
+          'Upload took too long (180 seconds). Please check your connection and try again.',
+          const Duration(seconds: 180),
+        ),
+      );
 
-      if (statusCode == 201) {
-        try {
-          final mediaData = jsonDecode(responseBody) as Map<String, dynamic>;
-          final uploadedMedia = UploadedMedia.fromJson(mediaData);
-          return uploadedMedia;
-        } catch (parseError) {
-          throw Exception('Server returned invalid response: $parseError');
-        }
-      } else if (statusCode == 413) {
-        throw Exception('File too large (max 50MB)');
-      } else if (statusCode == 400) {
-        try {
-          final error = jsonDecode(responseBody) as Map<String, dynamic>;
-          final message = error['error'] as String?;
-          throw Exception('Upload validation error: $message');
-        } catch (_) {
-          throw Exception('Upload failed: Invalid file or request format');
-        }
-      } else if (statusCode == 401) {
-        throw Exception('Unauthorized: Invalid or expired token');
-      } else if (statusCode >= 500) {
-        throw Exception('Server error ($statusCode). Please try again later.');
-      } else if (statusCode >= 400) {
-        try {
-          final error = jsonDecode(responseBody) as Map<String, dynamic>;
-          throw Exception('Upload failed: ${error['error']}');
-        } catch (e) {
-          throw Exception('Upload failed: $statusCode');
-        }
-      } else {
-        throw Exception('Upload failed: $statusCode');
-      }
+      final downloadUrl = await ref.getDownloadURL();
+
+      return UploadedMedia(
+        id: uploadId,
+        fileName: '$uploadId.$originalExt',
+        mimeType: pickedMedia.mimeType,
+        fileSizeBytes: pickedMedia.sizeBytes,
+        filePath: downloadUrl,
+        originalName: pickedMedia.name,
+        createdAt: DateTime.now().toUtc(),
+      );
     } catch (e) {
       rethrow;
     }

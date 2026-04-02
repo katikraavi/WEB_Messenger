@@ -271,6 +271,10 @@ Handler _createHandler(
         return await profileEndpoint.uploadProfilePicture(request);
       }
 
+      if (path == 'profile/picture/url' && method == 'POST') {
+        return await profileEndpoint.updateProfilePictureUrl(request);
+      }
+
       if (path == 'profile/picture' && method == 'DELETE') {
         return await profileEndpoint.deleteProfilePicture(request);
       }

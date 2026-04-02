@@ -3,7 +3,6 @@ import 'dart:typed_data';
 import 'package:shelf/shelf.dart';
 import 'package:postgres/postgres.dart';
 import '../services/media_storage_service.dart';
-import 'package:uuid/uuid.dart';
 
 typedef Connection = PostgreSQLConnection;
 
@@ -83,6 +82,23 @@ class MediaHandlers {
             body: jsonEncode({'error': 'Expected multipart/form-data'}));
       }
 
+      // Reject oversized uploads before buffering the whole multipart body.
+      final contentLengthHeader = _getHeaderValue(request, 'content-length');
+      final contentLength = int.tryParse(contentLengthHeader ?? '');
+      if (contentLength != null) {
+        // Allow 1MB multipart overhead above logical max file size.
+        final maxRequestBytes = MediaStorageService.maxFileSize + (1024 * 1024);
+        if (contentLength > maxRequestBytes) {
+          return Response(
+            413,
+            body: jsonEncode({
+              'error':
+                  'Upload too large. Maximum file size is ${MediaStorageService.maxFileSize ~/ 1048576}MB.'
+            }),
+          );
+        }
+      }
+
       // Read raw bytes for multipart parsing
       final bodyBytes = await request.read().fold<BytesBuilder>(
         BytesBuilder(copy: false),
@@ -146,8 +162,7 @@ class MediaHandlers {
       }
 
       return Response(500,
-          body: jsonEncode(
-              {'error': 'Failed to upload media: ${e.toString()}'}));
+          body: jsonEncode({'error': 'Failed to upload media'}));
     }
   }
 

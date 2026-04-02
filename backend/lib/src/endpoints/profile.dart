@@ -334,9 +334,7 @@ Future<Response> uploadProfilePicture(Request request) async {
       // Write image bytes to file
       final file = File(filePath);
       await file.writeAsBytes(imageBytes);
-      
-      final actualPath = file.absolute.path;
-      final actualExists = file.existsSync();
+
       print('[⚡] Image saved: $filePath');
     } catch (e) {
       print('[ProfileEndpoint] Error saving image file: $e');
@@ -429,6 +427,102 @@ Future<Response> uploadProfilePicture(Request request) async {
   }
 }
 
+/// POST /profile/picture/url
+/// Update profile picture URL directly (client uploads file to external storage)
+Future<Response> updateProfilePictureUrl(Request request) async {
+  try {
+    final authHeader = request.headers['authorization'] ?? '';
+    if (!authHeader.toLowerCase().startsWith('bearer ')) {
+      return Response(401,
+        body: jsonEncode({
+          'error': 'Authentication required',
+          'status': 401,
+        }),
+      );
+    }
+
+    final parts = authHeader.split(' ');
+    if (parts.length != 2) {
+      return Response(401,
+        body: jsonEncode({'error': 'Invalid token format', 'status': 401}),
+      );
+    }
+
+    final token = parts[1];
+    final payload = JwtService.validateToken(token);
+    final userId = payload.userId;
+
+    final body = await request.readAsString();
+    final data = jsonDecode(body) as Map<String, dynamic>;
+    final rawUrl = data['profilePictureUrl'] as String?;
+
+    if (rawUrl == null || rawUrl.trim().isEmpty) {
+      return Response(400,
+        body: jsonEncode({
+          'error': 'Missing profilePictureUrl',
+          'status': 400,
+        }),
+      );
+    }
+
+    final parsed = Uri.tryParse(rawUrl.trim());
+    if (parsed == null || !parsed.hasScheme || (parsed.scheme != 'http' && parsed.scheme != 'https')) {
+      return Response(400,
+        body: jsonEncode({
+          'error': 'profilePictureUrl must be a valid http/https URL',
+          'status': 400,
+        }),
+      );
+    }
+
+    final cacheTs = DateTime.now().millisecondsSinceEpoch;
+    final withCacheBust = rawUrl.contains('?')
+        ? '${rawUrl.trim()}&v=$cacheTs'
+        : '${rawUrl.trim()}?v=$cacheTs';
+
+    final updatedUser = await profileService.updateProfilePicture(
+      userId: userId,
+      pictureUrl: withCacheBust,
+    );
+
+    if (updatedUser == null) {
+      return Response(404,
+        body: jsonEncode({
+          'error': 'User not found',
+          'status': 404,
+        }),
+      );
+    }
+
+    try {
+      final webSocketService = WebSocketService.getInstance();
+      webSocketService.broadcastToAllUsers({
+        'type': 'profile_updated',
+        'userId': userId,
+        'profilePictureUrl': withCacheBust,
+        'timestamp': DateTime.now().toIso8601String(),
+      });
+    } catch (_) {}
+
+    return Response.ok(
+      jsonEncode({
+        'success': true,
+        'message': 'Profile picture URL updated successfully',
+        'profilePictureUrl': withCacheBust,
+        'userId': userId,
+      }),
+      headers: {'Content-Type': 'application/json'},
+    );
+  } catch (e) {
+    return Response.internalServerError(
+      body: jsonEncode({
+        'error': 'Failed to update profile picture URL',
+        'status': 500,
+      }),
+    );
+  }
+}
+
 /// DELETE /profile/picture
 /// Remove current profile picture and revert to default (requires authentication)
 Future<Response> deleteProfilePicture(Request request) async {
@@ -487,6 +581,16 @@ Future<Response> deleteProfilePicture(Request request) async {
       );
     }
 
+    try {
+      final webSocketService = WebSocketService.getInstance();
+      webSocketService.broadcastToAllUsers({
+        'type': 'profile_updated',
+        'userId': userId,
+        'profilePictureUrl': null,
+        'timestamp': DateTime.now().toIso8601String(),
+      });
+    } catch (_) {}
+
     return Response.ok(
       jsonEncode({
         'success': true,
@@ -522,7 +626,6 @@ List<int> _extractImageBytesFromMultipart(List<int> bodyBytes, String contentTyp
   print('[Multipart] Boundary extracted: "$boundary" (length: ${boundary.length})');
   
   final boundaryBytes = utf8.encode('--$boundary');
-  final endBoundaryBytes = utf8.encode('--$boundary--');
   
   print('[Multipart] Looking for boundary markers: "${String.fromCharCodes(boundaryBytes)}"');
   

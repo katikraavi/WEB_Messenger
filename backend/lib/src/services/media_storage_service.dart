@@ -63,7 +63,7 @@ class MediaFile {
 class MediaStorageService {
   final Connection connection;
   
-  static const int maxFileSize = 52428800; // 50MB in bytes
+  static const int maxFileSize = 15728640; // 15MB in bytes
   static const List<String> allowedMimeTypes = [
     'image/jpeg',
     'image/png',
@@ -87,6 +87,12 @@ class MediaStorageService {
       sb.write(byte.toRadixString(16).padLeft(2, '0'));
     }
     return sb.toString();
+  }
+
+  static String _compactError(Object e) {
+    final raw = e.toString();
+    if (raw.length <= 400) return raw;
+    return '${raw.substring(0, 400)}... [truncated]';
   }
 
   MediaStorageService({
@@ -208,8 +214,8 @@ class MediaStorageService {
         createdAt: DateTime.now(),
       );
     } catch (e) {
-      print('[MediaStorageService] ❌ Upload error: $e');
-      throw Exception('Failed to upload file: $e');
+      print('[MediaStorageService] ❌ Upload error: ${_compactError(e)}');
+      throw Exception('Failed to upload file');
     }
   }
 
