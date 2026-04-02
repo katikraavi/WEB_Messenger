@@ -80,6 +80,15 @@ class MediaStorageService {
     'audio/x-m4a',
   ];
 
+  /// Convert bytes to hexadecimal string for PostgreSQL bytea column
+  static String _bytesToHex(List<int> bytes) {
+    StringBuffer sb = StringBuffer();
+    for (int byte in bytes) {
+      sb.write(byte.toRadixString(16).padLeft(2, '0'));
+    }
+    return sb.toString();
+  }
+
   MediaStorageService({
     required this.connection,
   });
@@ -163,14 +172,14 @@ class MediaStorageService {
       final id = fileId; // Use same UUID for ID and filename
 
       // Store file data in database (BYTEA column)
-      // Convert Uint8List to List<int> for proper PostgreSQL bytea handling
-      final bytesAsList = fileBytes.toList();
+      // Use hex encoding for bytea - send as hex string
+      final hexData = _bytesToHex(fileBytes);
       
       await connection.execute(
         '''
         INSERT INTO media_storage
         (id, uploader_id, file_name, mime_type, file_size_bytes, file_data, original_name, created_at)
-        VALUES (@id, @uploaderId, @fileName, @mimeType, @fileSize, @fileData, @originalName, @createdAt)
+        VALUES (@id, @uploaderId, @fileName, @mimeType, @fileSize, decode(@hexData, 'hex')::bytea, @originalName, @createdAt)
         ''',
         substitutionValues: {
           'id': id,
@@ -178,7 +187,7 @@ class MediaStorageService {
           'fileName': safeFileName,
           'mimeType': mimeType,
           'fileSize': fileBytes.length,
-          'fileData': bytesAsList, // Convert to List<int> for proper bytea encoding
+          'hexData': hexData, // Pass as hex string - PostgreSQL will decode
           'originalName': fileName,
           'createdAt': DateTime.now().toIso8601String(),
         },
