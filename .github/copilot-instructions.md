@@ -14,7 +14,7 @@ Start the app locally with verified endpoints:
 ./scripts/validate-env.sh
 
 # 2. Start all services
-./start.sh
+./scripts/start.sh
 
 # 3. Run full verification
 ./scripts/verify-deployment.sh
@@ -87,7 +87,7 @@ cp .env.example .env
 |--------|---------|
 | `./scripts/verify-deployment.sh` | Full deployment verification |
 | `./scripts/validate-env.sh` | Check environment variables |
-| `./start.sh` | Start all local services |
+| `./scripts/start.sh` | Start all local services |
 | `docker-compose ps` | View service status |
 | `docker-compose logs -f` | Stream all service logs |
 
@@ -129,7 +129,7 @@ curl -v http://localhost:8081/health
 **Reset everything**
 ```bash
 docker-compose down -v  # Remove volumes too
-./start.sh             # Fresh start
+./scripts/start.sh     # Fresh start
 ./scripts/verify-deployment.sh
 ```
 
@@ -137,7 +137,7 @@ docker-compose down -v  # Remove volumes too
 
 | Issue | Solution |
 |-------|----------|
-| "Connection refused" | Run `./start.sh` to start services |
+| "Connection refused" | Run `./scripts/start.sh` to start services |
 | "Port already in use" | Kill process on port 8081: `lsof -i :8081` |
 | "Database error" | Check `.env` DATABASE_* vars, run `docker-compose logs messenger-postgres` |
 | "Endpoints don't match" | Compare `.env` vs `.env.oracle`, see deployment docs |

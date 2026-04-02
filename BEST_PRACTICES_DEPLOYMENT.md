@@ -128,7 +128,7 @@ Automatically invoked when you ask about:
    → ./scripts/validate-env.sh
 
 2. Start services
-   → ./start.sh
+   → ./scripts/start.sh
 
 3. Verify local deployment
    → ./scripts/verify-deployment.sh local

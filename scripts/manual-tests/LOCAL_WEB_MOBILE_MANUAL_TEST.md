@@ -2,7 +2,7 @@
 
 ## 1) Start backend and database
 From workspace root:
-./start.sh
+./scripts/start.sh
 
 Wait until health is up:
 curl http://localhost:8081/health
