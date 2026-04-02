@@ -9,7 +9,7 @@ Future<void> up(Connection connection) async {
       file_name VARCHAR(255) NOT NULL,
       mime_type VARCHAR(100),
       file_size_bytes INT NOT NULL,
-      file_path TEXT NOT NULL,
+      file_data BYTEA NOT NULL,
       original_name TEXT,
       created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
       

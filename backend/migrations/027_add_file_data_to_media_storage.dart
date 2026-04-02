@@ -6,16 +6,11 @@
 const migrationName = '027_add_file_data_to_media_storage';
 
 const migrationSql = '''
--- Add file_data column to media_storage if it doesn't exist
-ALTER TABLE IF EXISTS media_storage
-ADD COLUMN IF NOT EXISTS file_data BYTEA;
-
--- Comment for documentation
-COMMENT ON COLUMN media_storage.file_data IS 'Binary file content - enables persistence across container restarts on Render';
+-- file_data column already added in migration 016
+SELECT 1;
 ''';
 
 const rollbackSql = '''
--- Remove file_data column
-ALTER TABLE IF EXISTS media_storage
-DROP COLUMN IF EXISTS file_data;
+-- No changes to rollback - file_data column is part of migration 016
+SELECT 1;
 ''';
