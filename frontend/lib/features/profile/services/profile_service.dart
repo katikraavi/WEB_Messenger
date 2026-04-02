@@ -64,17 +64,17 @@ class ProfileService {
   }
 
   /// Upload profile picture
-  Future<String?> uploadProfilePicture(String filePath) async {
+  Future<String?> uploadProfilePicture(String imageUrl) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/api/profile/picture/upload'),
+        Uri.parse('$baseUrl/api/profile/picture/url'),
         headers: _headers(),
-        // In real app, would use MultipartRequest for file upload
+        body: jsonEncode({'profilePictureUrl': imageUrl}),
       ).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
-        return data['imageUrl'] as String?;
+        return data['profilePictureUrl'] as String?;
       } else {
         throw Exception('Upload failed: ${response.statusCode}');
       }
