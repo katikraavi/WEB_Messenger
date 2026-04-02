@@ -194,12 +194,11 @@ class MediaUploadService {
         createdAt: DateTime.now().toUtc(),
       );
     } catch (e) {
-      // Web Firebase Storage may fail when bucket CORS is not configured yet.
+      // Firebase Storage may fail on mobile if bucket/rules not configured properly.
       // Fallback to backend upload to keep messaging functional.
-      if (kIsWeb) {
-        return _uploadMediaViaBackend(pickedMedia: pickedMedia, token: token);
-      }
-      rethrow;
+      // This applies to both web and mobile - always try backend as fallback.
+      print('[MediaUploadService] Firebase upload failed: $e. Trying backend upload...');
+      return _uploadMediaViaBackend(pickedMedia: pickedMedia, token: token);
     }
   }
 
