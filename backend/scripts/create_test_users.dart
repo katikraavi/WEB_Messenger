@@ -159,25 +159,8 @@ void main() async {
         print('     [✓] Created user: $userId');
         seededUserIds[username] = userId;
 
-        // Create profile for the user
-        try {
-          await connection.execute(
-            '''INSERT INTO "user_profiles" (user_id, full_name, bio, profile_picture_url, is_private_profile, created_at, updated_at)
-               VALUES (@user_id, @full_name, @bio, @profile_picture_url, @is_private_profile, @created_at, @updated_at)''',
-            substitutionValues: {
-              'user_id': userId,
-              'full_name': fullName,
-              'bio': 'Test user - $fullName',
-              'profile_picture_url': null,
-              'is_private_profile': false,
-              'created_at': now,
-              'updated_at': now,
-            },
-          );
-          print('     [✓] Created profile for @$username');
-        } catch (e) {
-          print('     [⚠] Could not create profile: $e');
-        }
+        // Profile fields are already in users table (profile_picture_url, about_me, is_private_profile)
+        // No separate profile insert needed
 
         createdCount++;
       } catch (e) {
