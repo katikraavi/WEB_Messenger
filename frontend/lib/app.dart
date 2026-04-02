@@ -29,6 +29,7 @@ import 'package:frontend/features/chats/services/message_websocket_service.dart'
 import 'package:frontend/features/chats/services/chat_notification_settings_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:frontend/features/email_verification/screens/email_verify_link_screen.dart';
+import 'package:frontend/features/password_recovery/screens/password_reset_link_screen.dart';
 
 const String _appEnv = String.fromEnvironment(
   'APP_ENV',
@@ -156,6 +157,7 @@ class _MessengerAppState extends State<MessengerApp> {
   bool _isInitializing = true;
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   String? _deepLinkVerifyToken;
+  String? _deepLinkResetToken;
 
   @override
   void initState() {
@@ -174,10 +176,22 @@ class _MessengerAppState extends State<MessengerApp> {
   void _detectVerifyToken() {
     if (kIsWeb) {
       final uri = Uri.base;
+      
+      // Check for email verification token
       if (uri.path.contains('/verify')) {
         final token = uri.queryParameters['token'];
         if (token != null && token.isNotEmpty) {
           _deepLinkVerifyToken = token;
+          return;
+        }
+      }
+      
+      // Check for password reset token
+      if (uri.path.contains('/reset')) {
+        final token = uri.queryParameters['token'];
+        if (token != null && token.isNotEmpty) {
+          _deepLinkResetToken = token;
+          return;
         }
       }
     }
@@ -344,6 +358,13 @@ class _MessengerAppState extends State<MessengerApp> {
       return EmailVerifyLinkScreen(
         token: _deepLinkVerifyToken!,
         onDone: () => setState(() => _deepLinkVerifyToken = null),
+      );
+    }
+
+    if (_deepLinkResetToken != null) {
+      return PasswordResetLinkScreen(
+        token: _deepLinkResetToken!,
+        onDone: () => setState(() => _deepLinkResetToken = null),
       );
     }
 

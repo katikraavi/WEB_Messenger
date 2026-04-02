@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/password_recovery_provider.dart';
 import 'forgot_password_screen.dart';
+import 'reset_success_screen.dart';
 
 /// Screen for resetting password with token
 /// User enters new password and confirms
@@ -75,6 +76,13 @@ class _PasswordResetScreenState extends ConsumerState<PasswordResetScreen> {
   @override
   Widget build(BuildContext context) {
     final recoveryState = ref.watch(passwordRecoveryProvider);
+
+    // Show success screen after successful reset
+    if (recoveryState.phase == PasswordRecoveryPhase.success) {
+      return ResetSuccessScreen(
+        onContinueToLogin: widget.onSuccess,
+      );
+    }
 
     return WillPopScope(
       onWillPop: () async {
