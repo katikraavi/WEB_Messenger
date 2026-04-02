@@ -2,6 +2,11 @@ import 'package:postgres/postgres.dart';
 
 /// Migration: Create Media Storage table for tracking uploaded files
 Future<void> up(Connection connection) async {
+  // Drop if exists to ensure fresh schema with file_data (not file_path)
+  await connection.execute('''
+    DROP TABLE IF EXISTS media_storage CASCADE;
+  ''');
+  
   await connection.execute('''
     CREATE TABLE IF NOT EXISTS media_storage (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

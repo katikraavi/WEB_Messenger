@@ -508,7 +508,7 @@ class MigrationRunner {
             file_name VARCHAR(255) NOT NULL,
             mime_type VARCHAR(100),
             file_size_bytes INTEGER NOT NULL,
-            file_path TEXT NOT NULL,
+            file_data BYTEA NOT NULL,
             original_name TEXT,
             created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
             
@@ -740,14 +740,12 @@ class MigrationRunner {
         version: 27,
         description: 'Add file_data column to media_storage for persistent storage',
         upSql: '''
-          ALTER TABLE IF EXISTS media_storage
-          ADD COLUMN IF NOT EXISTS file_data BYTEA;
-          
-          COMMENT ON COLUMN media_storage.file_data IS 'Binary file content - enables persistence across container restarts on Render';
+          -- file_data column already created in migration 018
+          SELECT 1;
         ''',
         downSql: '''
-          ALTER TABLE IF EXISTS media_storage
-          DROP COLUMN IF EXISTS file_data;
+          -- No rollback needed - file_data is part of table schema
+          SELECT 1;
         ''',
       ),
     ]);
