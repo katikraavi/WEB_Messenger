@@ -77,6 +77,55 @@ class _VerificationPendingScreenState
     );
   }
 
+  /// Paste token from clipboard
+  Future<void> _pasteTokenFromClipboard() async {
+    try {
+      final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
+      final pastedText = clipboardData?.text ?? '';
+      
+      if (pastedText.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Clipboard is empty'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        return;
+      }
+
+      // Extract token from pasted text (handle both formats: token or full URL)
+      String token = pastedText.trim();
+      
+      // If it looks like a URL with token parameter, extract the token
+      if (token.contains('token=')) {
+        final uri = Uri.tryParse(token);
+        if (uri != null) {
+          final tokenFromUri = uri.queryParameters['token'];
+          if (tokenFromUri != null && tokenFromUri.isNotEmpty) {
+            token = tokenFromUri;
+          }
+        }
+      }
+      
+      _tokenController.text = token;
+      setState(() {});
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Pasted token${token.length > 20 ? ' (' + token.substring(0, 20) + '...)' : ''}'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to paste from clipboard: $e'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   @override
   void dispose() {
     _resendTimer.cancel();
@@ -283,6 +332,22 @@ class _VerificationPendingScreenState
                               ),
                             ),
                           ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                _autoFillToken(verificationState.devToken!);
+                                Future.delayed(const Duration(milliseconds: 200), () {
+                                  _handleVerifyEmail();
+                                });
+                              },
+                              icon: const Icon(Icons.flash_on, size: 18),
+                              label: const Text('1-Click'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue[700],
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ],
@@ -326,30 +391,42 @@ class _VerificationPendingScreenState
                 },
               ),
               const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: verificationState.isLoading
-                      ? null
-                      : _handleVerifyEmail,
-                  icon: verificationState.isLoading
-                      ? SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Theme.of(context).primaryColor,
-                            ),
-                          ),
-                        )
-                      : const Icon(Icons.check_circle),
-                  label: Text(
-                    verificationState.isLoading
-                        ? 'Verifying...'
-                        : 'Verify Email',
+              // Action buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _pasteTokenFromClipboard,
+                      icon: const Icon(Icons.paste, size: 18),
+                      label: const Text('Paste Code'),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: verificationState.isLoading
+                          ? null
+                          : _handleVerifyEmail,
+                      icon: verificationState.isLoading
+                          ? SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Theme.of(context).primaryColor,
+                                ),
+                              ),
+                            )
+                          : const Icon(Icons.check_circle),
+                      label: Text(
+                        verificationState.isLoading
+                            ? 'Verifying...'
+                            : 'Verify Email',
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 24),
 
