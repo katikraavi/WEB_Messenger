@@ -161,8 +161,14 @@ class _MessengerAppState extends State<MessengerApp> {
   void initState() {
     super.initState();
     _detectVerifyToken();
-    _initializeBackendConnection();
-    _initializePushNotifications();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      _initializeBackendConnection();
+      _initializePushNotifications();
+    });
   }
 
   void _detectVerifyToken() {

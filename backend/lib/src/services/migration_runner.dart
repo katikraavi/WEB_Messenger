@@ -748,6 +748,22 @@ class MigrationRunner {
           SELECT 1;
         ''',
       ),
+      Migration(
+        version: 28,
+        description: 'Add file_path metadata column for disk-backed media storage',
+        upSql: '''
+          ALTER TABLE media_storage
+          ADD COLUMN IF NOT EXISTS file_path TEXT;
+
+          UPDATE media_storage
+          SET file_path = '/api/media/' || id::text || '/download'
+          WHERE file_path IS NULL OR file_path = '';
+        ''',
+        downSql: '''
+          ALTER TABLE media_storage
+          DROP COLUMN IF EXISTS file_path;
+        ''',
+      ),
     ]);
   }
 

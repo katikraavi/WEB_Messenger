@@ -83,7 +83,7 @@ Future<Response> _handleSearchByUsername(
     // Search database for users by username (case-insensitive partial match)
     final searchPattern = '%${trimmed.toLowerCase()}%';
     final results = await database.query(
-      '''SELECT id, username, email FROM "users" 
+      '''SELECT id, username, email, profile_picture_url FROM "users" 
          WHERE LOWER(username) LIKE @pattern 
          ORDER BY username ASC 
          LIMIT @limit''',
@@ -100,7 +100,7 @@ Future<Response> _handleSearchByUsername(
         'userId': map['id'] as String,
         'username': map['username'] as String,
         'email': map['email'] as String,
-        'profilePictureUrl': null,
+        'profilePictureUrl': map['profile_picture_url'] as String?,
         'isPrivateProfile': false,
       };
     }).toList();
@@ -276,7 +276,7 @@ Future<Response> _handleSearchByEmail(
     // Search database for users by email (case-insensitive partial match)
     final searchPattern = '%${trimmed.toLowerCase()}%';
     final results = await database.query(
-      '''SELECT id, username, email FROM "users" 
+      '''SELECT id, username, email, profile_picture_url FROM "users" 
          WHERE LOWER(email) LIKE @pattern 
          ORDER BY email ASC 
          LIMIT @limit''',
@@ -293,7 +293,7 @@ Future<Response> _handleSearchByEmail(
         'userId': map['id'] as String,
         'username': map['username'] as String,
         'email': map['email'] as String,
-        'profilePictureUrl': null,
+        'profilePictureUrl': map['profile_picture_url'] as String?,
         'isPrivateProfile': false,
       };
     }).toList();

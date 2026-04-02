@@ -24,6 +24,7 @@ import './user_avatar_widget.dart';
 class MessageBubble extends StatelessWidget {
   final Message message;
   final String currentUserId;
+  final String? authToken;
   final VoidCallback? onLongPress;
   final VoidCallback? onRetry; // Callback to retry failed send
   final Function(String)? onEdit; // Callback for edit action (T052)
@@ -54,6 +55,7 @@ class MessageBubble extends StatelessWidget {
     super.key,
     required this.message,
     required this.currentUserId,
+    this.authToken,
     this.onLongPress,
     this.onRetry,
     this.onEdit,
@@ -72,6 +74,11 @@ class MessageBubble extends StatelessWidget {
 
   /// Get display content (decrypted if available)
   String get displayContent => message.getDisplayContent();
+
+  bool get _isMediaPlaceholderText =>
+      displayContent.trim() == '[Image]' ||
+      displayContent.trim() == '[Video]' ||
+      displayContent.trim() == '[Audio]';
 
   String get senderDisplayName {
     final override = senderNameOverride?.trim();
@@ -204,13 +211,14 @@ class MessageBubble extends StatelessWidget {
                               : CrossAxisAlignment.start,
                           children: [
                             // Media display (T077)
-                            if (message.mediaUrl != null)
+                            if (message.hasMedia)
                               _buildMediaWidget(context),
 
                             // Message content
-                            if (displayContent.isNotEmpty)
+                            if (displayContent.isNotEmpty &&
+                                !(message.hasMedia && _isMediaPlaceholderText))
                               Padding(
-                                padding: message.mediaUrl != null
+                                padding: message.hasMedia
                                     ? const EdgeInsets.only(top: 8)
                                     : EdgeInsets.zero,
                                 child: _buildHighlightedText(displayContent, searchQuery),
@@ -357,7 +365,7 @@ class MessageBubble extends StatelessWidget {
     final mediaUrl = message.mediaUrl;
     final mimeType = message.mediaType ?? '';
 
-    if (mediaUrl == null) {
+    if (mediaUrl == null || mediaUrl.trim().isEmpty) {
       return SizedBox.shrink();
     }
 
@@ -399,17 +407,34 @@ class MessageBubble extends StatelessWidget {
   }
 
   String _resolveMediaUrl(String mediaUrl) {
-    if (mediaUrl.startsWith('http://') || mediaUrl.startsWith('https://')) {
-      return mediaUrl;
+    String resolved = mediaUrl;
+    if (!(resolved.startsWith('http://') || resolved.startsWith('https://'))) {
+      final baseUrl = ApiClient.getBaseUrl();
+      resolved = resolved.startsWith('/') ? '$baseUrl$resolved' : '$baseUrl/$resolved';
     }
 
-    final baseUrl = ApiClient.getBaseUrl();
-
-    if (mediaUrl.startsWith('/')) {
-      return '$baseUrl$mediaUrl';
+    // Normalize legacy backend media paths to canonical download endpoint.
+    final mediaIdOnlyPath = RegExp(r'/api/media/[^/?]+$');
+    if (mediaIdOnlyPath.hasMatch(resolved)) {
+      resolved = '$resolved/download';
     }
 
-    return '$baseUrl/$mediaUrl';
+    // Protected backend media on web needs token query fallback.
+    // Native/mobile keeps using authenticated client APIs.
+    if (kIsWeb &&
+        authToken != null &&
+        authToken!.isNotEmpty &&
+        resolved.contains('/api/media/') &&
+        resolved.contains('/download')) {
+      final uri = Uri.parse(resolved);
+      if (!uri.queryParameters.containsKey('token')) {
+        final qp = Map<String, String>.from(uri.queryParameters)
+          ..['token'] = authToken!;
+        resolved = uri.replace(queryParameters: qp).toString();
+      }
+    }
+
+    return resolved;
   }
 
   /// Build profile picture widget for received messages

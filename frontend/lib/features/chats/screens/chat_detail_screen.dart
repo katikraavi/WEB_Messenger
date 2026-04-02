@@ -900,6 +900,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           key: ValueKey('${message.id}_${message.status}'),
           message: message,
           currentUserId: currentUserId,
+          authToken: token,
           isGroupChat: widget.isGroup,
           senderNameOverride: widget.isGroup
               ? _groupMemberUsernamesById[message.senderId]

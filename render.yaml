@@ -58,3 +58,5 @@ services:
         sync: false
       - key: VERBOSE_BACKEND_LOGS
         value: "false"
+      - key: MEDIA_STORAGE_DIR
+        value: "/app/backend/uploads/chat_media"

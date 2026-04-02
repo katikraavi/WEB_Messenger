@@ -62,8 +62,10 @@ class MediaFile {
 /// This ensures media persists on Render between container restarts
 class MediaStorageService {
   final Connection connection;
-  
-  static const int maxFileSize = 15728640; // 15MB in bytes
+
+  static const int maxFileSize = 10485760; // 10MB in bytes
+  static const String _storageDirEnv = 'MEDIA_STORAGE_DIR';
+  static const String _defaultStorageDir = '/app/backend/uploads/chat_media';
   static const List<String> allowedMimeTypes = [
     'image/jpeg',
     'image/png',
@@ -80,15 +82,6 @@ class MediaStorageService {
     'audio/x-m4a',
   ];
 
-  /// Convert bytes to hexadecimal string for PostgreSQL bytea column
-  static String _bytesToHex(List<int> bytes) {
-    StringBuffer sb = StringBuffer();
-    for (int byte in bytes) {
-      sb.write(byte.toRadixString(16).padLeft(2, '0'));
-    }
-    return sb.toString();
-  }
-
   static String _compactError(Object e) {
     final raw = e.toString();
     if (raw.length <= 400) return raw;
@@ -98,6 +91,27 @@ class MediaStorageService {
   MediaStorageService({
     required this.connection,
   });
+
+  Directory _ensureStorageDirectory() {
+    final configured = Platform.environment[_storageDirEnv];
+    final directoryPath =
+        (configured != null && configured.trim().isNotEmpty)
+        ? configured.trim()
+        : _defaultStorageDir;
+    final directory = Directory(directoryPath);
+    if (!directory.existsSync()) {
+      directory.createSync(recursive: true);
+    }
+    return directory;
+  }
+
+  String _resolveDiskPath(String fileName) {
+    final mediaDir = _ensureStorageDirectory();
+    return path.join(mediaDir.path, fileName);
+  }
+
+  String _defaultApiPathForId(String mediaId) => '/api/media/$mediaId/download';
+
   /// - File size <= 50MB
   /// - MIME type is allowed
   /// - File extension matches MIME type
@@ -148,9 +162,7 @@ class MediaStorageService {
     }
   }
 
-  /// Upload media file to database (T068)
-  /// 
-  /// Stores file data as BLOB in database for persistence on Render
+  /// Upload media file to persistent disk with metadata in database (T068)
   /// 
   /// Parameters:
   /// - fileBytes: Raw file data
@@ -176,32 +188,59 @@ class MediaStorageService {
       final ext = path.extension(fileName);
       final safeFileName = '$fileId$ext';
       final id = fileId; // Use same UUID for ID and filename
+      final mediaPath = _defaultApiPathForId(id);
+      final diskPath = _resolveDiskPath(safeFileName);
 
-      // Store file data in database (BYTEA column)
-      // Use hex encoding for bytea - send as hex string
-      final hexData = _bytesToHex(fileBytes);
-      final mediaPath = '/api/media/$id';
-      
-      await connection.execute(
-        '''
-        INSERT INTO media_storage
-        (id, uploader_id, file_name, mime_type, file_size_bytes, file_path, file_data, original_name, created_at)
-        VALUES (@id, @uploaderId, @fileName, @mimeType, @fileSize, @filePath, decode(@hexData, 'hex')::bytea, @originalName, @createdAt)
-        ''',
-        substitutionValues: {
-          'id': id,
-          'uploaderId': uploaderId,
-          'fileName': safeFileName,
-          'mimeType': mimeType,
-          'fileSize': fileBytes.length,
-          'filePath': mediaPath,
-          'hexData': hexData, // Pass as hex string - PostgreSQL will decode
-          'originalName': fileName,
-          'createdAt': DateTime.now().toIso8601String(),
-        },
-      );
+      // Write file bytes to persistent disk first.
+      final mediaFile = File(diskPath);
+      await mediaFile.writeAsBytes(fileBytes, flush: true);
 
-      print('[MediaStorageService] ✓ File uploaded to DB: $id by $uploaderId (${fileBytes.length} bytes)');
+      try {
+        await connection.execute(
+          '''
+          INSERT INTO media_storage
+          (id, uploader_id, file_name, mime_type, file_size_bytes, file_path, file_data, original_name, created_at)
+          VALUES (@id, @uploaderId, @fileName, @mimeType, @fileSize, @filePath, decode('', 'hex')::bytea, @originalName, @createdAt)
+          ''',
+          substitutionValues: {
+            'id': id,
+            'uploaderId': uploaderId,
+            'fileName': safeFileName,
+            'mimeType': mimeType,
+            'fileSize': fileBytes.length,
+            'filePath': mediaPath,
+            'originalName': fileName,
+            'createdAt': DateTime.now().toIso8601String(),
+          },
+        );
+      } catch (e) {
+        // Local/older schemas may not include file_path column.
+        if (e.toString().contains('column "file_path" of relation "media_storage" does not exist')) {
+          await connection.execute(
+            '''
+            INSERT INTO media_storage
+            (id, uploader_id, file_name, mime_type, file_size_bytes, file_data, original_name, created_at)
+            VALUES (@id, @uploaderId, @fileName, @mimeType, @fileSize, decode('', 'hex')::bytea, @originalName, @createdAt)
+            ''',
+            substitutionValues: {
+              'id': id,
+              'uploaderId': uploaderId,
+              'fileName': safeFileName,
+              'mimeType': mimeType,
+              'fileSize': fileBytes.length,
+              'originalName': fileName,
+              'createdAt': DateTime.now().toIso8601String(),
+            },
+          );
+        } else {
+          if (mediaFile.existsSync()) {
+            await mediaFile.delete();
+          }
+          rethrow;
+        }
+      }
+
+      print('[MediaStorageService] ✓ File uploaded to disk: $id by $uploaderId (${fileBytes.length} bytes)');
 
       return MediaFile(
         id: id,
@@ -222,27 +261,53 @@ class MediaStorageService {
   /// Get media file by ID (T069)
   Future<MediaFile?> getMediaById(String mediaId) async {
     try {
-      final result = await connection.query(
-        '''
-        SELECT id, uploader_id, file_name, mime_type, file_size_bytes, original_name, created_at
-        FROM media_storage
-        WHERE id = @mediaId
-        ''',
-        substitutionValues: {'mediaId': mediaId},
-      );
+      List<List<dynamic>> result;
+      bool hasFilePath = true;
+      try {
+        result = await connection.query(
+          '''
+          SELECT id, uploader_id, file_name, mime_type, file_size_bytes, file_path, original_name, created_at
+          FROM media_storage
+          WHERE id = @mediaId
+          ''',
+          substitutionValues: {'mediaId': mediaId},
+        );
+      } catch (e) {
+        if (!e.toString().contains('column "file_path"')) {
+          rethrow;
+        }
+        hasFilePath = false;
+        result = await connection.query(
+          '''
+          SELECT id, uploader_id, file_name, mime_type, file_size_bytes, original_name, created_at
+          FROM media_storage
+          WHERE id = @mediaId
+          ''',
+          substitutionValues: {'mediaId': mediaId},
+        );
+      }
 
       if (result.isEmpty) return null;
 
       final row = result.first;
+      final createdAtValue = hasFilePath ? row[7] : row[6];
+      final createdAt = createdAtValue is DateTime
+          ? createdAtValue.toUtc()
+          : DateTime.parse(createdAtValue.toString());
+      final storedPath = hasFilePath ? row[5] as String? : null;
+      final mediaPath =
+          (storedPath != null && storedPath.trim().isNotEmpty)
+          ? storedPath
+          : _defaultApiPathForId(row[0] as String);
       return MediaFile(
         id: row[0] as String,
         uploaderId: row[1] as String,
         fileName: row[2] as String,
         mimeType: row[3] as String?,
         fileSizeBytes: row[4] as int,
-        filePath: '/api/media/${row[0]}', // Database-based path
-        originalName: row[5] as String?,
-        createdAt: DateTime.parse(row[6] as String),
+        filePath: mediaPath,
+        originalName: hasFilePath ? row[6] as String? : row[5] as String?,
+        createdAt: createdAt,
       );
     } catch (e) {
       print('[MediaStorageService] ❌ Error getting media: $e');
@@ -250,7 +315,7 @@ class MediaStorageService {
     }
   }
 
-  /// Download file bytes from database
+  /// Download file bytes from disk (fallback to legacy DB blob rows)
   Future<Uint8List> downloadFile(String mediaId) async {
     try {
       final result = await connection.query(
@@ -268,13 +333,25 @@ class MediaStorageService {
 
       final row = result.first;
       final fileData = row[0];
-      
-      if (fileData == null) {
-        throw Exception('File data is null for media: $mediaId');
+      final fileName = row[1] as String;
+      final diskFile = File(_resolveDiskPath(fileName));
+
+      if (diskFile.existsSync()) {
+        final bytes = await diskFile.readAsBytes();
+        print('[MediaStorageService] ✓ Downloaded media $mediaId from disk (${bytes.length} bytes)');
+        return bytes;
       }
 
-      print('[MediaStorageService] ✓ Downloaded media $mediaId (${(fileData as List).length} bytes)');
-      return Uint8List.fromList(fileData as List<int>);
+      if (fileData is Uint8List && fileData.isNotEmpty) {
+        print('[MediaStorageService] ✓ Downloaded legacy blob media $mediaId (${fileData.length} bytes)');
+        return fileData;
+      }
+      if (fileData is List<int> && fileData.isNotEmpty) {
+        print('[MediaStorageService] ✓ Downloaded legacy blob media $mediaId (${fileData.length} bytes)');
+        return Uint8List.fromList(fileData);
+      }
+
+      throw Exception('Media file missing on disk and no legacy blob data found for: $mediaId');
     } catch (e) {
       print('[MediaStorageService] ❌ Download error: $e');
       rethrow;
@@ -303,7 +380,7 @@ class MediaStorageService {
       );
 
       // Delete from disk
-      final file = File(media.filePath);
+      final file = File(_resolveDiskPath(media.fileName));
       if (file.existsSync()) {
         await file.delete();
       }

@@ -27,13 +27,17 @@ Message _$MessageFromJson(Map<String, dynamic> json) => Message(
       deliveredCount: (json['delivered_count'] as num?)?.toInt(),
       readCount: (json['read_count'] as num?)?.toInt(),
       decryptedContent: json['decrypted_content'] as String?,
-    );
+    )
+      ..senderUsername = json['sender_username'] as String?
+      ..senderAvatarUrl = json['sender_avatar_url'] as String?;
 
 Map<String, dynamic> _$MessageToJson(Message instance) => <String, dynamic>{
       'id': instance.id,
       'chat_id': instance.chatId,
       'sender_id': instance.senderId,
       'recipient_id': instance.recipientId,
+    'sender_username': instance.senderUsername,
+    'sender_avatar_url': instance.senderAvatarUrl,
       'encrypted_content': instance.encryptedContent,
       'status': instance.status,
       'created_at': instance.createdAt.toIso8601String(),

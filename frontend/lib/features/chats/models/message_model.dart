@@ -74,6 +74,18 @@ class Message {
       return DateTime.parse(timestamp);
     }
     
+    final rawMediaUrl = (json['media_url'] ?? json['mediaUrl']) as String?;
+    final normalizedMediaUrl =
+      (rawMediaUrl != null && rawMediaUrl.trim().isNotEmpty)
+      ? rawMediaUrl.trim()
+      : null;
+
+    final rawMediaType = (json['media_type'] ?? json['mediaType']) as String?;
+    final normalizedMediaType =
+      (rawMediaType != null && rawMediaType.trim().isNotEmpty)
+      ? rawMediaType.trim()
+      : null;
+
     return Message(
       id: json['id'] as String,
       chatId: (json['chat_id'] ?? json['chatId']) as String,
@@ -86,8 +98,8 @@ class Message {
       senderUsername: (json['sender_username'] ?? json['senderUsername']) as String?,
       senderAvatarUrl: (json['sender_avatar_url'] ?? json['senderAvatarUrl']) as String?,
       decryptedContent: (json['decrypted_content'] ?? json['decryptedContent']) as String?,
-      mediaUrl: (json['media_url'] ?? json['mediaUrl']) as String?,
-      mediaType: (json['media_type'] ?? json['mediaType']) as String?,
+      mediaUrl: normalizedMediaUrl,
+      mediaType: normalizedMediaType,
       recipientCount: (json['recipient_count'] ?? json['recipientCount']) as int?,
       deliveredCount: (json['delivered_count'] ?? json['deliveredCount']) as int?,
       readCount: (json['read_count'] ?? json['readCount']) as int?,
@@ -210,6 +222,9 @@ class Message {
 
   /// Check if message display is loading (sending or decrypting)
   bool get isLoading => isSending;
+
+  /// True when this message has a non-empty media URL.
+  bool get hasMedia => mediaUrl != null && mediaUrl!.trim().isNotEmpty;
 
   bool get hasReceiptTracking =>
       recipientId != null || (recipientCount != null && recipientCount! > 0);

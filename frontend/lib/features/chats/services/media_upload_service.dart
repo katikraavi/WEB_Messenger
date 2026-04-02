@@ -112,6 +112,12 @@ class MediaUploadService {
     required String token,
   }) async {
     try {
+      // Web uses backend upload directly to avoid browser CORS dependency
+      // on Firebase Storage bucket configuration.
+      if (kIsWeb) {
+        return _uploadMediaViaBackend(pickedMedia: pickedMedia, token: token);
+      }
+
       // Validate before upload
       if (!pickedMedia.isValid) {
         throw Exception('Invalid media file');

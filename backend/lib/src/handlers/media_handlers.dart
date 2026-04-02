@@ -328,9 +328,15 @@ class MediaHandlers {
     String mediaId,
   ) async {
     try {
-      // Get JWT token
+      // Get JWT token from Authorization header first, then query param fallback.
+      // Query fallback is used by web image/video tags that cannot reliably attach
+      // custom auth headers for protected media endpoints.
       final authHeader = _getHeaderValue(request, 'authorization');
-      final token = authHeader?.replaceFirst('Bearer ', '');
+      final headerToken = authHeader?.replaceFirst('Bearer ', '');
+      final queryToken = request.url.queryParameters['token'];
+      final token = (headerToken != null && headerToken.isNotEmpty)
+          ? headerToken
+          : queryToken;
       if (token == null || token.isEmpty) {
         return Response(401, body: jsonEncode({'error': 'Missing token'}));
       }

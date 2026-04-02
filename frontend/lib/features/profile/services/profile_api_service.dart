@@ -259,6 +259,16 @@ class ProfileApiService {
         throw HttpException('Unauthorized (401) - Please log in again');
       }
 
+      // Web uses backend upload directly to avoid browser CORS dependency
+      // on Firebase Storage bucket configuration.
+      if (kIsWeb) {
+        return _uploadProfileImageViaBackend(
+          imageBytes,
+          filename: filename,
+          token: token,
+        );
+      }
+
       if (Firebase.apps.isEmpty) {
         throw HttpException('Firebase is not initialized');
       }
