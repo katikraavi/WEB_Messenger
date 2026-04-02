@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:video_player/video_player.dart';
 import 'package:frontend/core/services/api_client.dart';
 import '../models/message_model.dart';
@@ -373,15 +372,20 @@ class MessageBubble extends StatelessWidget {
     final resolvedMediaUrl = _resolveMediaUrl(mediaUrl);
 
     if (mimeType.startsWith('image/')) {
-      // Image media - use authenticated loading on mobile, direct network on web
+      // Image media - use Image.network with caching (web + mobile)
       return ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: Container(
           constraints: BoxConstraints(maxWidth: 250, maxHeight: 300),
           color: Colors.grey.shade200,
-          child: kIsWeb
-              ? _buildWebImage(resolvedMediaUrl)
-              : _buildMobileImage(resolvedMediaUrl),
+          child: Image.network(
+            resolvedMediaUrl,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => Container(
+              color: Colors.grey.shade300,
+              child: Icon(Icons.broken_image, color: Colors.grey.shade600),
+            ),
+          ),
         ),
       );
     } else if (mimeType.startsWith('video/')) {
@@ -534,83 +538,6 @@ class MessageBubble extends StatelessWidget {
     // Show context menu with edit/delete options
     // This would typically use showMenu or a custom popup
     // For now, this is a placeholder - in the parent widget's onLongPress handler
-  }
-
-  /// Build image for web using Image.network with query token
-  Widget _buildWebImage(String url) {
-    return Image.network(
-      url,
-      fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) => Container(
-        color: Colors.grey.shade300,
-        child: Icon(Icons.broken_image, color: Colors.grey.shade600),
-      ),
-    );
-  }
-
-  /// Build image for mobile by fetching with auth header and displaying bytes
-  Widget _buildMobileImage(String url) {
-    return FutureBuilder<Uint8List?>(
-      future: _fetchMediaBytes(url),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(
-            child: SizedBox(
-              width: 30,
-              height: 30,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.grey[600]!),
-              ),
-            ),
-          );
-        }
-
-        if (snapshot.hasError || snapshot.data == null) {
-          return Container(
-            color: Colors.grey.shade300,
-            child: Icon(Icons.broken_image, color: Colors.grey.shade600),
-          );
-        }
-
-        return Image.memory(
-          snapshot.data!,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => Container(
-            color: Colors.grey.shade300,
-            child: Icon(Icons.broken_image, color: Colors.grey.shade600),
-          ),
-        );
-      },
-    );
-  }
-
-  /// Fetch media bytes with proper auth header for mobile
-  Future<Uint8List?> _fetchMediaBytes(String url) async {
-    try {
-      if (authToken == null || authToken!.isEmpty) {
-        print('[MessageBubble] No auth token available for media fetch');
-        return null;
-      }
-
-      final http.Client client = http.Client();
-      final response = await client.get(
-        Uri.parse(url),
-        headers: {
-          'Authorization': 'Bearer $authToken',
-        },
-      ).timeout(const Duration(seconds: 15));
-
-      if (response.statusCode == 200) {
-        return response.bodyBytes;
-      } else {
-        print('[MessageBubble] Media fetch failed: ${response.statusCode}');
-        return null;
-      }
-    } catch (e) {
-      print('[MessageBubble] Error fetching media: $e');
-      return null;
-    }
   }
 }
 
