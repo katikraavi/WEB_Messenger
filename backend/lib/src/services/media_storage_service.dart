@@ -174,12 +174,13 @@ class MediaStorageService {
       // Store file data in database (BYTEA column)
       // Use hex encoding for bytea - send as hex string
       final hexData = _bytesToHex(fileBytes);
+      final mediaPath = '/api/media/$id';
       
       await connection.execute(
         '''
         INSERT INTO media_storage
-        (id, uploader_id, file_name, mime_type, file_size_bytes, file_data, original_name, created_at)
-        VALUES (@id, @uploaderId, @fileName, @mimeType, @fileSize, decode(@hexData, 'hex')::bytea, @originalName, @createdAt)
+        (id, uploader_id, file_name, mime_type, file_size_bytes, file_path, file_data, original_name, created_at)
+        VALUES (@id, @uploaderId, @fileName, @mimeType, @fileSize, @filePath, decode(@hexData, 'hex')::bytea, @originalName, @createdAt)
         ''',
         substitutionValues: {
           'id': id,
@@ -187,6 +188,7 @@ class MediaStorageService {
           'fileName': safeFileName,
           'mimeType': mimeType,
           'fileSize': fileBytes.length,
+          'filePath': mediaPath,
           'hexData': hexData, // Pass as hex string - PostgreSQL will decode
           'originalName': fileName,
           'createdAt': DateTime.now().toIso8601String(),
@@ -201,7 +203,7 @@ class MediaStorageService {
         fileName: safeFileName,
         mimeType: mimeType,
         fileSizeBytes: fileBytes.length,
-        filePath: '/api/media/$id', // Return database-based path
+        filePath: mediaPath,
         originalName: fileName,
         createdAt: DateTime.now(),
       );

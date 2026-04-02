@@ -16,7 +16,11 @@ final activeChatListProvider = StreamProvider.family<List<Chat>, String>((ref, t
     if (chat.lastMessagePreview != null && chat.lastMessagePreview!.isNotEmpty) {
       return chat;
     }
-    // Fetch latest message for chat
+    // Skip message preview for group chats (groups use different message API)
+    if (chat.isGroup) {
+      return chat;
+    }
+    // Fetch latest message for chat (direct chats only)
     final messages = await apiService.fetchMessages(token: token, chatId: chat.id, limit: 1);
     if (messages.isNotEmpty) {
       final msg = messages.first;

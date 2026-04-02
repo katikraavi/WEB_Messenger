@@ -2,12 +2,12 @@
 # Comprehensive test: text messages, picture messages, video messages
 
 BASE_URL="${BASE_URL:-https://web-messenger-backend.onrender.com}"
-ALICE_EMAIL="testuser1@example.com"
-ALICE_PASSWORD="testuser1pass"
-BOB_EMAIL="testuser2@example.com"
-BOB_PASSWORD="testuser2pass"
-TEST_IMG="/home/katikraavi/mobile-messenger/Test_Pictures/okPicture.jpg"
-TEST_VID="/home/katikraavi/mobile-messenger/Test_Pictures/Salvestamine202334.mp4"
+ALICE_EMAIL="${ALICE_EMAIL:-testuser1@example.com}"
+ALICE_PASSWORD="${ALICE_PASSWORD:-testuser1pass}"
+BOB_EMAIL="${BOB_EMAIL:-testuser2@example.com}"
+BOB_PASSWORD="${BOB_PASSWORD:-testuser2pass}"
+TEST_IMG="${TEST_IMG:-/home/katikraavi/web-messenger/Test_Pictures/okPicture.jpg}"
+TEST_VID="${TEST_VID:-/home/katikraavi/web-messenger/Test_Pictures/Salvestamine202334.mp4}"
 
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -25,7 +25,7 @@ echo ""
 
 # ── 1. Auth ──────────────────────────────────────
 info "1. Logging in as TestUser1..."
-ALICE_RESP=$(curl -sf -X POST "$BASE_URL/auth/login" \
+ALICE_RESP=$(curl -sf -X POST "$BASE_URL/api/auth/login" \
   -H "Content-Type: application/json" \
   -d "{\"email\":\"$ALICE_EMAIL\",\"password\":\"$ALICE_PASSWORD\"}" 2>&1) || fail "Alice login request failed"
 ALICE_TOKEN=$(echo "$ALICE_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('token',''))" 2>/dev/null)
@@ -34,7 +34,7 @@ ALICE_ID=$(echo "$ALICE_RESP"    | python3 -c "import sys,json; d=json.load(sys.
 pass "TestUser1 logged in (id=${ALICE_ID:0:8}...)"
 
 info "2. Logging in as TestUser2..."
-BOB_RESP=$(curl -sf -X POST "$BASE_URL/auth/login" \
+BOB_RESP=$(curl -sf -X POST "$BASE_URL/api/auth/login" \
   -H "Content-Type: application/json" \
   -d "{\"email\":\"$BOB_EMAIL\",\"password\":\"$BOB_PASSWORD\"}" 2>&1) || fail "Bob login request failed"
 BOB_TOKEN=$(echo "$BOB_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('token',''))" 2>/dev/null)
@@ -78,23 +78,21 @@ IMG_RESP=$(curl -sf -X POST "$BASE_URL/api/media/upload" \
   -H "Authorization: Bearer $ALICE_TOKEN" \
   -F "file=@${TEST_IMG};type=image/jpeg" 2>&1) || fail "Picture upload request failed: $IMG_RESP"
 IMG_PATH=$(echo "$IMG_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('file_path',''))" 2>/dev/null)
-IMG_NAME=$(echo "$IMG_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('file_name',''))" 2>/dev/null)
 [ -z "$IMG_PATH" ] && fail "Picture upload failed – response: $IMG_RESP"
 pass "Picture uploaded  path=$IMG_PATH"
 
 info "6. Sending PICTURE message..."
-MEDIA_URL="/uploads/media/${IMG_NAME}"
 IMG_MSG_RESP=$(curl -sf -X POST "$BASE_URL/api/chats/$CHAT_ID/messages" \
   -H "Authorization: Bearer $ALICE_TOKEN" \
   -H "Content-Type: application/json" \
-  -d "{\"encrypted_content\":\"$(echo -n '[image]' | base64)\",\"media_url\":\"$MEDIA_URL\",\"media_type\":\"image/jpeg\"}" 2>&1) || fail "Send picture message failed: $IMG_MSG_RESP"
+  -d "{\"encrypted_content\":\"$(echo -n '[image]' | base64)\",\"media_url\":\"$IMG_PATH\",\"media_type\":\"image/jpeg\"}" 2>&1) || fail "Send picture message failed: $IMG_MSG_RESP"
 IMG_MSG_ID=$(echo "$IMG_MSG_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id',''))" 2>/dev/null)
 RETURNED_URL=$(echo "$IMG_MSG_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('media_url',''))" 2>/dev/null)
 [ -z "$IMG_MSG_ID" ] && fail "Picture message send failed – response: $IMG_MSG_RESP"
 pass "Picture message sent  id=${IMG_MSG_ID:0:8}...  media_url=$RETURNED_URL"
 
 # Verify file is accessible over HTTP
-HTTP_STATUS=$(curl -so /dev/null -w "%{http_code}" "$BASE_URL/$IMG_PATH" \
+HTTP_STATUS=$(curl -so /dev/null -w "%{http_code}" "$BASE_URL$IMG_PATH" \
   -H "Authorization: Bearer $BOB_TOKEN" 2>&1)
 [ "$HTTP_STATUS" = "200" ] && pass "Picture file accessible via HTTP ($HTTP_STATUS)" \
   || echo -e "${YELLOW}⚠️  Picture file HTTP status: $HTTP_STATUS (may need auth or path differs)${NC}"
@@ -109,24 +107,22 @@ VID_RESP=$(curl -sf -X POST "$BASE_URL/api/media/upload" \
   -H "Authorization: Bearer $ALICE_TOKEN" \
   -F "file=@${TEST_VID};type=video/mp4" 2>&1) || fail "Video upload request failed: $VID_RESP"
 VID_PATH=$(echo "$VID_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('file_path',''))" 2>/dev/null)
-VID_NAME=$(echo "$VID_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('file_name',''))" 2>/dev/null)
 VID_SIZE_RESP=$(echo "$VID_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('file_size_bytes',''))" 2>/dev/null)
 [ -z "$VID_PATH" ] && fail "Video upload failed – response: $VID_RESP"
 pass "Video uploaded  path=$VID_PATH  size=${VID_SIZE_RESP}B"
 
 info "8. Sending VIDEO message..."
-VID_MEDIA_URL="/uploads/media/${VID_NAME}"
 VID_MSG_RESP=$(curl -sf -X POST "$BASE_URL/api/chats/$CHAT_ID/messages" \
   -H "Authorization: Bearer $ALICE_TOKEN" \
   -H "Content-Type: application/json" \
-  -d "{\"encrypted_content\":\"$(echo -n '[video]' | base64)\",\"media_url\":\"$VID_MEDIA_URL\",\"media_type\":\"video/mp4\"}" 2>&1) || fail "Send video message failed: $VID_MSG_RESP"
+  -d "{\"encrypted_content\":\"$(echo -n '[video]' | base64)\",\"media_url\":\"$VID_PATH\",\"media_type\":\"video/mp4\"}" 2>&1) || fail "Send video message failed: $VID_MSG_RESP"
 VID_MSG_ID=$(echo "$VID_MSG_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id',''))" 2>/dev/null)
 VID_RETURNED_URL=$(echo "$VID_MSG_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('media_url',''))" 2>/dev/null)
 [ -z "$VID_MSG_ID" ] && fail "Video message send failed – response: $VID_MSG_RESP"
 pass "Video message sent  id=${VID_MSG_ID:0:8}...  media_url=$VID_RETURNED_URL"
 
 # Verify file is accessible over HTTP
-VID_HTTP=$(curl -so /dev/null -w "%{http_code}" "$BASE_URL/$VID_PATH" \
+VID_HTTP=$(curl -so /dev/null -w "%{http_code}" "$BASE_URL$VID_PATH" \
   -H "Authorization: Bearer $BOB_TOKEN" 2>&1)
 [ "$VID_HTTP" = "200" ] && pass "Video file accessible via HTTP ($VID_HTTP)" \
   || echo -e "${YELLOW}⚠️  Video file HTTP status: $VID_HTTP (may need auth or path differs)${NC}"

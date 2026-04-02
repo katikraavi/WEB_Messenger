@@ -428,7 +428,7 @@ class MediaHandlers {
         ''',
         substitutionValues: {
           'messageId': messageId,
-          'mediaUrl': '/uploads/media/${media.fileName}',
+          'mediaUrl': media.filePath,
           'mediaType': media.mimeType,
         },
       );
@@ -442,7 +442,7 @@ class MediaHandlers {
             'message_id': messageId,
             'media_id': mediaId,
             'media_type': media.mimeType,
-            'media_url': '/uploads/media/${media.fileName}',
+            'media_url': media.filePath,
           }));
     } catch (e) {
       print('[MediaHandlers] ❌ Attach media error: $e');

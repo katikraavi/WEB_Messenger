@@ -221,7 +221,7 @@ extension _ChatDetailScreenStateHandlers on _ChatDetailScreenState {
 
       final currentUserId = currentUserIdFromContext();
       final chatApiService = ChatApiService(baseUrl: ApiClient.getBaseUrl());
-      final mediaPath = '/uploads/media/${uploadedMedia.fileName}';
+      final mediaPath = uploadedMedia.filePath;  // Use backend-provided path (/api/media/{id})
       
       // Encrypt image placeholder using AES-256-GCM
       final encryptedContent = await MessageEncryptionService.encryptMessage(
@@ -311,7 +311,7 @@ extension _ChatDetailScreenStateHandlers on _ChatDetailScreenState {
 
       final currentUserId = currentUserIdFromContext();
       final chatApiService = ChatApiService(baseUrl: ApiClient.getBaseUrl());
-      final mediaPath = '/uploads/media/${uploadedMedia.fileName}';
+      final mediaPath = uploadedMedia.filePath;  // Use backend-provided path (/api/media/{id})
       
       // Encrypt video placeholder using AES-256-GCM
       final encryptedContent = await MessageEncryptionService.encryptMessage(
